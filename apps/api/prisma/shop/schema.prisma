@@ -8,6 +8,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================================
+// LOT 1 — SOCLE BOUTIQUE ISOLÉ
+// ============================================================================
+
 model ShopLocalConfig {
   id                 String   @id @default("default") @db.VarChar(32)
   shopId             String   @map("shop_id") @db.Uuid
@@ -108,4 +112,546 @@ model ShopAuditLog {
   @@index([action, createdAt])
   @@index([declaredOperatorId, createdAt])
   @@map("shop_audit_logs")
+}
+
+// ============================================================================
+// LOT 2 — GESTION COMMERCIALE (CATALOGUE, STOCKS, ACHATS, VENTES, CAISSE, DÉPENSES, IMPORT)
+// ============================================================================
+
+model Category {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(80)
+  description String?  @db.VarChar(300)
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  products Product[]
+
+  @@index([isActive, sortOrder])
+  @@map("categories")
+}
+
+model Product {
+  id             String   @id @default(uuid()) @db.Uuid
+  categoryId     String?  @map("category_id") @db.Uuid
+  name           String   @db.VarChar(140)
+  sku            String   @unique @db.VarChar(64)
+  barcode        String?  @db.VarChar(64)
+  description    String?  @db.VarChar(2000)
+  unit           String   @default("unité") @db.VarChar(24)
+  salePriceXof   Int      @map("sale_price_xof")
+  costPriceXof   Int?     @map("cost_price_xof")
+  alertThreshold Int      @default(5) @map("alert_threshold")
+  status         String   @default("DRAFT") @db.VarChar(20)
+  imageUrls      Json     @default("[]") @map("image_urls")
+  importBatchId  String?  @map("import_batch_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  category       Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  variants       ProductVariant[]
+  stockBalances  StockBalance[]
+  stockMovements StockMovement[]
+  costHistory    ProductCostHistory[]
+  saleLines      SaleLine[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([barcode])
+  @@index([importBatchId])
+  @@map("products")
+}
+
+model ProductVariant {
+  id             String   @id @default(uuid()) @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  name           String   @db.VarChar(80)
+  sku            String?  @db.VarChar(64)
+  barcode        String?  @db.VarChar(64)
+  salePriceXof   Int?     @map("sale_price_xof")
+  costPriceXof   Int?     @map("cost_price_xof")
+  alertThreshold Int      @default(5) @map("alert_threshold")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stockBalances StockBalance[]
+
+  @@index([productId])
+  @@index([barcode])
+  @@map("product_variants")
+}
+
+model StockBalance {
+  id          String   @id @default(uuid()) @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  variantId   String?  @map("variant_id") @db.Uuid
+  variantKey  String   @default("BASE") @map("variant_key") @db.VarChar(40)
+  physicalQty Int      @default(0) @map("physical_qty")
+  reservedQty Int      @default(0) @map("reserved_qty")
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, variantKey])
+  @@index([physicalQty])
+  @@map("stock_balances")
+}
+
+model StockMovement {
+  id                   String   @id @default(uuid()) @db.Uuid
+  productId            String   @map("product_id") @db.Uuid
+  variantId            String?  @map("variant_id") @db.Uuid
+  movementType         String   @map("movement_type") @db.VarChar(32)
+  quantityDelta        Int      @map("quantity_delta")
+  qtyBefore            Int      @map("qty_before")
+  qtyAfter             Int      @map("qty_after")
+  unitCostXof          Int?     @map("unit_cost_xof")
+  referenceType        String?  @map("reference_type") @db.VarChar(40)
+  referenceId          String?  @map("reference_id") @db.VarChar(120)
+  reason               String?  @db.VarChar(500)
+  actorUserId          String?  @map("actor_user_id") @db.Uuid
+  declaredOperatorId   String?  @map("declared_operator_id") @db.Uuid
+  declaredOperatorName String?  @map("declared_operator_name") @db.VarChar(80)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([productId, createdAt])
+  @@index([movementType, createdAt])
+  @@index([referenceType, referenceId])
+  @@map("stock_movements")
+}
+
+model ProductCostHistory {
+  id                  String   @id @default(uuid()) @db.Uuid
+  productId           String   @map("product_id") @db.Uuid
+  variantId           String?  @map("variant_id") @db.Uuid
+  previousCostXof     Int?     @map("previous_cost_xof")
+  newCostXof          Int      @map("new_cost_xof")
+  receivedQty         Int      @map("received_qty")
+  receivedUnitCostXof Int      @map("received_unit_cost_xof")
+  sourceType          String   @map("source_type") @db.VarChar(40)
+  sourceId            String   @map("source_id") @db.VarChar(120)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, createdAt])
+  @@map("product_cost_history")
+}
+
+model Supplier {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String   @db.VarChar(120)
+  phone         String?  @db.VarChar(30)
+  email         String?  @db.VarChar(160)
+  address       String?  @db.VarChar(255)
+  notes         String?  @db.VarChar(500)
+  isActive      Boolean  @default(true) @map("is_active")
+  importBatchId String?  @map("import_batch_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  purchaseOrders PurchaseOrder[]
+  payments       SupplierPayment[]
+
+  @@index([isActive])
+  @@index([importBatchId])
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id                   String    @id @default(uuid()) @db.Uuid
+  poNumber             String    @unique @map("po_number") @db.VarChar(40)
+  supplierId           String    @map("supplier_id") @db.Uuid
+  status               String    @default("ORDERED") @db.VarChar(32)
+  expectedDate         DateTime? @map("expected_date") @db.Timestamptz(6)
+  notes                String?   @db.VarChar(500)
+  totalOrderedXof      Int       @default(0) @map("total_ordered_xof")
+  totalReceivedXof     Int       @default(0) @map("total_received_xof")
+  totalPaidXof         Int       @default(0) @map("total_paid_xof")
+  actorUserId          String?   @map("actor_user_id") @db.Uuid
+  declaredOperatorName String?   @map("declared_operator_name") @db.VarChar(80)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  items    PurchaseOrderItem[]
+  receipts PurchaseReceipt[]
+  payments SupplierPayment[]
+
+  @@index([supplierId, createdAt])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String  @id @default(uuid()) @db.Uuid
+  purchaseOrderId String  @map("purchase_order_id") @db.Uuid
+  productId       String  @map("product_id") @db.Uuid
+  variantId       String? @map("variant_id") @db.Uuid
+  productName     String  @map("product_name") @db.VarChar(160)
+  orderedQty      Int     @map("ordered_qty")
+  receivedQty     Int     @default(0) @map("received_qty")
+  unitCostXof     Int     @map("unit_cost_xof")
+
+  purchaseOrder PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  receiptItems  PurchaseReceiptItem[]
+
+  @@index([purchaseOrderId])
+  @@map("purchase_order_items")
+}
+
+model PurchaseReceipt {
+  id                   String   @id @default(uuid()) @db.Uuid
+  purchaseOrderId      String   @map("purchase_order_id") @db.Uuid
+  receiptNumber        String   @unique @map("receipt_number") @db.VarChar(40)
+  notes                String?  @db.VarChar(500)
+  totalCostXof         Int      @map("total_cost_xof")
+  actorUserId          String?  @map("actor_user_id") @db.Uuid
+  declaredOperatorId   String?  @map("declared_operator_id") @db.Uuid
+  declaredOperatorName String?  @map("declared_operator_name") @db.VarChar(80)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  purchaseOrder PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  items         PurchaseReceiptItem[]
+
+  @@index([purchaseOrderId])
+  @@map("purchase_receipts")
+}
+
+model PurchaseReceiptItem {
+  id                  String  @id @default(uuid()) @db.Uuid
+  purchaseReceiptId   String  @map("purchase_receipt_id") @db.Uuid
+  purchaseOrderItemId String  @map("purchase_order_item_id") @db.Uuid
+  productId           String  @map("product_id") @db.Uuid
+  variantId           String? @map("variant_id") @db.Uuid
+  receivedQty         Int     @map("received_qty")
+  unitCostXof         Int     @map("unit_cost_xof")
+
+  receipt   PurchaseReceipt   @relation(fields: [purchaseReceiptId], references: [id], onDelete: Cascade)
+  orderItem PurchaseOrderItem @relation(fields: [purchaseOrderItemId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseReceiptId])
+  @@map("purchase_receipt_items")
+}
+
+model SupplierPayment {
+  id                   String   @id @default(uuid()) @db.Uuid
+  supplierId           String   @map("supplier_id") @db.Uuid
+  purchaseOrderId      String   @map("purchase_order_id") @db.Uuid
+  amountXof            Int      @map("amount_xof")
+  paymentMethodCode    String   @map("payment_method_code") @db.VarChar(32)
+  transactionRef       String?  @map("transaction_ref") @db.VarChar(120)
+  paidFromCashDrawer   Boolean  @default(false) @map("paid_from_cash_drawer")
+  cashMovementId       String?  @map("cash_movement_id") @db.Uuid
+  notes                String?  @db.VarChar(300)
+  actorUserId          String?  @map("actor_user_id") @db.Uuid
+  declaredOperatorName String?  @map("declared_operator_name") @db.VarChar(80)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  supplier      Supplier      @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+
+  @@index([supplierId, createdAt])
+  @@index([purchaseOrderId])
+  @@map("supplier_payments")
+}
+
+model Client {
+  id             String   @id @default(uuid()) @db.Uuid
+  fullName       String   @map("full_name") @db.VarChar(120)
+  phone          String   @unique @db.VarChar(30)
+  email          String?  @db.VarChar(160)
+  address        String?  @db.VarChar(255)
+  creditLimitXof Int      @default(0) @map("credit_limit_xof")
+  notes          String?  @db.VarChar(500)
+  isBlocked      Boolean  @default(false) @map("is_blocked")
+  importBatchId  String?  @map("import_batch_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sales       Sale[]
+  receivables Receivable[]
+
+  @@index([isBlocked])
+  @@index([importBatchId])
+  @@map("clients")
+}
+
+model CashRegister {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(80)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sessions CashSession[]
+
+  @@map("cash_registers")
+}
+
+model CashSession {
+  id                   String    @id @default(uuid()) @db.Uuid
+  registerId           String    @map("register_id") @db.Uuid
+  status               String    @default("OPEN") @db.VarChar(16)
+  openingAmountXof     Int       @map("opening_amount_xof")
+  theoreticalAmountXof Int       @default(0) @map("theoretical_amount_xof")
+  countedAmountXof     Int?      @map("counted_amount_xof")
+  discrepancyXof       Int?      @map("discrepancy_xof")
+  openedByUserId       String?   @map("opened_by_user_id") @db.Uuid
+  openedByOperatorId   String?   @map("opened_by_operator_id") @db.Uuid
+  openedByOperatorName String?   @map("opened_by_operator_name") @db.VarChar(80)
+  closedByUserId       String?   @map("closed_by_user_id") @db.Uuid
+  closedByOperatorId   String?   @map("closed_by_operator_id") @db.Uuid
+  closedByOperatorName String?   @map("closed_by_operator_name") @db.VarChar(80)
+  openingNotes         String?   @map("opening_notes") @db.VarChar(300)
+  closingNotes         String?   @map("closing_notes") @db.VarChar(500)
+  openedAt             DateTime  @default(now()) @map("opened_at") @db.Timestamptz(6)
+  closedAt             DateTime? @map("closed_at") @db.Timestamptz(6)
+
+  register  CashRegister   @relation(fields: [registerId], references: [id], onDelete: Restrict)
+  movements CashMovement[]
+  sales     Sale[]
+
+  @@index([registerId, status])
+  @@index([openedAt])
+  @@map("cash_sessions")
+}
+
+model CashMovement {
+  id                   String   @id @default(uuid()) @db.Uuid
+  sessionId            String   @map("session_id") @db.Uuid
+  type                 String   @db.VarChar(32)
+  amountXof            Int      @map("amount_xof")
+  signedAmountXof      Int      @map("signed_amount_xof")
+  referenceType        String?  @map("reference_type") @db.VarChar(40)
+  referenceId          String?  @map("reference_id") @db.VarChar(120)
+  reason               String?  @db.VarChar(500)
+  actorUserId          String?  @map("actor_user_id") @db.Uuid
+  declaredOperatorId   String?  @map("declared_operator_id") @db.Uuid
+  declaredOperatorName String?  @map("declared_operator_name") @db.VarChar(80)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  session CashSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId, createdAt])
+  @@map("cash_movements")
+}
+
+model Sale {
+  id                   String    @id @default(uuid()) @db.Uuid
+  saleNumber           String    @unique @map("sale_number") @db.VarChar(40)
+  status               String    @default("COMPLETED") @db.VarChar(20)
+  clientId             String?   @map("client_id") @db.Uuid
+  cashSessionId        String?   @map("cash_session_id") @db.Uuid
+  clientOperationId    String?   @unique @map("client_operation_id") @db.VarChar(120)
+  offlineSynced        Boolean   @default(false) @map("offline_synced")
+  stockConflict        Boolean   @default(false) @map("stock_conflict")
+  grossSubtotalXof     Int       @map("gross_subtotal_xof")
+  discountTotalXof     Int       @default(0) @map("discount_total_xof")
+  taxMode              String    @default("NONE") @map("tax_mode") @db.VarChar(16)
+  taxRateBps           Int       @default(0) @map("tax_rate_bps")
+  taxTotalXof          Int       @default(0) @map("tax_total_xof")
+  roundingXof          Int       @default(0) @map("rounding_xof")
+  totalXof             Int       @map("total_xof")
+  paidAmountXof        Int       @default(0) @map("paid_amount_xof")
+  dueAmountXof         Int       @default(0) @map("due_amount_xof")
+  refundedAmountXof    Int       @default(0) @map("refunded_amount_xof")
+  notes                String?   @db.VarChar(400)
+  cancelReason         String?   @map("cancel_reason") @db.VarChar(500)
+  cancelledAt          DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelledByUserId    String?   @map("cancelled_by_user_id") @db.Uuid
+  actorUserId          String?   @map("actor_user_id") @db.Uuid
+  declaredOperatorId   String?   @map("declared_operator_id") @db.Uuid
+  declaredOperatorName String?   @map("declared_operator_name") @db.VarChar(80)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client      Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  cashSession CashSession?  @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+  lines       SaleLine[]
+  payments    SalePayment[]
+  returns     SaleReturn[]
+  refunds     SaleRefund[]
+  receivable  Receivable?
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([clientId])
+  @@map("sales")
+}
+
+model SaleLine {
+  id           String  @id @default(uuid()) @db.Uuid
+  saleId       String  @map("sale_id") @db.Uuid
+  productId    String  @map("product_id") @db.Uuid
+  variantId    String? @map("variant_id") @db.Uuid
+  productName  String  @map("product_name") @db.VarChar(160)
+  sku          String  @db.VarChar(64)
+  quantity     Int
+  returnedQty  Int     @default(0) @map("returned_qty")
+  unitPriceXof Int     @map("unit_price_xof")
+  unitCostXof  Int?    @map("unit_cost_xof")
+  discountXof  Int     @default(0) @map("discount_xof")
+  taxXof       Int     @default(0) @map("tax_xof")
+  lineTotalXof Int     @map("line_total_xof")
+
+  sale    Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  returns SaleReturn[]
+
+  @@index([saleId])
+  @@map("sale_lines")
+}
+
+model SalePayment {
+  id                String   @id @default(uuid()) @db.Uuid
+  saleId            String   @map("sale_id") @db.Uuid
+  paymentMethodCode String   @map("payment_method_code") @db.VarChar(32)
+  amountXof         Int      @map("amount_xof")
+  transactionRef    String?  @map("transaction_ref") @db.VarChar(120)
+  affectsCashDrawer Boolean  @default(false) @map("affects_cash_drawer")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@map("sale_payments")
+}
+
+model SaleReturn {
+  id                   String   @id @default(uuid()) @db.Uuid
+  saleId               String   @map("sale_id") @db.Uuid
+  saleLineId           String   @map("sale_line_id") @db.Uuid
+  productId            String   @map("product_id") @db.Uuid
+  variantId            String?  @map("variant_id") @db.Uuid
+  quantity             Int
+  condition            String   @db.VarChar(24)
+  reason               String   @db.VarChar(500)
+  actorUserId          String?  @map("actor_user_id") @db.Uuid
+  declaredOperatorId   String?  @map("declared_operator_id") @db.Uuid
+  declaredOperatorName String?  @map("declared_operator_name") @db.VarChar(80)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sale     Sale     @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  saleLine SaleLine @relation(fields: [saleLineId], references: [id], onDelete: Restrict)
+
+  @@index([saleId])
+  @@map("sale_returns")
+}
+
+model SaleRefund {
+  id                   String   @id @default(uuid()) @db.Uuid
+  saleId               String   @map("sale_id") @db.Uuid
+  amountXof            Int      @map("amount_xof")
+  paymentMethodCode    String   @map("payment_method_code") @db.VarChar(32)
+  transactionRef       String?  @map("transaction_ref") @db.VarChar(120)
+  cashMovementId       String?  @map("cash_movement_id") @db.Uuid
+  reason               String   @db.VarChar(500)
+  actorUserId          String?  @map("actor_user_id") @db.Uuid
+  declaredOperatorId   String?  @map("declared_operator_id") @db.Uuid
+  declaredOperatorName String?  @map("declared_operator_name") @db.VarChar(80)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Restrict)
+
+  @@index([saleId])
+  @@map("sale_refunds")
+}
+
+model Receivable {
+  id                 String   @id @default(uuid()) @db.Uuid
+  clientId           String   @map("client_id") @db.Uuid
+  saleId             String   @unique @map("sale_id") @db.Uuid
+  initialAmountXof   Int      @map("initial_amount_xof")
+  paidAmountXof      Int      @default(0) @map("paid_amount_xof")
+  remainingAmountXof Int      @map("remaining_amount_xof")
+  status             String   @default("OPEN") @db.VarChar(24)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client   Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  sale     Sale                @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  payments ReceivablePayment[]
+
+  @@index([clientId, status])
+  @@index([status, createdAt])
+  @@map("receivables")
+}
+
+model ReceivablePayment {
+  id                   String   @id @default(uuid()) @db.Uuid
+  receivableId         String   @map("receivable_id") @db.Uuid
+  amountXof            Int      @map("amount_xof")
+  paymentMethodCode    String   @map("payment_method_code") @db.VarChar(32)
+  transactionRef       String?  @map("transaction_ref") @db.VarChar(120)
+  cashMovementId       String?  @map("cash_movement_id") @db.Uuid
+  notes                String?  @db.VarChar(300)
+  actorUserId          String?  @map("actor_user_id") @db.Uuid
+  declaredOperatorId   String?  @map("declared_operator_id") @db.Uuid
+  declaredOperatorName String?  @map("declared_operator_name") @db.VarChar(80)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  receivable Receivable @relation(fields: [receivableId], references: [id], onDelete: Restrict)
+
+  @@index([receivableId])
+  @@map("receivable_payments")
+}
+
+model ExpenseCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(80)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  expenses Expense[]
+
+  @@map("expense_categories")
+}
+
+model Expense {
+  id                   String    @id @default(uuid()) @db.Uuid
+  categoryId           String    @map("category_id") @db.Uuid
+  amountXof            Int       @map("amount_xof")
+  expenseDate          DateTime  @default(now()) @map("expense_date") @db.Timestamptz(6)
+  paymentMethodCode    String    @default("CASH") @map("payment_method_code") @db.VarChar(32)
+  paidFromCashDrawer   Boolean   @default(true) @map("paid_from_cash_drawer")
+  cashMovementId       String?   @map("cash_movement_id") @db.Uuid
+  beneficiary          String?   @db.VarChar(120)
+  note                 String?   @db.VarChar(500)
+  status               String    @default("ACTIVE") @db.VarChar(20)
+  cancelReason         String?   @map("cancel_reason") @db.VarChar(500)
+  cancelledAt          DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  actorUserId          String?   @map("actor_user_id") @db.Uuid
+  declaredOperatorId   String?   @map("declared_operator_id") @db.Uuid
+  declaredOperatorName String?   @map("declared_operator_name") @db.VarChar(80)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  category ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([expenseDate])
+  @@index([status, expenseDate])
+  @@map("expenses")
+}
+
+model ImportBatch {
+  id               String    @id @default(uuid()) @db.Uuid
+  entityType       String    @map("entity_type") @db.VarChar(24)
+  fileName         String?   @map("file_name") @db.VarChar(160)
+  totalRows        Int       @map("total_rows")
+  importedCount    Int       @map("imported_count")
+  errorCount       Int       @map("error_count")
+  status           String    @default("COMMITTED") @db.VarChar(24)
+  createdEntityIds Json      @default("[]") @map("created_entity_ids")
+  rolledBackAt     DateTime? @map("rolled_back_at") @db.Timestamptz(6)
+  actorUserId      String?   @map("actor_user_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@map("import_batches")
 }

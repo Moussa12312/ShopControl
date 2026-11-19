@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Client } from 'pg';
 import { PrismaClient as ShopPrismaClient } from '../../generated/prisma-shop';
+import { DEFAULT_EXPENSE_CATEGORY_NAMES } from '@shopcontrol/shared';
 import { getEnv } from '../config/env.config';
 import { ControlPrismaService } from './control-prisma.service';
 import { runShopMigrations } from './shop-migration.runner';
@@ -127,6 +128,21 @@ export class ShopDatabaseManagerService implements OnModuleDestroy {
         openingHours: input.openingHours as object,
       },
     });
+
+    // Initialise la caisse principale et les catégories de dépenses par défaut dans la BDD boutique
+    await shopClient.cashRegister.upsert({
+      where: { name: 'Caisse Principale' },
+      create: { name: 'Caisse Principale', isActive: true },
+      update: {},
+    });
+
+    for (const catName of DEFAULT_EXPENSE_CATEGORY_NAMES) {
+      await shopClient.expenseCategory.upsert({
+        where: { name: catName },
+        create: { name: catName, isActive: true },
+        update: {},
+      });
+    }
 
     return { dbName: input.dbName, schemaVersion: latestVersion };
   }

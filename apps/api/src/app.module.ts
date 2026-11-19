@@ -18,6 +18,14 @@ import { AgentsModule } from './modules/agents/agents.module';
 import { OperatorsModule } from './modules/operators/operators.module';
 import { TerminalsModule } from './modules/terminals/terminals.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
+import { CashModule } from './modules/cash/cash.module';
+import { PurchasesModule } from './modules/purchases/purchases.module';
+import { ClientsModule } from './modules/clients/clients.module';
+import { SalesModule } from './modules/sales/sales.module';
+import { ExpensesModule } from './modules/expenses/expenses.module';
+import { ImportsModule } from './modules/imports/imports.module';
 
 @Module({
   imports: [
@@ -40,6 +48,14 @@ import { AdminModule } from './modules/admin/admin.module';
     TerminalsModule,
     AdminModule,
     AuditModule,
+    InventoryModule,
+    CatalogModule,
+    CashModule,
+    PurchasesModule,
+    ClientsModule,
+    SalesModule,
+    ExpensesModule,
+    ImportsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

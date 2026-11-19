@@ -69,6 +69,7 @@ model Merchant {
   supportAccessGrants SupportAccessGrant[]
   notifications       Notification[]
   auditLogs           AuditLog[]
+  companyExpenses     CompanyExpense[]
 
   @@index([status])
   @@index([createdAt])
@@ -268,4 +269,26 @@ model AuditLog {
   @@index([actorUserId, createdAt])
   @@index([action, createdAt])
   @@map("audit_logs")
+}
+
+model CompanyExpense {
+  id                String    @id @default(uuid()) @db.Uuid
+  merchantId        String    @map("merchant_id") @db.Uuid
+  categoryName      String    @map("category_name") @db.VarChar(80)
+  amountXof         Int       @map("amount_xof")
+  expenseDate       DateTime  @default(now()) @map("expense_date") @db.Timestamptz(6)
+  paymentMethodCode String    @default("BANK") @map("payment_method_code") @db.VarChar(32)
+  beneficiary       String?   @db.VarChar(120)
+  note              String?   @db.VarChar(500)
+  status            String    @default("ACTIVE") @db.VarChar(20)
+  cancelReason      String?   @map("cancel_reason") @db.VarChar(500)
+  cancelledAt       DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  actorUserId       String    @map("actor_user_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+
+  @@index([merchantId, expenseDate])
+  @@index([merchantId, status])
+  @@map("company_expenses")
 }
