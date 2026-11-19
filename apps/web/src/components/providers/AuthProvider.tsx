@@ -128,11 +128,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      if (localMeta?.activeOperatorId && localMeta?.activeOperatorName) {
+      if (data.user.role === 'AGENT' && localMeta?.activeOperatorId && localMeta?.activeOperatorName) {
         setActiveOperatorState({
           id: localMeta.activeOperatorId,
           firstName: localMeta.activeOperatorName,
         });
+      } else {
+        setActiveOperatorState(null);
       }
     } catch {
       setUser(null);

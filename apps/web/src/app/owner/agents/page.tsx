@@ -74,10 +74,10 @@ export default function OwnerAgentsPage() {
   useEffect(() => {
     if (selectedShopId !== 'ALL') {
       setTargetShopId(selectedShopId);
-    } else if (!targetShopId && shops[0]) {
-      setTargetShopId(shops[0].shopId);
+    } else if (shops[0]) {
+      setTargetShopId((prev) => (prev && shops.some((s) => s.shopId === prev) ? prev : shops[0].shopId));
     }
-  }, [selectedShopId, shops, targetShopId]);
+  }, [selectedShopId, shops]);
 
   const domains = useMemo(() => {
     const map = new Map<string, typeof PERMISSION_CATALOG>();

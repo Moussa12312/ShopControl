@@ -2,11 +2,41 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Laptop, ShieldCheck } from 'lucide-react';
-import { formatDateTimeInTimezone } from '@shopcontrol/shared';
+import {
+  Building2,
+  CheckCircle2,
+  Crown,
+  ExternalLink,
+  Laptop,
+  LifeBuoy,
+  MessageSquarePlus,
+  QrCode,
+  Receipt,
+  Save,
+  Send,
+  ShieldCheck,
+  Store,
+  Truck,
+} from 'lucide-react';
+import {
+  DEFAULT_DELIVERY_CONFIG,
+  DEFAULT_RECEIPT_SETTINGS,
+  formatDateTimeInTimezone,
+  formatXof,
+  PLATFORM_MODULE_LABELS,
+  PlatformModuleKey,
+  SUBSCRIPTION_PLAN_LABELS,
+  SubscriptionPlan,
+  SUPPORT_TICKET_STATUS_LABELS,
+  SupportTicketStatus,
+  TAX_MODES,
+  TaxMode,
+} from '@shopcontrol/shared';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { AppShell } from '@/components/layout/AppShell';
+import { ImageUploader } from '@/components/ui/ImageUploader';
+import { ShopQrModal } from '@/components/commerce/ShopQrModal';
 import { ErrorState, LoadingSkeleton, StatusBadge } from '@/components/ui/StateViews';
 
 interface MerchantProfile {
@@ -29,6 +59,22 @@ interface MerchantProfile {
   }>;
 }
 
+interface ShopDetail {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  timezone: string;
+  taxMode: TaxMode;
+  defaultTaxRateBps: number;
+  status: string;
+  receiptSettings?: Record<string, any> | null;
+  deliveryConfig?: Record<string, any> | null;
+}
+
 interface SessionRow {
   id: string;
   deviceName: string;
@@ -37,64 +83,270 @@ interface SessionRow {
   isCurrent: boolean;
 }
 
+interface SubscriptionPayload {
+  subscription: {
+    planCode: SubscriptionPlan;
+    monthlyPriceXof: number;
+    maxShops: number;
+    maxAgentsPerShop: number;
+    enabledModules: PlatformModuleKey[];
+    currentPeriodEnd: string;
+  };
+  payments: Array<{
+    id: string;
+    amountXof: number;
+    paymentMethodCode: string;
+    periodLabel: string;
+    reference: string | null;
+    paidAt: string;
+  }>;
+}
+
+interface SupportTicketRow {
+  id: string;
+  ticketNumber: string;
+  subject: string;
+  priority: string;
+  status: SupportTicketStatus;
+  createdAt: string;
+  messages: Array<{
+    id: string;
+    senderRole: string;
+    senderName: string;
+    body: string;
+    createdAt: string;
+  }>;
+}
+
 export default function OwnerSettingsPage() {
-  const { user, refreshMe, supportGrantId } = useAuth();
+  const { user, shops, selectedShopId, refreshMe, supportGrantId } = useAuth();
+  const [tab, setTab] = useState<'shop' | 'company' | 'security'>('shop');
+
   const [profile, setProfile] = useState<MerchantProfile | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [subData, setSubData] = useState<SubscriptionPayload | null>(null);
+  const [tickets, setTickets] = useState<SupportTicketRow[]>([]);
+  const [shopList, setShopList] = useState<ShopDetail[]>([]);
+  const [activeShopId, setActiveShopId] = useState<string>('');
+  const [qrOpen, setQrOpen] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const [form, setForm] = useState({ name: '', legalName: '', phone: '', email: '' });
+  // Formulaire Entreprise
+  const [companyForm, setCompanyForm] = useState({ name: '', legalName: '', phone: '', email: '' });
+
+  // Formulaire Boutique + Logo + Ticket + Livraison
+  const [shopForm, setShopForm] = useState({
+    name: '',
+    slug: '',
+    logoUrl: null as string | null,
+    phone: '',
+    email: '',
+    address: '',
+    taxMode: 'NONE' as TaxMode,
+    taxRatePercent: 0,
+    slogan: '',
+    headerText: '',
+    footerText: DEFAULT_RECEIPT_SETTINGS.footerText,
+    legalNotice: DEFAULT_RECEIPT_SETTINGS.legalNotice,
+    showLogo: true,
+    paperWidthMm: 80 as 58 | 80,
+    pickupEnabled: true,
+    deliveryEnabled: true,
+    defaultDeliveryFeeXof: 1000,
+    whatsappNumber: '',
+    allowOutOfHoursOrders: true,
+    outOfHoursMessage: DEFAULT_DELIVERY_CONFIG.outOfHoursMessage,
+    maxOrderQty: 100,
+    maxOrderAmountXof: 5_000_000,
+  });
+
+  // Nouveau ticket support
+  const [ticketForm, setTicketForm] = useState({ subject: '', priority: 'INFO', message: '' });
+  const [replyByTicket, setReplyByTicket] = useState<Record<string, string>>({});
+
+  const hydrateShopForm = useCallback((s: ShopDetail) => {
+    const r = { ...DEFAULT_RECEIPT_SETTINGS, ...(s.receiptSettings || {}) };
+    const d = { ...DEFAULT_DELIVERY_CONFIG, ...(s.deliveryConfig || {}) };
+    setShopForm({
+      name: s.name || '',
+      slug: s.slug || '',
+      logoUrl: s.logoUrl || null,
+      phone: s.phone || '',
+      email: s.email || '',
+      address: s.address || '',
+      taxMode: s.taxMode || 'NONE',
+      taxRatePercent: Number(((s.defaultTaxRateBps || 0) / 100).toFixed(2)),
+      slogan: r.slogan || '',
+      headerText: r.headerText || '',
+      footerText: r.footerText || DEFAULT_RECEIPT_SETTINGS.footerText,
+      legalNotice: r.legalNotice || DEFAULT_RECEIPT_SETTINGS.legalNotice,
+      showLogo: r.showLogo !== false,
+      paperWidthMm: r.paperWidthMm === 58 ? 58 : 80,
+      pickupEnabled: d.pickupEnabled !== false,
+      deliveryEnabled: d.deliveryEnabled !== false,
+      defaultDeliveryFeeXof: Number(d.defaultDeliveryFeeXof ?? 1000),
+      whatsappNumber: d.whatsappNumber || '',
+      allowOutOfHoursOrders: d.allowOutOfHoursOrders !== false,
+      outOfHoursMessage: d.outOfHoursMessage || DEFAULT_DELIVERY_CONFIG.outOfHoursMessage,
+      maxOrderQty: Number(d.maxOrderQty ?? 100),
+      maxOrderAmountXof: Number(d.maxOrderAmountXof ?? 5_000_000),
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [p, s] = await Promise.all([
+      const [p, s, sh, sub, tks] = await Promise.all([
         apiFetch<MerchantProfile>('/merchant', { supportGrantId }),
         apiFetch<SessionRow[]>('/auth/sessions'),
+        apiFetch<ShopDetail[]>('/shops', { supportGrantId }),
+        apiFetch<SubscriptionPayload>('/merchant/subscription').catch(() => null),
+        apiFetch<SupportTicketRow[]>('/support/tickets').catch(() => []),
       ]);
       setProfile(p);
       setSessions(s);
-      setForm({
+      setShopList(sh);
+      setSubData(sub);
+      setTickets(tks);
+      setCompanyForm({
         name: p.name,
         legalName: p.legalName || '',
         phone: p.phone,
         email: p.email,
       });
+
+      if (sh.length > 0) {
+        const preferred =
+          (activeShopId && sh.find((x) => x.id === activeShopId)) ||
+          (selectedShopId !== 'ALL' && sh.find((x) => x.id === selectedShopId)) ||
+          sh[0];
+        setActiveShopId(preferred.id);
+        hydrateShopForm(preferred);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur de chargement des paramètres.');
     } finally {
       setLoading(false);
     }
-  }, [supportGrantId]);
+  }, [supportGrantId, selectedShopId, activeShopId, hydrateShopForm]);
 
   useEffect(() => {
     void load();
-  }, [load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supportGrantId]);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSelectShop = (id: string) => {
+    setActiveShopId(id);
+    const found = shopList.find((s) => s.id === id);
+    if (found) hydrateShopForm(found);
+    setSavedMsg(null);
+  };
+
+  const handleSaveShop = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeShopId) return;
+    setBusy(true);
+    setSavedMsg(null);
+    setError(null);
+    try {
+      const updated = await apiFetch<ShopDetail>(`/shops/${activeShopId}`, {
+        method: 'PATCH',
+        shopId: activeShopId,
+        body: {
+          name: shopForm.name.trim(),
+          slug: shopForm.slug.trim(),
+          logoUrl: shopForm.logoUrl,
+          phone: shopForm.phone.trim() || undefined,
+          email: shopForm.email.trim() || '',
+          address: shopForm.address.trim() || undefined,
+          taxMode: shopForm.taxMode,
+          defaultTaxRateBps: Math.round((Number(shopForm.taxRatePercent) || 0) * 100),
+          receiptSettings: {
+            slogan: shopForm.slogan.trim(),
+            headerText: shopForm.headerText.trim(),
+            footerText: shopForm.footerText.trim(),
+            legalNotice: shopForm.legalNotice.trim(),
+            showLogo: shopForm.showLogo,
+            paperWidthMm: shopForm.paperWidthMm,
+          },
+          deliveryConfig: {
+            pickupEnabled: shopForm.pickupEnabled,
+            deliveryEnabled: shopForm.deliveryEnabled,
+            defaultDeliveryFeeXof: Math.max(0, Math.round(Number(shopForm.defaultDeliveryFeeXof) || 0)),
+            deliveryZones: [],
+            allowOutOfHoursOrders: shopForm.allowOutOfHoursOrders,
+            outOfHoursMessage: shopForm.outOfHoursMessage.trim(),
+            whatsappNumber: shopForm.whatsappNumber.trim(),
+            maxOrderQty: Math.max(1, Math.round(Number(shopForm.maxOrderQty) || 100)),
+            maxOrderAmountXof: Math.max(0, Math.round(Number(shopForm.maxOrderAmountXof) || 5_000_000)),
+            maxOrdersPerPhonePerHour: 5,
+          },
+        },
+      });
+      setShopList((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
+      await refreshMe();
+      setSavedMsg('Logo et informations de la boutique enregistrés avec succès !');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Enregistrement boutique impossible.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setSavedMsg(null);
+    setError(null);
     try {
       await apiFetch('/merchant', {
         method: 'PATCH',
         body: {
-          name: form.name,
-          legalName: form.legalName.trim() || null,
-          phone: form.phone,
-          email: form.email,
+          name: companyForm.name,
+          legalName: companyForm.legalName.trim() || null,
+          phone: companyForm.phone,
+          email: companyForm.email,
         },
       });
       await Promise.all([load(), refreshMe()]);
-      setSavedMsg('Paramètres enregistrés avec succès.');
+      setSavedMsg('Fiche entreprise enregistrée.');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Mise à jour impossible.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleCreateTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch('/support/tickets', { method: 'POST', body: ticketForm });
+      setTicketForm({ subject: '', priority: 'INFO', message: '' });
+      await load();
+      setSavedMsg('Ticket support envoyé à l’équipe ShopControl.');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Impossible de créer le ticket.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReplyTicket = async (ticketId: string) => {
+    const body = (replyByTicket[ticketId] || '').trim();
+    if (!body) return;
+    try {
+      await apiFetch(`/support/tickets/${ticketId}/reply`, { method: 'POST', body: { body } });
+      setReplyByTicket((prev) => ({ ...prev, [ticketId]: '' }));
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Envoi impossible.');
     }
   };
 
@@ -103,168 +355,751 @@ export default function OwnerSettingsPage() {
     await load();
   };
 
+  const currentShop = shopList.find((s) => s.id === activeShopId) || null;
+
   return (
     <AppShell allowedRoles={['OWNER']}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Paramètres entreprise & sécurité</h1>
-          <p className="text-sm text-slate-600">
-            Informations commerciales, double authentification, sessions actives et transparence des
-            accès support.
-          </p>
+        {/* En-tête + Onglets */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+              Paramètres, Logo & Boutique
+            </h1>
+            <p className="text-sm text-slate-600">
+              Personnalisez l’identité visuelle (logo, coordonnées, tickets, vitrine QR), votre abonnement et votre sécurité.
+            </p>
+          </div>
+
+          <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-xs">
+            {(
+              [
+                { id: 'shop', label: 'Logo & Boutique', icon: Store },
+                { id: 'company', label: 'Entreprise & SaaS', icon: Building2 },
+                { id: 'security', label: 'Sécurité', icon: ShieldCheck },
+              ] as const
+            ).map((t) => {
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => {
+                    setTab(t.id);
+                    setSavedMsg(null);
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+                    tab === t.id
+                      ? 'bg-forest-900 text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
+        {savedMsg ? (
+          <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span>{savedMsg}</span>
+          </div>
+        ) : null}
+
+        {error ? <ErrorState message={error} onRetry={load} /> : null}
+
         {loading ? (
-          <LoadingSkeleton rows={5} />
-        ) : error ? (
-          <ErrorState message={error} onRetry={load} />
-        ) : profile ? (
-          <div className="grid gap-6 lg:grid-cols-2">
-            <form
-              onSubmit={handleSave}
-              className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold text-slate-900">Fiche entreprise</h2>
-                <StatusBadge status={profile.status} />
+          <LoadingSkeleton rows={6} />
+        ) : tab === 'shop' ? (
+          shopList.length === 0 ? (
+            <div className="sc-card p-8 text-center">
+              <p className="text-sm font-semibold text-slate-700">
+                Aucune boutique créée pour le moment.
+              </p>
+              <Link href="/owner/shops" className="sc-btn-primary mt-3 inline-flex">
+                Créer ma première boutique
+              </Link>
+            </div>
+          ) : (
+            <form onSubmit={handleSaveShop} className="space-y-5">
+              {/* Sélecteur de boutique + raccourcis QR / Vitrine */}
+              <div className="sc-card flex flex-wrap items-center justify-between gap-3 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Boutique configurée :
+                  </span>
+                  {shopList.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => handleSelectShop(s.id)}
+                      className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                        activeShopId === s.id
+                          ? 'bg-forest-900 text-white'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {s.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={s.logoUrl} alt="" className="h-4 w-4 rounded-full object-cover" />
+                      ) : null}
+                      <span>{s.name}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {currentShop ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setQrOpen(true)}
+                      className="sc-btn-lime px-3.5 py-2 text-xs"
+                    >
+                      <QrCode className="h-3.5 w-3.5" />
+                      QR Code & Affiche
+                    </button>
+                    <a
+                      href={`/s/${shopForm.slug || currentShop.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="sc-btn-ghost px-3 py-2 text-xs"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Voir la vitrine
+                    </a>
+                  </div>
+                ) : null}
               </div>
 
-              {savedMsg ? (
-                <p className="rounded-xl bg-emerald-50 p-3 text-xs font-medium text-emerald-800">
-                  {savedMsg}
-                </p>
-              ) : null}
+              <div className="grid gap-5 lg:grid-cols-12">
+                {/* Colonne gauche : Logo & Identité + Aperçu live */}
+                <div className="space-y-5 lg:col-span-5">
+                  <section className="sc-card space-y-4 p-5">
+                    <div className="flex items-center gap-2">
+                      <Store className="h-5 w-5 text-brand-700" />
+                      <h2 className="text-base font-extrabold text-slate-900">
+                        Logo & Identité visuelle
+                      </h2>
+                    </div>
 
+                    <ImageUploader
+                      purpose="logo"
+                      aspect="wide"
+                      label="Logo officiel de la boutique"
+                      hint="Utilisé sur votre vitrine QR publique, votre affiche QR et l’en-tête des tickets de caisse / PDF."
+                      value={shopForm.logoUrl}
+                      onChange={(url) => setShopForm((f) => ({ ...f, logoUrl: url }))}
+                    />
+
+                    {/* Aperçu temps réel vitrine & ticket */}
+                    <div className="rounded-2xl border border-slate-200 bg-forest-950 p-4 text-white">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-limeglow-400">
+                        Aperçu en-tête vitrine & affiche QR
+                      </p>
+                      <div className="mt-3 flex items-center gap-3">
+                        {shopForm.logoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={shopForm.logoUrl}
+                            alt={shopForm.name}
+                            className="h-14 w-14 rounded-2xl bg-white object-contain p-1.5"
+                          />
+                        ) : (
+                          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-lg font-black text-limeglow-400">
+                            {(shopForm.name || 'SC').slice(0, 2).toUpperCase()}
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-extrabold text-white">
+                            {shopForm.name || 'Ma Boutique'}
+                          </p>
+                          <p className="truncate text-xs text-emerald-200/80">
+                            {shopForm.slogan || 'Votre boutique connectée ShopControl'}
+                          </p>
+                          <p className="mt-0.5 truncate text-[11px] text-emerald-200/60">
+                            {[shopForm.address, shopForm.phone].filter(Boolean).join(' · ') ||
+                              'Adresse & téléphone à renseigner'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Configuration Tickets thermiques & PDF */}
+                  <section className="sc-card space-y-3.5 p-5">
+                    <div className="flex items-center gap-2">
+                      <Receipt className="h-5 w-5 text-brand-700" />
+                      <h2 className="text-base font-extrabold text-slate-900">
+                        Tickets de caisse & PDF
+                      </h2>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">
+                          Largeur imprimante
+                        </label>
+                        <select
+                          value={shopForm.paperWidthMm}
+                          onChange={(e) =>
+                            setShopForm({ ...shopForm, paperWidthMm: Number(e.target.value) as 58 | 80 })
+                          }
+                          className="sc-input mt-1"
+                        >
+                          <option value={80}>80 mm (Standard)</option>
+                          <option value={58}>58 mm (Mobile / Bluetooth)</option>
+                        </select>
+                      </div>
+                      <label className="mt-5 flex items-center gap-2 rounded-xl border border-slate-200 bg-porcelain-50 px-3 py-2 text-xs font-semibold text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={shopForm.showLogo}
+                          onChange={(e) => setShopForm({ ...shopForm, showLogo: e.target.checked })}
+                          className="h-4 w-4 rounded accent-brand-700"
+                        />
+                        Afficher le logo
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Texte en-tête ticket
+                      </label>
+                      <input
+                        value={shopForm.headerText}
+                        onChange={(e) => setShopForm({ ...shopForm, headerText: e.target.value })}
+                        placeholder="Ex. NIF / RCCM ou message de bienvenue"
+                        className="sc-input mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Message pied de ticket
+                      </label>
+                      <input
+                        value={shopForm.footerText}
+                        onChange={(e) => setShopForm({ ...shopForm, footerText: e.target.value })}
+                        className="sc-input mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Mention commerciale / légale
+                      </label>
+                      <input
+                        value={shopForm.legalNotice}
+                        onChange={(e) => setShopForm({ ...shopForm, legalNotice: e.target.value })}
+                        className="sc-input mt-1"
+                      />
+                    </div>
+                  </section>
+                </div>
+
+                {/* Colonne droite : Informations boutique + Vitrine & Livraison */}
+                <div className="space-y-5 lg:col-span-7">
+                  <section className="sc-card space-y-4 p-5">
+                    <h2 className="text-base font-extrabold text-slate-900">
+                      Informations générales de la boutique
+                    </h2>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">
+                          Nom de la boutique *
+                        </label>
+                        <input
+                          required
+                          value={shopForm.name}
+                          onChange={(e) => setShopForm({ ...shopForm, name: e.target.value })}
+                          className="sc-input mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">
+                          Lien public (slug) *
+                        </label>
+                        <div className="mt-1 flex items-center rounded-xl border border-slate-200 bg-porcelain-50 px-3">
+                          <span className="text-xs font-semibold text-slate-400">/s/</span>
+                          <input
+                            required
+                            value={shopForm.slug}
+                            onChange={(e) => setShopForm({ ...shopForm, slug: e.target.value })}
+                            className="w-full bg-transparent py-2.5 pl-1 font-mono text-sm text-slate-900 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Slogan / Description courte (affiché en haut de votre vitrine)
+                      </label>
+                      <input
+                        value={shopForm.slogan}
+                        onChange={(e) => setShopForm({ ...shopForm, slogan: e.target.value })}
+                        placeholder="Ex. Mode & Prêt-à-porter haut de gamme à Bamako"
+                        className="sc-input mt-1"
+                      />
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">Téléphone</label>
+                        <input
+                          value={shopForm.phone}
+                          onChange={(e) => setShopForm({ ...shopForm, phone: e.target.value })}
+                          placeholder="+223 70 00 00 00"
+                          className="sc-input mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">
+                          WhatsApp boutique
+                        </label>
+                        <input
+                          value={shopForm.whatsappNumber}
+                          onChange={(e) => setShopForm({ ...shopForm, whatsappNumber: e.target.value })}
+                          placeholder="+223 70 00 00 00"
+                          className="sc-input mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">E-mail</label>
+                        <input
+                          type="email"
+                          value={shopForm.email}
+                          onChange={(e) => setShopForm({ ...shopForm, email: e.target.value })}
+                          className="sc-input mt-1"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Adresse physique / Quartier
+                      </label>
+                      <input
+                        value={shopForm.address}
+                        onChange={(e) => setShopForm({ ...shopForm, address: e.target.value })}
+                        placeholder="Ex. Hamdallaye ACI 2000, Rue 312, Bamako"
+                        className="sc-input mt-1"
+                      />
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">Mode fiscal / TVA</label>
+                        <select
+                          value={shopForm.taxMode}
+                          onChange={(e) => setShopForm({ ...shopForm, taxMode: e.target.value as TaxMode })}
+                          className="sc-input mt-1"
+                        >
+                          {TAX_MODES.map((m) => (
+                            <option key={m} value={m}>
+                              {m === 'NONE'
+                                ? 'Sans taxe (exonéré / forfait)'
+                                : m === 'TTC'
+                                  ? 'Prix TTC (taxe incluse)'
+                                  : 'Prix HT (taxe ajoutée)'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">
+                          Taux TVA (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          min={0}
+                          max={50}
+                          disabled={shopForm.taxMode === 'NONE'}
+                          value={shopForm.taxRatePercent}
+                          onChange={(e) =>
+                            setShopForm({ ...shopForm, taxRatePercent: Number(e.target.value) })
+                          }
+                          className="sc-input mt-1 tabular disabled:bg-slate-100"
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Paramètres Vitrine QR & Livraison */}
+                  <section className="sc-card space-y-4 p-5">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-5 w-5 text-brand-700" />
+                      <h2 className="text-base font-extrabold text-slate-900">
+                        Vitrine QR, Livraison & Protection Anti-abus
+                      </h2>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-porcelain-50 p-3 text-xs font-bold text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={shopForm.pickupEnabled}
+                          onChange={(e) =>
+                            setShopForm({ ...shopForm, pickupEnabled: e.target.checked })
+                          }
+                          className="h-4 w-4 accent-brand-700"
+                        />
+                        Autoriser le retrait en boutique
+                      </label>
+                      <label className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-porcelain-50 p-3 text-xs font-bold text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={shopForm.deliveryEnabled}
+                          onChange={(e) =>
+                            setShopForm({ ...shopForm, deliveryEnabled: e.target.checked })
+                          }
+                          className="h-4 w-4 accent-brand-700"
+                        />
+                        Proposer la livraison client
+                      </label>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">
+                          Frais livraison (XOF)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={shopForm.defaultDeliveryFeeXof}
+                          onChange={(e) =>
+                            setShopForm({
+                              ...shopForm,
+                              defaultDeliveryFeeXof: Number(e.target.value),
+                            })
+                          }
+                          className="sc-input mt-1 tabular"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">
+                          Qté max / commande
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={shopForm.maxOrderQty}
+                          onChange={(e) =>
+                            setShopForm({ ...shopForm, maxOrderQty: Number(e.target.value) })
+                          }
+                          className="sc-input mt-1 tabular"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">
+                          Plafond commande (XOF)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={shopForm.maxOrderAmountXof}
+                          onChange={(e) =>
+                            setShopForm({
+                              ...shopForm,
+                              maxOrderAmountXof: Number(e.target.value),
+                            })
+                          }
+                          className="sc-input mt-1 tabular"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      {!supportGrantId ? (
+                        <button type="submit" disabled={busy} className="sc-btn-primary px-6">
+                          <Save className="h-4 w-4" />
+                          {busy ? 'Enregistrement…' : 'Enregistrer le logo & les infos boutique'}
+                        </button>
+                      ) : null}
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </form>
+          )
+        ) : tab === 'company' && profile ? (
+          <div className="grid gap-6 lg:grid-cols-12">
+            {/* Fiche Entreprise */}
+            <form onSubmit={handleSaveCompany} className="sc-card space-y-4 p-6 lg:col-span-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-extrabold text-slate-900">Fiche entreprise</h2>
+                <StatusBadge status={profile.status} />
+              </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700">Nom commercial</label>
+                <label className="block text-xs font-semibold text-slate-700">Nom commercial</label>
                 <input
                   required
                   disabled={Boolean(supportGrantId)}
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+                  value={companyForm.name}
+                  onChange={(e) => setCompanyForm({ ...companyForm, name: e.target.value })}
+                  className="sc-input mt-1 disabled:bg-slate-50"
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-medium text-slate-700">Raison sociale</label>
+                <label className="block text-xs font-semibold text-slate-700">Raison sociale</label>
                 <input
                   disabled={Boolean(supportGrantId)}
-                  value={form.legalName}
-                  onChange={(e) => setForm({ ...form, legalName: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+                  value={companyForm.legalName}
+                  onChange={(e) => setCompanyForm({ ...companyForm, legalName: e.target.value })}
+                  className="sc-input mt-1 disabled:bg-slate-50"
                 />
               </div>
-
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700">Téléphone</label>
+                  <label className="block text-xs font-semibold text-slate-700">Téléphone</label>
                   <input
                     required
                     disabled={Boolean(supportGrantId)}
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+                    value={companyForm.phone}
+                    onChange={(e) => setCompanyForm({ ...companyForm, phone: e.target.value })}
+                    className="sc-input mt-1 disabled:bg-slate-50"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700">E-mail</label>
+                  <label className="block text-xs font-semibold text-slate-700">E-mail</label>
                   <input
                     type="email"
                     required
                     disabled={Boolean(supportGrantId)}
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+                    value={companyForm.email}
+                    onChange={(e) => setCompanyForm({ ...companyForm, email: e.target.value })}
+                    className="sc-input mt-1 disabled:bg-slate-50"
                   />
                 </div>
               </div>
-
               {!supportGrantId ? (
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="rounded-xl bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
-                >
-                  {busy ? 'Enregistrement…' : 'Enregistrer les modifications'}
+                <button type="submit" disabled={busy} className="sc-btn-primary">
+                  <Save className="h-4 w-4" />
+                  Enregistrer l’entreprise
                 </button>
               ) : null}
             </form>
 
-            <div className="space-y-6">
-              <section className="rounded-2xl border border-slate-200 bg-white p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-5 w-5 text-brand-700" />
-                    <h2 className="text-base font-semibold text-slate-900">
-                      Double authentification (2FA)
-                    </h2>
-                  </div>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      user?.totpEnabled
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {user?.totpEnabled ? 'Activé' : 'Inactif'}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs text-slate-600">
-                  Protégez l’accès à votre compte Propriétaire avec un code TOTP à 6 chiffres.
-                </p>
-                {!user?.totpEnabled && !supportGrantId ? (
-                  <Link
-                    href="/setup-2fa"
-                    className="mt-4 inline-flex rounded-xl border border-brand-700 px-3.5 py-2 text-xs font-semibold text-brand-800 hover:bg-brand-50"
-                  >
-                    Activer le 2FA maintenant
-                  </Link>
-                ) : null}
-              </section>
-
-              <section className="rounded-2xl border border-slate-200 bg-white p-6">
-                <div className="mb-3 flex items-center gap-2">
-                  <Laptop className="h-5 w-5 text-slate-500" />
-                  <h2 className="text-base font-semibold text-slate-900">Mes sessions actives</h2>
-                </div>
-                <div className="space-y-2">
-                  {sessions.map((s) => (
-                    <div
-                      key={s.id}
-                      className="flex items-center justify-between rounded-xl border border-slate-200 p-3 text-xs"
-                    >
-                      <div>
-                        <p className="font-semibold text-slate-900">
-                          {s.deviceName}{' '}
-                          {s.isCurrent ? (
-                            <span className="ml-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700">
-                              Session actuelle
-                            </span>
-                          ) : null}
-                        </p>
-                        <p className="text-slate-500">
-                          IP : {s.ipAddress || '—'} · Actif : {formatDateTimeInTimezone(s.lastActiveAt)}
-                        </p>
-                      </div>
-                      {!s.isCurrent ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRevokeSession(s.id)}
-                          className="rounded-lg bg-red-50 px-2.5 py-1 font-semibold text-red-700 hover:bg-red-100"
-                        >
-                          Déconnecter
-                        </button>
-                      ) : null}
+            {/* Abonnement SaaS & Support Plateforme */}
+            <div className="space-y-6 lg:col-span-7">
+              {subData ? (
+                <section className="sc-card space-y-4 p-6">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Crown className="h-5 w-5 text-amber-500" />
+                      <h2 className="text-base font-extrabold text-slate-900">
+                        Mon abonnement ShopControl
+                      </h2>
                     </div>
-                  ))}
+                    <span className="rounded-full bg-forest-900 px-3 py-1 text-xs font-bold text-limeglow-400">
+                      {SUBSCRIPTION_PLAN_LABELS[subData.subscription.planCode]}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-porcelain-50 p-3">
+                      <p className="text-[11px] text-slate-500">Tarif mensuel</p>
+                      <p className="text-base font-extrabold text-slate-900 tabular">
+                        {formatXof(subData.subscription.monthlyPriceXof)}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-porcelain-50 p-3">
+                      <p className="text-[11px] text-slate-500">Quota boutiques</p>
+                      <p className="text-base font-extrabold text-slate-900 tabular">
+                        {shops.length} / {subData.subscription.maxShops}
+                      </p>
+                    </div>
+                    <div className="col-span-2 rounded-2xl bg-porcelain-50 p-3 sm:col-span-1">
+                      <p className="text-[11px] text-slate-500">Agents / boutique</p>
+                      <p className="text-base font-extrabold text-slate-900 tabular">
+                        max {subData.subscription.maxAgentsPerShop}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {subData.subscription.enabledModules.map((mod) => (
+                      <span
+                        key={mod}
+                        className="rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-semibold text-brand-800"
+                      >
+                        ✓ {PLATFORM_MODULE_LABELS[mod] || mod}
+                      </span>
+                    ))}
+                  </div>
+
+                  {subData.payments.length > 0 ? (
+                    <div className="border-t border-slate-100 pt-3">
+                      <p className="mb-2 text-xs font-bold text-slate-700">
+                        Derniers paiements plateforme
+                      </p>
+                      <div className="space-y-1.5 text-xs">
+                        {subData.payments.slice(0, 5).map((p) => (
+                          <div
+                            key={p.id}
+                            className="flex items-center justify-between rounded-xl bg-porcelain-50 px-3 py-2"
+                          >
+                            <span>
+                              <strong>{p.periodLabel}</strong> · {p.paymentMethodCode}
+                              {p.reference ? ` (${p.reference})` : ''}
+                            </span>
+                            <span className="font-bold text-emerald-700 tabular">
+                              {formatXof(p.amountXof)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {/* Tickets Support */}
+              <section className="sc-card space-y-4 p-6">
+                <div className="flex items-center gap-2">
+                  <LifeBuoy className="h-5 w-5 text-brand-700" />
+                  <h2 className="text-base font-extrabold text-slate-900">
+                    Support & Assistance Plateforme
+                  </h2>
+                </div>
+
+                {!supportGrantId ? (
+                  <form onSubmit={handleCreateTicket} className="space-y-2.5 rounded-2xl bg-porcelain-50 p-4">
+                    <p className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                      <MessageSquarePlus className="h-4 w-4 text-brand-600" />
+                      Ouvrir un nouveau ticket d’assistance
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <input
+                        required
+                        minLength={4}
+                        value={ticketForm.subject}
+                        onChange={(e) => setTicketForm({ ...ticketForm, subject: e.target.value })}
+                        placeholder="Objet de votre demande…"
+                        className="sc-input sm:col-span-2"
+                      />
+                      <select
+                        value={ticketForm.priority}
+                        onChange={(e) => setTicketForm({ ...ticketForm, priority: e.target.value })}
+                        className="sc-input"
+                      >
+                        <option value="INFO">Normal</option>
+                        <option value="WARNING">Important</option>
+                        <option value="URGENT">Urgent</option>
+                      </select>
+                    </div>
+                    <textarea
+                      required
+                      minLength={5}
+                      rows={2}
+                      value={ticketForm.message}
+                      onChange={(e) => setTicketForm({ ...ticketForm, message: e.target.value })}
+                      placeholder="Décrivez votre question ou besoin…"
+                      className="sc-input"
+                    />
+                    <button type="submit" disabled={busy} className="sc-btn-primary text-xs">
+                      <Send className="h-3.5 w-3.5" />
+                      Envoyer au support
+                    </button>
+                  </form>
+                ) : null}
+
+                <div className="space-y-3">
+                  {tickets.length === 0 ? (
+                    <p className="text-xs text-slate-400">Aucun ticket support ouvert.</p>
+                  ) : (
+                    tickets.map((t) => (
+                      <div key={t.id} className="rounded-2xl border border-slate-200 p-3.5 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-bold text-slate-900">
+                            <span className="font-mono text-brand-700">{t.ticketNumber}</span> ·{' '}
+                            {t.subject}
+                          </p>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700">
+                            {SUPPORT_TICKET_STATUS_LABELS[t.status] || t.status}
+                          </span>
+                        </div>
+                        <div className="mt-2 space-y-1.5">
+                          {t.messages.map((m) => (
+                            <div
+                              key={m.id}
+                              className={`rounded-xl px-3 py-2 ${
+                                m.senderRole === 'SUPER_ADMIN'
+                                  ? 'bg-brand-50 text-brand-950'
+                                  : 'bg-slate-50 text-slate-800'
+                              }`}
+                            >
+                              <p className="font-bold text-[10px] opacity-75">{m.senderName}</p>
+                              <p>{m.body}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {t.status !== 'CLOSED' ? (
+                          <div className="mt-2 flex gap-2">
+                            <input
+                              value={replyByTicket[t.id] || ''}
+                              onChange={(e) =>
+                                setReplyByTicket((prev) => ({ ...prev, [t.id]: e.target.value }))
+                              }
+                              placeholder="Ajouter une réponse…"
+                              className="sc-input py-1.5 text-xs"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleReplyTicket(t.id)}
+                              className="sc-btn-primary px-3 py-1.5 text-xs"
+                            >
+                              Répondre
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
                 </div>
               </section>
+            </div>
+          </div>
+        ) : profile ? (
+          /* Tab Sécurité & Sessions */
+          <div className="grid gap-6 lg:grid-cols-2">
+            <section className="sc-card p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-brand-700" />
+                  <h2 className="text-base font-extrabold text-slate-900">
+                    Double authentification (2FA)
+                  </h2>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-0.5 text-xs font-bold ${
+                    user?.totpEnabled
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {user?.totpEnabled ? 'Activé' : 'Inactif'}
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-slate-600">
+                Protégez votre compte Propriétaire avec un code TOTP à 6 chiffres (Google Authenticator / Authy).
+              </p>
+              {!user?.totpEnabled && !supportGrantId ? (
+                <Link href="/setup-2fa" className="sc-btn-primary mt-4 text-xs">
+                  Activer le 2FA maintenant
+                </Link>
+              ) : null}
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-6">
-                <h2 className="text-base font-semibold text-slate-900">
-                  Historique des accès d’assistance plateforme
-                </h2>
+              <div className="mt-6 border-t border-slate-100 pt-5">
+                <h3 className="text-sm font-extrabold text-slate-900">
+                  Transparence des accès d’assistance plateforme
+                </h3>
                 <p className="mt-1 text-xs text-slate-500">
                   Chaque intervention exceptionnelle d’un Super Admin est journalisée ici.
                 </p>
@@ -274,7 +1109,7 @@ export default function OwnerSettingsPage() {
                   <div className="mt-3 space-y-2 text-xs">
                     {profile.supportAccessHistory.map((g) => (
                       <div key={g.id} className="rounded-xl border border-slate-200 p-3">
-                        <p className="font-semibold text-slate-800">
+                        <p className="font-bold text-slate-800">
                           {g.superAdminName} · {g.readOnly ? 'Lecture seule' : 'Étendu'}
                         </p>
                         <p className="text-slate-600">{g.reason}</p>
@@ -286,11 +1121,58 @@ export default function OwnerSettingsPage() {
                     ))}
                   </div>
                 )}
-              </section>
-            </div>
+              </div>
+            </section>
+
+            <section className="sc-card p-6">
+              <div className="mb-3 flex items-center gap-2">
+                <Laptop className="h-5 w-5 text-brand-700" />
+                <h2 className="text-base font-extrabold text-slate-900">Mes sessions actives</h2>
+              </div>
+              <div className="space-y-2.5">
+                {sessions.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-porcelain-50 p-3.5 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900">
+                        {s.deviceName}{' '}
+                        {s.isCurrent ? (
+                          <span className="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                            Actuelle
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-slate-500">
+                        IP : {s.ipAddress || '—'} · Actif : {formatDateTimeInTimezone(s.lastActiveAt)}
+                      </p>
+                    </div>
+                    {!s.isCurrent ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRevokeSession(s.id)}
+                        className="rounded-xl bg-rose-50 px-3 py-1.5 font-bold text-rose-700 hover:bg-rose-100"
+                      >
+                        Déconnecter
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
         ) : null}
       </div>
+
+      {qrOpen && currentShop ? (
+        <ShopQrModal
+          slug={shopForm.slug || currentShop.slug}
+          shopName={shopForm.name || currentShop.name}
+          logoUrl={shopForm.logoUrl}
+          onClose={() => setQrOpen(false)}
+        />
+      ) : null}
     </AppShell>
   );
 }

@@ -85,8 +85,8 @@ export default function ExpensesPage() {
         setCategories(cats);
         setShopExpenses(exp.items);
         setShopTotal(exp.totalActiveXof);
-        if (cats[0] && !form.categoryId) {
-          setForm((f) => ({ ...f, categoryId: cats[0].id }));
+        if (cats[0]) {
+          setForm((f) => (f.categoryId && cats.some((c) => c.id === f.categoryId) ? f : { ...f, categoryId: cats[0].id }));
         }
       }
       if (isOwner) {
@@ -101,7 +101,7 @@ export default function ExpensesPage() {
     } finally {
       setLoading(false);
     }
-  }, [shopId, isOwner, form.categoryId]);
+  }, [shopId, isOwner]);
 
   useEffect(() => {
     void load();

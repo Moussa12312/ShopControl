@@ -89,15 +89,15 @@ export default function StockPage() {
       setAlerts(al);
       setMovements(mv.items);
       setProducts(pr.items);
-      if (pr.items[0] && !adjForm.productId) {
-        setAdjForm((f) => ({ ...f, productId: pr.items[0].id }));
+      if (pr.items[0]) {
+        setAdjForm((f) => (f.productId && pr.items.some((p) => p.id === f.productId) ? f : { ...f, productId: pr.items[0].id }));
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur de chargement des stocks.');
     } finally {
       setLoading(false);
     }
-  }, [shopId, adjForm.productId]);
+  }, [shopId]);
 
   useEffect(() => {
     void load();

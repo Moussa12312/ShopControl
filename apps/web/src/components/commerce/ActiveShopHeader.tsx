@@ -1,44 +1,44 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Store } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 
 /**
- * Hook utilitaire qui résout la boutique opérationnelle active pour les écrans Lot 2 :
- * - Pour un Agent : toujours sa boutique unique
- * - Pour un Propriétaire : suit le sélecteur d'en-tête ou bascule sur sa 1re boutique active si "ALL"
+ * Résout de manière synchrone et fiable la boutique opérationnelle active pour les écrans Commerce & POS :
+ * - Agent : toujours sa boutique unique
+ * - Propriétaire : suit le sélecteur d'en-tête, ou bascule immédiatement sur la 1re boutique active si "ALL"
  */
 export function useActiveOperationalShop() {
-  const { user, shops, selectedShopId, setSelectedShopId } = useAuth();
-  const [localShopId, setLocalShopId] = useState<string>('');
+  const { loading, user, shops, selectedShopId, setSelectedShopId } = useAuth();
 
-  useEffect(() => {
-    if (user?.role === 'AGENT' && shops[0]) {
-      setLocalShopId(shops[0].shopId);
-    } else if (selectedShopId !== 'ALL' && shops.some((s) => s.shopId === selectedShopId)) {
-      setLocalShopId(selectedShopId);
-    } else if (shops[0]) {
-      setLocalShopId((prev) => (prev && shops.some((s) => s.shopId === prev) ? prev : shops[0].shopId));
-    } else {
-      setLocalShopId('');
+  const shopId = useMemo(() => {
+    if (shops.length === 0) return '';
+    if (user?.role === 'AGENT') return shops[0].shopId;
+    if (selectedShopId && selectedShopId !== 'ALL' && shops.some((s) => s.shopId === selectedShopId)) {
+      return selectedShopId;
     }
-  }, [user, shops, selectedShopId]);
+    const firstActive = shops.find((s) => s.status === 'ACTIVE') || shops[0];
+    return firstActive.shopId;
+  }, [user?.role, shops, selectedShopId]);
 
-  const activeShop = shops.find((s) => s.shopId === localShopId) || null;
+  const activeShop = useMemo(
+    () => shops.find((s) => s.shopId === shopId) || null,
+    [shops, shopId],
+  );
 
-  const selectShop = (shopId: string) => {
-    setLocalShopId(shopId);
+  const selectShop = (nextId: string) => {
     if (user?.role === 'OWNER') {
-      setSelectedShopId(shopId);
+      setSelectedShopId(nextId);
     }
   };
 
   return {
-    shopId: localShopId,
+    shopId,
     activeShop,
     shops,
     selectShop,
+    resolving: loading,
     isOwner: user?.role === 'OWNER',
   };
 }
@@ -54,13 +54,13 @@ export function ShopPickerInline({
   if (user?.role !== 'OWNER' || shops.length <= 1) return null;
 
   return (
-    <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm">
-      <Store className="h-4 w-4 text-brand-700" />
+    <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200/90 bg-white px-3 py-2 text-sm shadow-xs">
+      <Store className="h-4 w-4 text-brand-600" />
       <select
         value={shopId}
         onChange={(e) => onChange(e.target.value)}
         aria-label="Boutique active"
-        className="bg-transparent font-medium text-slate-800 focus:outline-none"
+        className="bg-transparent font-semibold text-slate-800 focus:outline-none"
       >
         {shops.map((s) => (
           <option key={s.shopId} value={s.shopId}>

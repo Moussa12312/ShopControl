@@ -22,6 +22,7 @@ import {
   createSaleReturnSchema,
   createSaleSchema,
   DEFAULT_PAYMENT_METHODS,
+  DEFAULT_RECEIPT_SETTINGS,
   formatXof,
   PaymentMethodConfig,
   TaxMode,
@@ -128,6 +129,7 @@ export class SalesService {
           unitCostXof: showCost ? l.unitCostXof : null,
         })),
         payments: s.payments,
+        refunds: s.refunds,
         returnsCount: s.returns.length,
         refundsCount: s.refunds.length,
         createdAt: s.createdAt.toISOString(),
@@ -490,6 +492,69 @@ export class SalesService {
         });
       }
 
+      // 12. Génération du justificatif immuable (Lot 3 — Critères #11 & #25)
+      const clientRow = input.clientId
+        ? await tx.client.findUnique({
+            where: { id: input.clientId },
+            select: { fullName: true, phone: true },
+          })
+        : null;
+
+      const receiptCfg = {
+        ...DEFAULT_RECEIPT_SETTINGS,
+        ...((shop.receiptSettings as Record<string, unknown>) || {}),
+      };
+
+      await tx.saleDocument.create({
+        data: {
+          documentNumber: sale.saleNumber,
+          documentType: 'SALE_RECEIPT',
+          saleId: sale.id,
+          status: 'VALID',
+          printCount: 0,
+          snapshot: {
+            shop: {
+              id: shop.id,
+              name: shop.name,
+              slug: shop.slug,
+              logoUrl: shop.logoUrl,
+              phone: shop.phone,
+              email: shop.email,
+              address: shop.address,
+              currency: shop.currency,
+              timezone: shop.timezone,
+            },
+            receiptSettings: receiptCfg,
+            saleNumber: sale.saleNumber,
+            issuedAt: sale.createdAt.toISOString(),
+            client: clientRow,
+            operatorName: operator?.firstName ?? actor.fullName,
+            lines: sale.lines.map((l) => ({
+              productName: l.productName,
+              sku: l.sku,
+              quantity: l.quantity,
+              unitPriceXof: l.unitPriceXof,
+              discountXof: l.discountXof,
+              lineTotalXof: l.lineTotalXof,
+            })),
+            grossSubtotalXof: sale.grossSubtotalXof,
+            discountTotalXof: sale.discountTotalXof,
+            taxMode: sale.taxMode,
+            taxRateBps: sale.taxRateBps,
+            taxTotalXof: sale.taxTotalXof,
+            roundingXof: sale.roundingXof,
+            totalXof: sale.totalXof,
+            paidAmountXof: sale.paidAmountXof,
+            dueAmountXof: sale.dueAmountXof,
+            payments: sale.payments.map((p) => ({
+              paymentMethodCode: p.paymentMethodCode,
+              amountXof: p.amountXof,
+              transactionRef: p.transactionRef,
+            })),
+          } as object,
+        },
+      });
+
       return sale;
     });
 
@@ -620,6 +685,12 @@ export class SalesService {
           data: { status: 'CANCELLED', remainingAmountXof: 0 },
         });
       }
+
+      // Conserve le justificatif dans la série avec mention ANNULÉ (Critère #25)
+      await tx.saleDocument.updateMany({
+        where: { saleId: sale.id, documentType: 'SALE_RECEIPT' },
+        data: { status: 'CANCELLED' },
+      });
 
       return tx.sale.update({
         where: { id: sale.id },
@@ -798,11 +869,26 @@ export class SalesService {
     const client = await this.shopDbManager.getClientForShop(shopId);
 
     const refund = await client.$transaction(async (tx) => {
-      const sale = await tx.sale.findUnique({ where: { id: saleId } });
+      const sale = await tx.sale.findUnique({
+        where: { id: saleId },
+        include: { client: { select: { fullName: true, phone: true } } },
+      });
       if (!sale) {
         throw new NotFoundException({ code: 'SALE_NOT_FOUND', message: 'Vente introuvable.' });
       }
+      if (sale.status === 'CANCELLED') {
+        throw new ConflictException({
+          code: 'SALE_ALREADY_CANCELLED',
+          message: 'Impossible de rembourser une vente déjà annulée.',
+        });
+      }
       const maxRefundable = Math.max(0, sale.paidAmountXof - sale.refundedAmountXof);
+      if (maxRefundable <= 0) {
+        throw new BadRequestException({
+          code: 'SALE_ALREADY_REFUNDED',
+          message: 'Cette vente a déjà été intégralement remboursée.',
+        });
+      }
       if (input.amountXof > maxRefundable) {
         throw new BadRequestException({
           code: 'REFUND_EXCEEDS_SALE',
@@ -810,13 +896,17 @@ export class SalesService {
         });
       }
 
+      const seqRows = await tx.$queryRaw<Array<{ nextval: bigint }>>`SELECT nextval('credit_note_number_seq')`;
+      const creditNoteNumber = `AV-${String(Number(seqRows[0].nextval)).padStart(6, '0')}`;
+
       let cashMovementId: string | null = null;
       if (methodCfg?.affectsCashDrawer || input.paymentMethodCode === 'CASH') {
         const openSession = await this.cashService.getOpenSessionInTx(tx);
         if (!openSession) {
           throw new BadRequestException({
             code: 'CASH_SESSION_REQUIRED',
-            message: 'Ouvrez une session de caisse pour effectuer un remboursement en espèces.',
+            message:
+              'Ouvrez une session de caisse pour un remboursement en espèces (ou choisissez Mobile Money / Virement).',
           });
         }
         const mv = await this.cashService.recordMovementInTx(tx, {
@@ -824,8 +914,8 @@ export class SalesService {
           type: 'REFUND_OUT',
           amountXof: input.amountXof,
           referenceType: 'SALE_REFUND',
-          referenceId: sale.saleNumber,
-          reason: `Remboursement vente ${sale.saleNumber} : ${input.reason}`,
+          referenceId: creditNoteNumber,
+          reason: `Remboursement ${creditNoteNumber} sur ${sale.saleNumber} : ${input.reason}`,
           actorUserId: actor.userId,
           declaredOperatorId: operator?.id ?? null,
           declaredOperatorName: operator?.firstName ?? null,
@@ -836,6 +926,7 @@ export class SalesService {
       const created = await tx.saleRefund.create({
         data: {
           saleId: sale.id,
+          creditNoteNumber,
           amountXof: input.amountXof,
           paymentMethodCode: input.paymentMethodCode,
           transactionRef: input.transactionRef?.trim() || null,
@@ -852,7 +943,47 @@ export class SalesService {
         data: { refundedAmountXof: sale.refundedAmountXof + input.amountXof },
       });
 
-      return created;
+      const receiptCfg = {
+        ...DEFAULT_RECEIPT_SETTINGS,
+        ...((shop.receiptSettings as Record<string, unknown>) || {}),
+      };
+
+      // Génère un avoir distinct lié à la vente d'origine (Section 10.1 & Critère #25)
+      const creditDoc = await tx.saleDocument.create({
+        data: {
+          documentNumber: creditNoteNumber,
+          documentType: 'CREDIT_NOTE',
+          saleId: sale.id,
+          refundId: created.id,
+          status: 'VALID',
+          printCount: 0,
+          snapshot: {
+            shop: {
+              id: shop.id,
+              name: shop.name,
+              slug: shop.slug,
+              logoUrl: shop.logoUrl,
+              phone: shop.phone,
+              email: shop.email,
+              address: shop.address,
+              currency: shop.currency,
+              timezone: shop.timezone,
+            },
+            receiptSettings: receiptCfg,
+            creditNoteNumber,
+            originalSaleNumber: sale.saleNumber,
+            issuedAt: created.createdAt.toISOString(),
+            client: sale.client,
+            operatorName: operator?.firstName ?? actor.fullName,
+            amountXof: created.amountXof,
+            paymentMethodCode: created.paymentMethodCode,
+            transactionRef: created.transactionRef,
+            reason: created.reason,
+          } as object,
+        },
+      });
+
+      return { ...created, documentId: creditDoc.id };
     });
 
     await this.auditService.recordShop({

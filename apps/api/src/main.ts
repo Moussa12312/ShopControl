@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { json, urlencoded } from 'express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { getEnv } from './common/config/env.config';
@@ -12,7 +13,9 @@ async function bootstrap(): Promise<void> {
   const env = getEnv();
   const app = await NestFactory.create(AppModule);
 
-  app.use(helmet());
+  app.use(json({ limit: '8mb' }));
+  app.use(urlencoded({ extended: true, limit: '8mb' }));
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(cookieParser());
 
   const allowedOrigins = env.CORS_ORIGINS.split(',')

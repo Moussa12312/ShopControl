@@ -5,7 +5,7 @@
 @layer base {
   html,
   body {
-    @apply min-h-screen w-full overflow-x-hidden bg-[#f4f8f7] text-slate-900 antialiased;
+    @apply min-h-screen w-full overflow-x-hidden bg-porcelain-100 text-slate-900 antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
@@ -14,6 +14,81 @@
   }
 }
 
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .sc-card {
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-card transition-shadow;
+  }
+  .sc-card-hover {
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-card transition-all hover:border-brand-200 hover:shadow-elevated;
+  }
+  .sc-dark-glass {
+    @apply rounded-2xl border border-white/10 bg-white/[0.05] backdrop-blur-sm;
+  }
+  .sc-input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20;
+  }
+  .sc-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-forest-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-forest-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .sc-btn-lime {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-limeglow-400 px-4 py-2.5 text-sm font-bold text-forest-950 shadow-lime transition hover:bg-limeglow-300 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .sc-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50;
+  }
+}
+
 .lime-glow-card {
-  background: radial-gradient(circle at 78% 55%, rgba(163, 230, 53, 0.34), rgba(16, 48, 42, 0.94) 58%, rgba(12, 34, 33, 0.98) 100%);
+  background: radial-gradient(circle at 82% 45%, rgba(163, 230, 53, 0.34), rgba(14, 46, 40, 0.94) 55%, rgba(5, 20, 19, 0.99) 100%);
+}
+
+.obsidian-hero {
+  background:
+    radial-gradient(800px circle at 12% -10%, rgba(20, 158, 127, 0.22), transparent 55%),
+    radial-gradient(600px circle at 92% 0%, rgba(163, 230, 53, 0.14), transparent 50%),
+    linear-gradient(180deg, #071918 0%, #091f1e 100%);
+}
+
+/* Scrollbar fine */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.45);
+}
+
+/* Impression thermique 58mm / 80mm & Affiche QR propre */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .sc-printable-area,
+  .sc-printable-area * {
+    visibility: visible !important;
+  }
+  .sc-printable-area {
+    position: fixed !important;
+    inset: 0 !important;
+    margin: 0 auto !important;
+    padding: 8mm !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    z-index: 99999 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
 }

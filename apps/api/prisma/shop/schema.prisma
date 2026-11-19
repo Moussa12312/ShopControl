@@ -472,13 +472,14 @@ model Sale {
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  client      Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  cashSession CashSession?  @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+  client      Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  cashSession CashSession?   @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
   lines       SaleLine[]
   payments    SalePayment[]
   returns     SaleReturn[]
   refunds     SaleRefund[]
   receivable  Receivable?
+  documents   SaleDocument[]
 
   @@index([createdAt])
   @@index([status, createdAt])
@@ -548,6 +549,7 @@ model SaleReturn {
 model SaleRefund {
   id                   String   @id @default(uuid()) @db.Uuid
   saleId               String   @map("sale_id") @db.Uuid
+  creditNoteNumber     String?  @unique @map("credit_note_number") @db.VarChar(40)
   amountXof            Int      @map("amount_xof")
   paymentMethodCode    String   @map("payment_method_code") @db.VarChar(32)
   transactionRef       String?  @map("transaction_ref") @db.VarChar(120)
@@ -561,6 +563,7 @@ model SaleRefund {
   sale Sale @relation(fields: [saleId], references: [id], onDelete: Restrict)
 
   @@index([saleId])
+  @@index([createdAt])
   @@map("sale_refunds")
 }
 
@@ -654,4 +657,140 @@ model ImportBatch {
 
   @@index([createdAt])
   @@map("import_batches")
+}
+
+// ============================================================================
+// LOT 3 — DOCUMENTS, TICKETS THERMIQUES & AVOIRS (CRITÈRES #11 & #25)
+// ============================================================================
+
+model SaleDocument {
+  id             String    @id @default(uuid()) @db.Uuid
+  documentNumber String    @unique @map("document_number") @db.VarChar(40)
+  documentType   String    @map("document_type") @db.VarChar(24)
+  saleId         String    @map("sale_id") @db.Uuid
+  refundId       String?   @map("refund_id") @db.Uuid
+  status         String    @default("VALID") @db.VarChar(20)
+  printCount     Int       @default(0) @map("print_count")
+  lastPrintedAt  DateTime? @map("last_printed_at") @db.Timestamptz(6)
+  snapshot       Json
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Restrict)
+
+  @@index([saleId])
+  @@index([documentType, createdAt])
+  @@map("sale_documents")
+}
+
+// ============================================================================
+// LOT 4 — BILANS JOURNALIERS ARCHIVÉS & VERSIONNÉS (SECTION 11.1)
+// ============================================================================
+
+model DailyReport {
+  id          String   @id @default(uuid()) @db.Uuid
+  reportDate  String   @map("report_date") @db.VarChar(10)
+  version     Int      @default(1)
+  status      String   @default("PROVISIONAL") @db.VarChar(20)
+  generatedBy String   @default("MANUAL") @map("generated_by") @db.VarChar(16)
+  metrics     Json
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([reportDate, version])
+  @@index([reportDate, status])
+  @@map("daily_reports")
+}
+
+// ============================================================================
+// LOT 5 — E-COMMERCE PAR QR CODE, COMMANDES & ANTI-ABUS (SECTION 8)
+// ============================================================================
+
+model OnlineOrder {
+  id                   String    @id @default(uuid()) @db.Uuid
+  orderNumber          String    @unique @map("order_number") @db.VarChar(40)
+  secretToken          String    @unique @map("secret_token") @db.VarChar(96)
+  status               String    @default("NEW") @db.VarChar(24)
+  fulfillmentMode      String    @map("fulfillment_mode") @db.VarChar(16)
+  clientName           String    @map("client_name") @db.VarChar(120)
+  clientPhone          String    @map("client_phone") @db.VarChar(30)
+  deliveryAddress      String?   @map("delivery_address") @db.VarChar(255)
+  deliveryDistrict     String?   @map("delivery_district") @db.VarChar(100)
+  deliveryNotes        String?   @map("delivery_notes") @db.VarChar(400)
+  deliveryFeeXof       Int       @default(0) @map("delivery_fee_xof")
+  subtotalXof          Int       @map("subtotal_xof")
+  totalXof             Int       @map("total_xof")
+  depositPaidXof       Int       @default(0) @map("deposit_paid_xof")
+  outOfHours           Boolean   @default(false) @map("out_of_hours")
+  marketingConsent     Boolean   @default(false) @map("marketing_consent")
+  convertedSaleId      String?   @unique @map("converted_sale_id") @db.Uuid
+  cancelOrRejectReason String?   @map("cancel_or_reject_reason") @db.VarChar(500)
+  clientIp             String?   @map("client_ip") @db.VarChar(64)
+  confirmedAt          DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  completedAt          DateTime? @map("completed_at") @db.Timestamptz(6)
+  expiresAt            DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  lines        OnlineOrderLine[]
+  statusEvents OnlineOrderStatusEvent[]
+
+  @@index([status, createdAt])
+  @@index([clientPhone, createdAt])
+  @@index([clientIp, createdAt])
+  @@map("online_orders")
+}
+
+model OnlineOrderLine {
+  id           String  @id @default(uuid()) @db.Uuid
+  orderId      String  @map("order_id") @db.Uuid
+  productId    String  @map("product_id") @db.Uuid
+  variantId    String? @map("variant_id") @db.Uuid
+  productName  String  @map("product_name") @db.VarChar(160)
+  sku          String  @db.VarChar(64)
+  orderedQty   Int     @map("ordered_qty")
+  deliveredQty Int     @default(0) @map("delivered_qty")
+  unitPriceXof Int     @map("unit_price_xof")
+  lineTotalXof Int     @map("line_total_xof")
+
+  order OnlineOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("online_order_lines")
+}
+
+model OnlineOrderStatusEvent {
+  id                   String   @id @default(uuid()) @db.Uuid
+  orderId              String   @map("order_id") @db.Uuid
+  fromStatus           String?  @map("from_status") @db.VarChar(24)
+  toStatus             String   @map("to_status") @db.VarChar(24)
+  reason               String?  @db.VarChar(500)
+  actorUserId          String?  @map("actor_user_id") @db.Uuid
+  declaredOperatorName String?  @map("declared_operator_name") @db.VarChar(80)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order OnlineOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("online_order_status_events")
+}
+
+model BlockedPhone {
+  id          String   @id @default(uuid()) @db.Uuid
+  phone       String   @unique @db.VarChar(30)
+  reason      String?  @db.VarChar(300)
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("blocked_phones")
+}
+
+model OrderTrackingAttempt {
+  id          String   @id @default(uuid()) @db.Uuid
+  orderNumber String   @map("order_number") @db.VarChar(40)
+  ipAddress   String   @map("ip_address") @db.VarChar(64)
+  succeeded   Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([orderNumber, ipAddress, createdAt])
+  @@map("order_tracking_attempts")
 }

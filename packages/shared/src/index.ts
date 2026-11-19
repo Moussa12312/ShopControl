@@ -5,3 +5,5 @@ export * from './formatters';
 export * from './commerce.enums';
 export * from './commerce.calc';
 export * from './commerce.schemas';
+export * from './platform.enums';
+export * from './platform.schemas';

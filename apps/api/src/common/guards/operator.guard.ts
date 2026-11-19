@@ -51,8 +51,18 @@ export class OperatorGuard implements CanActivate {
       return true;
     }
 
-    // Le Propriétaire travaille en son nom propre sans obligation d'opérateur déclaré
-    if (user.role !== 'AGENT' && !operatorId) {
+    // Le Propriétaire (ou Super Admin) travaille en son nom propre : jamais bloqué par un x-operator-id obsolète
+    if (user.role !== 'AGENT') {
+      if (!operatorId) {
+        return true;
+      }
+      const shopClient = await this.shopDbManager.getClientForShop(shopId).catch(() => null);
+      const op = shopClient
+        ? await shopClient.shopOperator.findUnique({ where: { id: operatorId } }).catch(() => null)
+        : null;
+      if (op && op.isActive) {
+        req.declaredOperator = { id: op.id, firstName: op.firstName, pinVerified: true };
+      }
       return true;
     }
 

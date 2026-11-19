@@ -127,11 +127,13 @@ export class AnalyticsService {
 
     const [
       salesRows,
+      refundRows,
       products,
       openReceivables,
       expensesAgg,
       openSessions,
       recentDiscrepancies,
+      pendingOrdersCount,
     ] = await Promise.all([
       client.sale.findMany({
         where: {
@@ -143,9 +145,29 @@ export class AnalyticsService {
           totalXof: true,
           paidAmountXof: true,
           dueAmountXof: true,
+          refundedAmountXof: true,
           stockConflict: true,
           createdAt: true,
-          lines: { select: { productId: true, quantity: true, lineTotalXof: true } },
+          lines: {
+            select: {
+              productId: true,
+              quantity: true,
+              returnedQty: true,
+              unitCostXof: true,
+              lineTotalXof: true,
+            },
+          },
+        },
+      }),
+      client.saleRefund.findMany({
+        where: {
+          createdAt: { gte: spec.previousStart },
+          sale: { status: { not: 'CANCELLED' } },
+        },
+        select: {
+          id: true,
+          amountXof: true,
+          createdAt: true,
         },
       }),
       client.product.findMany({
@@ -175,26 +197,39 @@ export class AnalyticsService {
           discrepancyXof: { not: 0 },
         },
       }),
+      client.onlineOrder.count({
+        where: { status: { in: ['NEW', 'CONFIRMED', 'PREPARING', 'READY', 'IN_DELIVERY'] } },
+      }),
     ]);
 
     const currentSeries = new Array<number>(spec.buckets.length).fill(0);
     const previousSeries = new Array<number>(spec.buckets.length).fill(0);
     const currentCounts = new Array<number>(spec.buckets.length).fill(0);
 
-    let currentSalesXof = 0;
+    let grossSalesCurrentXof = 0;
+    let refundsCurrentXof = 0;
     let previousSalesXof = 0;
     let currentSalesCount = 0;
+    let cogsCurrentXof = 0;
+    let missingCostProductsCount = 0;
+    const missingCostProductIds = new Set<string>();
     let stockConflictsCount = 0;
     const productSalesQty = new Map<string, number>();
 
     for (const sale of salesRows) {
       const ts = sale.createdAt.getTime();
       if (ts >= spec.currentStart.getTime()) {
-        currentSalesXof += sale.totalXof;
+        grossSalesCurrentXof += sale.totalXof;
         currentSalesCount += 1;
         if (sale.stockConflict) stockConflictsCount += 1;
         for (const l of sale.lines) {
-          productSalesQty.set(l.productId, (productSalesQty.get(l.productId) ?? 0) + l.quantity);
+          const netQty = Math.max(0, l.quantity - l.returnedQty);
+          productSalesQty.set(l.productId, (productSalesQty.get(l.productId) ?? 0) + netQty);
+          if (l.unitCostXof !== null) {
+            cogsCurrentXof += l.unitCostXof * netQty;
+          } else if (netQty > 0) {
+            missingCostProductIds.add(l.productId);
+          }
         }
         const idx = spec.buckets.findIndex((b) => ts >= b.startMs && ts < b.endMs);
         if (idx >= 0) {
@@ -209,6 +244,27 @@ export class AnalyticsService {
         }
       }
     }
+
+    // Section 11.3 : chaque remboursement se déduit du Chiffre d'affaires net à la date de l'opération !
+    for (const ref of refundRows) {
+      const ts = ref.createdAt.getTime();
+      if (ts >= spec.currentStart.getTime()) {
+        refundsCurrentXof += ref.amountXof;
+        const idx = spec.buckets.findIndex((b) => ts >= b.startMs && ts < b.endMs);
+        if (idx >= 0) {
+          currentSeries[idx] = Math.max(0, currentSeries[idx] - ref.amountXof);
+        }
+      } else {
+        previousSalesXof = Math.max(0, previousSalesXof - ref.amountXof);
+        const idx = spec.prevBuckets.findIndex((b) => ts >= b.startMs && ts < b.endMs);
+        if (idx >= 0) {
+          previousSeries[idx] = Math.max(0, previousSeries[idx] - ref.amountXof);
+        }
+      }
+    }
+
+    const currentSalesXof = Math.max(0, grossSalesCurrentXof - refundsCurrentXof);
+    missingCostProductsCount = missingCostProductIds.size;
 
     let lowStockCount = 0;
     let outOfStockCount = 0;
@@ -226,6 +282,7 @@ export class AnalyticsService {
         lowStockCount += 1;
       }
 
+      const imgs = Array.isArray(p.imageUrls) ? (p.imageUrls as string[]) : [];
       return {
         id: p.id,
         shopId,
@@ -233,6 +290,7 @@ export class AnalyticsService {
         name: p.name,
         sku: p.sku,
         categoryName: p.category?.name ?? null,
+        imageUrl: imgs[0] ?? null,
         salePriceXof: p.salePriceXof,
         stockAvailable: available,
         alertThreshold: p.alertThreshold,
@@ -250,9 +308,13 @@ export class AnalyticsService {
     return {
       shopId,
       shopName,
+      grossSalesXof: grossSalesCurrentXof,
+      refundsXof: refundsCurrentXof,
       currentSalesXof,
       previousSalesXof,
       currentSalesCount,
+      cogsCurrentXof,
+      missingCostProductsCount,
       totalProductsCount: products.length,
       lowStockCount,
       outOfStockCount,
@@ -263,6 +325,7 @@ export class AnalyticsService {
       overdueCashSessions,
       recentDiscrepancies,
       stockConflictsCount,
+      pendingOrdersCount,
       currentSeries,
       previousSeries,
       currentCounts,
@@ -275,9 +338,13 @@ export class AnalyticsService {
     perShop: Array<Awaited<ReturnType<AnalyticsService['collectSingleShopMetrics']>>>,
     companyExpensesXof: number,
   ) {
+    const grossSalesXof = perShop.reduce((a, s) => a + s.grossSalesXof, 0);
+    const refundsXof = perShop.reduce((a, s) => a + s.refundsXof, 0);
     const currentSalesXof = perShop.reduce((a, s) => a + s.currentSalesXof, 0);
     const previousSalesXof = perShop.reduce((a, s) => a + s.previousSalesXof, 0);
     const currentSalesCount = perShop.reduce((a, s) => a + s.currentSalesCount, 0);
+    const cogsXof = perShop.reduce((a, s) => a + s.cogsCurrentXof, 0);
+    const missingCostProductsCount = perShop.reduce((a, s) => a + s.missingCostProductsCount, 0);
     const totalProductsCount = perShop.reduce((a, s) => a + s.totalProductsCount, 0);
     const lowStockCount = perShop.reduce((a, s) => a + s.lowStockCount, 0);
     const outOfStockCount = perShop.reduce((a, s) => a + s.outOfStockCount, 0);
@@ -285,10 +352,13 @@ export class AnalyticsService {
     const openReceivablesAmountXof = perShop.reduce((a, s) => a + s.openReceivablesAmountXof, 0);
     const expensesXof =
       perShop.reduce((a, s) => a + s.expensesXof, 0) + companyExpensesXof;
+    const grossMarginXof = currentSalesXof - cogsXof;
+    const estimatedNetProfitXof = grossMarginXof - expensesXof;
     const openCashSessionsCount = perShop.reduce((a, s) => a + s.openCashSessionsCount, 0);
     const overdueCashSessions = perShop.reduce((a, s) => a + s.overdueCashSessions, 0);
     const recentDiscrepancies = perShop.reduce((a, s) => a + s.recentDiscrepancies, 0);
     const stockConflictsCount = perShop.reduce((a, s) => a + s.stockConflictsCount, 0);
+    const pendingOrdersCount = perShop.reduce((a, s) => a + s.pendingOrdersCount, 0);
 
     const salesDeltaPercent =
       previousSalesXof > 0
@@ -321,16 +391,27 @@ export class AnalyticsService {
       .slice(0, 30);
 
     const priorityActionsCount =
-      lowStockCount + openReceivablesCount + overdueCashSessions + stockConflictsCount;
+      lowStockCount +
+      openReceivablesCount +
+      overdueCashSessions +
+      stockConflictsCount +
+      pendingOrdersCount;
 
     return {
       period: spec.period,
       kpis: {
+        grossSalesXof,
+        refundsXof,
         currentSalesXof,
         previousSalesXof,
         salesDeltaPercent,
         currentSalesCount,
         averageOrderXof,
+        cogsXof,
+        grossMarginXof,
+        estimatedNetProfitXof,
+        isEstimated: missingCostProductsCount > 0,
+        missingCostProductsCount,
         totalProductsCount,
         lowStockCount,
         outOfStockCount,
@@ -342,6 +423,7 @@ export class AnalyticsService {
         overdueCashSessions,
         recentDiscrepancies,
         stockConflictsCount,
+        pendingOrdersCount,
         priorityActionsCount,
       },
       chartSeries,
@@ -353,11 +435,18 @@ export class AnalyticsService {
     return {
       period: spec.period,
       kpis: {
+        grossSalesXof: 0,
+        refundsXof: 0,
         currentSalesXof: 0,
         previousSalesXof: 0,
         salesDeltaPercent: 0,
         currentSalesCount: 0,
         averageOrderXof: 0,
+        cogsXof: 0,
+        grossMarginXof: 0,
+        estimatedNetProfitXof: 0,
+        isEstimated: false,
+        missingCostProductsCount: 0,
         totalProductsCount: 0,
         lowStockCount: 0,
         outOfStockCount: 0,
@@ -369,6 +458,7 @@ export class AnalyticsService {
         overdueCashSessions: 0,
         recentDiscrepancies: 0,
         stockConflictsCount: 0,
+        pendingOrdersCount: 0,
         priorityActionsCount: 0,
       },
       chartSeries: spec.buckets.map((b) => ({

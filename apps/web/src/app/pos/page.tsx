@@ -5,8 +5,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   CloudOff,
+  FileText,
   Minus,
+  Package,
   Plus,
+  Printer,
   RefreshCw,
   RotateCcw,
   Search,
@@ -39,6 +42,7 @@ import {
   ShopPickerInline,
   useActiveOperationalShop,
 } from '@/components/commerce/ActiveShopHeader';
+import { ReceiptModal, SaleDocumentView } from '@/components/commerce/ReceiptModal';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateViews';
 
 interface ProductItem {
@@ -50,6 +54,7 @@ interface ProductItem {
   stockAvailable: number;
   status: string;
   unit: string;
+  imageUrls?: string[];
 }
 
 interface ClientItem {
@@ -119,7 +124,9 @@ export default function PosPage() {
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err' | 'warn'; msg: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Modales historique (Annulation / Retour / Remboursement)
+  // Modales historique (Ticket / Annulation / Retour / Remboursement)
+  const [activeDoc, setActiveDoc] = useState<SaleDocumentView | null>(null);
+  const [modalErr, setModalErr] = useState<string | null>(null);
   const [cancelSaleTarget, setCancelSaleTarget] = useState<SaleRow | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [returnTarget, setReturnTarget] = useState<SaleRow | null>(null);
@@ -129,6 +136,7 @@ export default function PosPage() {
   const [returnReason, setReturnReason] = useState('');
   const [refundTarget, setRefundTarget] = useState<SaleRow | null>(null);
   const [refundAmount, setRefundAmount] = useState(0);
+  const [refundMethodCode, setRefundMethodCode] = useState('CASH');
   const [refundReason, setRefundReason] = useState('');
 
   const loadOfflineQueue = useCallback(async () => {
@@ -314,15 +322,17 @@ export default function PosPage() {
         return;
       }
 
-      const created = await apiFetch<{ saleNumber: string; totalXof: number; dueAmountXof: number }>(
-        `/shops/${shopId}/sales`,
-        {
-          method: 'POST',
-          shopId,
-          operatorId: activeOperator?.id,
-          body: payload,
-        },
-      );
+      const created = await apiFetch<{
+        id: string;
+        saleNumber: string;
+        totalXof: number;
+        dueAmountXof: number;
+      }>(`/shops/${shopId}/sales`, {
+        method: 'POST',
+        shopId,
+        operatorId: activeOperator?.id,
+        body: payload,
+      });
 
       setCart([]);
       setMobilePosPane('catalog');
@@ -337,6 +347,13 @@ export default function PosPage() {
         }.`,
       });
       await loadData();
+      // Ouvre immédiatement le ticket de caisse prêt à imprimer / PDF / WhatsApp (Lot 3)
+      apiFetch<SaleDocumentView[]>(`/shops/${shopId}/documents/by-sale/${created.id}`, { shopId })
+        .then((docs) => {
+          const receipt = docs.find((d) => d.documentType === 'SALE_RECEIPT') || docs[0];
+          if (receipt) setActiveDoc(receipt);
+        })
+        .catch(() => undefined);
     } catch (err) {
       setFeedback({
         type: 'err',
@@ -383,9 +400,30 @@ export default function PosPage() {
     });
   };
 
+  const openSaleDocument = async (saleId: string, preferredType: 'SALE_RECEIPT' | 'CREDIT_NOTE' = 'SALE_RECEIPT') => {
+    if (!shopId) return;
+    try {
+      const docs = await apiFetch<SaleDocumentView[]>(
+        `/shops/${shopId}/documents/by-sale/${saleId}`,
+        { shopId },
+      );
+      const chosen =
+        docs.find((d) => d.documentType === preferredType) ||
+        docs[docs.length - 1] ||
+        null;
+      if (chosen) setActiveDoc(chosen);
+    } catch (err) {
+      setFeedback({
+        type: 'err',
+        msg: err instanceof ApiError ? err.message : 'Impossible d’ouvrir le justificatif.',
+      });
+    }
+  };
+
   const handleCancelSale = async () => {
     if (!shopId || !cancelSaleTarget) return;
     setBusy(true);
+    setModalErr(null);
     try {
       await apiFetch(`/shops/${shopId}/sales/${cancelSaleTarget.id}/cancel`, {
         method: 'POST',
@@ -395,9 +433,10 @@ export default function PosPage() {
       });
       setCancelSaleTarget(null);
       setCancelReason('');
+      setFeedback({ type: 'ok', msg: `Vente ${cancelSaleTarget.saleNumber} annulée et stock réintégré.` });
       await loadData();
     } catch (err) {
-      setFeedback({ type: 'err', msg: err instanceof ApiError ? err.message : 'Annulation refusée.' });
+      setModalErr(err instanceof ApiError ? err.message : 'Annulation refusée.');
     } finally {
       setBusy(false);
     }
@@ -407,6 +446,7 @@ export default function PosPage() {
     e.preventDefault();
     if (!shopId || !returnTarget || !returnLineId) return;
     setBusy(true);
+    setModalErr(null);
     try {
       await apiFetch(`/shops/${shopId}/sales/${returnTarget.id}/returns`, {
         method: 'POST',
@@ -419,9 +459,10 @@ export default function PosPage() {
       });
       setReturnTarget(null);
       setReturnReason('');
+      setFeedback({ type: 'ok', msg: `Retour article enregistré sur ${returnTarget.saleNumber}.` });
       await loadData();
     } catch (err) {
-      setFeedback({ type: 'err', msg: err instanceof ApiError ? err.message : 'Retour refusé.' });
+      setModalErr(err instanceof ApiError ? err.message : 'Retour refusé.');
     } finally {
       setBusy(false);
     }
@@ -431,18 +472,35 @@ export default function PosPage() {
     e.preventDefault();
     if (!shopId || !refundTarget) return;
     setBusy(true);
+    setModalErr(null);
     try {
-      await apiFetch(`/shops/${shopId}/sales/${refundTarget.id}/refunds`, {
-        method: 'POST',
-        shopId,
-        operatorId: activeOperator?.id,
-        body: { amountXof: refundAmount, paymentMethodCode: 'CASH', reason: refundReason },
-      });
+      const refunded = await apiFetch<{ creditNoteNumber?: string }>(
+        `/shops/${shopId}/sales/${refundTarget.id}/refunds`,
+        {
+          method: 'POST',
+          shopId,
+          operatorId: activeOperator?.id,
+          body: {
+            amountXof: Math.round(Number(refundAmount) || 0),
+            paymentMethodCode: refundMethodCode,
+            reason: refundReason.trim(),
+          },
+        },
+      );
+      const targetId = refundTarget.id;
+      const targetNum = refundTarget.saleNumber;
       setRefundTarget(null);
       setRefundReason('');
+      setFeedback({
+        type: 'ok',
+        msg: `Remboursement de ${formatXof(refundAmount)} enregistré sur ${targetNum}${
+          refunded.creditNoteNumber ? ` (Avoir ${refunded.creditNoteNumber})` : ''
+        }. Le chiffre d’affaires net a été actualisé.`,
+      });
       await loadData();
+      await openSaleDocument(targetId, 'CREDIT_NOTE');
     } catch (err) {
-      setFeedback({ type: 'err', msg: err instanceof ApiError ? err.message : 'Remboursement refusé.' });
+      setModalErr(err instanceof ApiError ? err.message : 'Remboursement refusé.');
     } finally {
       setBusy(false);
     }
@@ -591,38 +649,53 @@ export default function PosPage() {
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {filteredProducts.map((p) => {
                       const inCartQty = cart.find((c) => c.product.id === p.id)?.quantity || 0;
+                      const thumb = p.imageUrls?.[0];
                       return (
                         <button
                           key={p.id}
                           type="button"
                           onClick={() => addToCart(p)}
-                          className={`flex items-center justify-between rounded-2xl border bg-white p-3.5 text-left transition hover:border-forest-800 hover:shadow-xs sm:p-4 ${
+                          className={`flex items-center justify-between gap-2.5 rounded-2xl border bg-white p-3 text-left transition hover:border-forest-800 hover:shadow-card sm:p-3.5 ${
                             inCartQty > 0 ? 'border-forest-900 ring-1 ring-forest-900/15' : 'border-slate-200'
                           }`}
                         >
-                          <div className="min-w-0 pr-2">
-                            <div className="flex items-center gap-1.5">
-                              <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
-                              {inCartQty > 0 ? (
-                                <span className="shrink-0 rounded-full bg-forest-900 px-1.5 py-0.5 text-[10px] font-bold text-limeglow-400">
-                                  ×{inCartQty}
-                                </span>
-                              ) : null}
-                            </div>
-                            <p className="mt-0.5 text-xs text-slate-500">
-                              {p.sku} · Stock :{' '}
-                              <span
-                                className={
-                                  p.stockAvailable <= 0
-                                    ? 'font-bold text-red-600'
-                                    : 'font-semibold text-emerald-700'
-                                }
-                              >
-                                {p.stockAvailable} {p.unit}
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            {thumb ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={thumb}
+                                alt={p.name}
+                                className="h-12 w-12 shrink-0 rounded-xl border border-slate-200 object-cover bg-porcelain-50"
+                              />
+                            ) : (
+                              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                                <Package className="h-5 w-5" />
                               </span>
-                            </p>
+                            )}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="truncate text-sm font-bold text-slate-900">{p.name}</p>
+                                {inCartQty > 0 ? (
+                                  <span className="shrink-0 rounded-full bg-forest-900 px-1.5 py-0.5 text-[10px] font-bold text-limeglow-400">
+                                    ×{inCartQty}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="mt-0.5 text-xs text-slate-500">
+                                {p.sku} ·{' '}
+                                <span
+                                  className={
+                                    p.stockAvailable <= 0
+                                      ? 'font-bold text-rose-600'
+                                      : 'font-semibold text-emerald-700'
+                                  }
+                                >
+                                  {p.stockAvailable} {p.unit}
+                                </span>
+                              </p>
+                            </div>
                           </div>
-                          <span className="shrink-0 rounded-xl bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-800 sm:text-sm">
+                          <span className="shrink-0 rounded-xl bg-brand-50 px-2.5 py-1 text-xs font-extrabold text-brand-800 tabular sm:text-sm">
                             {formatXof(p.salePriceXof)}
                           </span>
                         </button>
@@ -953,49 +1026,84 @@ export default function PosPage() {
                     </div>
 
                     {sale.status === 'COMPLETED' ? (
-                      <div className="mt-3 grid grid-cols-3 gap-1.5">
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openSaleDocument(sale.id, 'SALE_RECEIPT')}
+                          className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-forest-900 py-2 text-xs font-bold text-white"
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                          Ticket
+                        </button>
+                        {sale.refundedAmountXof > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => openSaleDocument(sale.id, 'CREDIT_NOTE')}
+                            className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-rose-50 py-2 text-xs font-bold text-rose-700"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                            Avoir
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => {
+                            setModalErr(null);
                             setReturnTarget(sale);
                             setReturnLineId(sale.lines[0]?.id || '');
                             setReturnQty(1);
                             setReturnReason('');
                           }}
-                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-300 py-2 text-xs font-semibold text-slate-700"
+                          className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-slate-300 py-2 text-xs font-semibold text-slate-700"
                         >
                           <Undo2 className="h-3.5 w-3.5" />
                           Retour
                         </button>
+                        {sale.paidAmountXof - sale.refundedAmountXof > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModalErr(null);
+                              setRefundTarget(sale);
+                              setRefundAmount(
+                                Math.max(0, sale.paidAmountXof - sale.refundedAmountXof),
+                              );
+                              setRefundMethodCode(sale.payments[0]?.paymentMethodCode || 'CASH');
+                              setRefundReason('');
+                            }}
+                            className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-amber-300 bg-amber-50 py-2 text-xs font-bold text-amber-900"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Remb.
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => {
-                            setRefundTarget(sale);
-                            setRefundAmount(
-                              Math.max(0, sale.paidAmountXof - sale.refundedAmountXof),
-                            );
-                            setRefundReason('');
-                          }}
-                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-300 py-2 text-xs font-semibold text-slate-700"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          Remb.
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
+                            setModalErr(null);
                             setCancelSaleTarget(sale);
                             setCancelReason('');
                           }}
-                          className="inline-flex items-center justify-center gap-1 rounded-xl bg-red-50 py-2 text-xs font-semibold text-red-700"
+                          className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-red-50 py-2 text-xs font-semibold text-red-700"
                         >
                           <XCircle className="h-3.5 w-3.5" />
                           Annuler
                         </button>
                       </div>
-                    ) : sale.cancelReason ? (
-                      <p className="mt-2 text-xs text-slate-500">Motif : {sale.cancelReason}</p>
-                    ) : null}
+                    ) : (
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <p className="text-xs text-slate-500">
+                          {sale.cancelReason ? `Motif : ${sale.cancelReason}` : 'Vente annulée'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => openSaleDocument(sale.id, 'SALE_RECEIPT')}
+                          className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                        >
+                          Voir ticket ANNULÉ
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1048,61 +1156,95 @@ export default function PosPage() {
                           </p>
                         </td>
                         <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                              sale.status === 'COMPLETED'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-red-50 text-red-700'
-                            }`}
-                          >
-                            {sale.status === 'COMPLETED' ? 'Validée' : 'Annulée'}
-                          </span>
+                          <div className="flex flex-col items-start gap-1">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                                sale.status === 'COMPLETED'
+                                  ? sale.refundedAmountXof >= sale.paidAmountXof && sale.paidAmountXof > 0
+                                    ? 'bg-amber-50 text-amber-800'
+                                    : 'bg-emerald-50 text-emerald-700'
+                                  : 'bg-rose-50 text-rose-700'
+                              }`}
+                            >
+                              {sale.status === 'COMPLETED'
+                                ? sale.refundedAmountXof >= sale.paidAmountXof && sale.paidAmountXof > 0
+                                  ? 'Remboursée'
+                                  : sale.refundedAmountXof > 0
+                                    ? 'Remb. partiel'
+                                    : 'Validée'
+                                : 'Annulée'}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {sale.status === 'COMPLETED' ? (
-                            <div className="inline-flex flex-wrap justify-end gap-1.5">
+                          <div className="inline-flex flex-wrap justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openSaleDocument(sale.id, 'SALE_RECEIPT')}
+                              className="inline-flex items-center gap-1 rounded-lg bg-forest-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-forest-800"
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                              Ticket
+                            </button>
+                            {sale.refundedAmountXof > 0 ? (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setReturnTarget(sale);
-                                  setReturnLineId(sale.lines[0]?.id || '');
-                                  setReturnQty(1);
-                                  setReturnReason('');
-                                }}
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                                onClick={() => openSaleDocument(sale.id, 'CREDIT_NOTE')}
+                                className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                               >
-                                <Undo2 className="h-3.5 w-3.5" />
-                                Retour
+                                <FileText className="h-3.5 w-3.5" />
+                                Avoir
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setRefundTarget(sale);
-                                  setRefundAmount(
-                                    Math.max(0, sale.paidAmountXof - sale.refundedAmountXof),
-                                  );
-                                  setRefundReason('');
-                                }}
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                                Rembourser
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCancelSaleTarget(sale);
-                                  setCancelReason('');
-                                }}
-                                className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
-                              >
-                                <XCircle className="h-3.5 w-3.5" />
-                                Annuler
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-slate-400">{sale.cancelReason}</span>
-                          )}
+                            ) : null}
+                            {sale.status === 'COMPLETED' ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setModalErr(null);
+                                    setReturnTarget(sale);
+                                    setReturnLineId(sale.lines[0]?.id || '');
+                                    setReturnQty(1);
+                                    setReturnReason('');
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                                >
+                                  <Undo2 className="h-3.5 w-3.5" />
+                                  Retour
+                                </button>
+                                {sale.paidAmountXof - sale.refundedAmountXof > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setModalErr(null);
+                                      setRefundTarget(sale);
+                                      setRefundAmount(
+                                        Math.max(0, sale.paidAmountXof - sale.refundedAmountXof),
+                                      );
+                                      setRefundMethodCode(sale.payments[0]?.paymentMethodCode || 'CASH');
+                                      setRefundReason('');
+                                    }}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                    Rembourser
+                                  </button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setModalErr(null);
+                                    setCancelSaleTarget(sale);
+                                    setCancelReason('');
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
+                                >
+                                  <XCircle className="h-3.5 w-3.5" />
+                                  Annuler
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1123,6 +1265,11 @@ export default function PosPage() {
               <p className="mt-1 text-xs text-slate-600">
                 La vente reste dans l’historique avec mention ANNULÉ et réintègre les articles en stock.
               </p>
+              {modalErr ? (
+                <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+                  {modalErr}
+                </div>
+              ) : null}
               <textarea
                 rows={3}
                 required
@@ -1162,6 +1309,11 @@ export default function PosPage() {
               <h3 className="text-lg font-bold text-slate-900">
                 Retour article — {returnTarget.saleNumber}
               </h3>
+              {modalErr ? (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+                  {modalErr}
+                </div>
+              ) : null}
               <div>
                 <label className="block text-xs font-medium text-slate-700">Article</label>
                 <select
@@ -1229,57 +1381,110 @@ export default function PosPage() {
           </div>
         ) : null}
 
-        {/* Modale Remboursement */}
+        {/* Modale Remboursement (avec mode de remboursement + erreur inline + génération Avoir) */}
         {refundTarget ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/65 p-4 backdrop-blur-xs">
             <form
               onSubmit={handleRefundSubmit}
-              className="max-h-[90dvh] w-full max-w-md space-y-3 overflow-y-auto rounded-2xl bg-white p-5 shadow-xl sm:p-6"
+              className="max-h-[90dvh] w-full max-w-md space-y-3.5 overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-6"
             >
-              <h3 className="text-lg font-bold text-slate-900">
-                Remboursement — {refundTarget.saleNumber}
+              <h3 className="text-lg font-extrabold text-slate-900">
+                Remboursement & Avoir — {refundTarget.saleNumber}
               </h3>
               <p className="text-xs text-slate-600">
                 Maximum remboursable :{' '}
-                <strong>
+                <strong className="text-slate-900 tabular">
                   {formatXof(refundTarget.paidAmountXof - refundTarget.refundedAmountXof)}
                 </strong>
+                . Le montant remboursé sera immédiatement déduit du chiffre d’affaires net et un
+                avoir numéroté sera généré.
               </p>
-              <input
-                type="number"
-                min={1}
-                max={refundTarget.paidAmountXof - refundTarget.refundedAmountXof}
-                required
-                value={refundAmount}
-                onChange={(e) => setRefundAmount(Number(e.target.value) || 0)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold"
-              />
-              <textarea
-                rows={2}
-                required
-                value={refundReason}
-                onChange={(e) => setRefundReason(e.target.value)}
-                placeholder="Motif obligatoire du remboursement…"
-                className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"
-              />
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+
+              {modalErr ? (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+                  {modalErr}
+                </div>
+              ) : null}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Montant à rembourser (XOF) *
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={refundTarget.paidAmountXof - refundTarget.refundedAmountXof}
+                    required
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(Number(e.target.value) || 0)}
+                    className="sc-input mt-1 font-bold tabular"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Mode de remboursement *
+                  </label>
+                  <select
+                    value={refundMethodCode}
+                    onChange={(e) => setRefundMethodCode(e.target.value)}
+                    className="sc-input mt-1"
+                  >
+                    {paymentMethods.map((m) => (
+                      <option key={m.code} value={m.code}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  Motif obligatoire (5+ caractères) *
+                </label>
+                <textarea
+                  rows={2}
+                  required
+                  minLength={5}
+                  value={refundReason}
+                  onChange={(e) => setRefundReason(e.target.value)}
+                  placeholder="Ex. Article retourné par le client / erreur facturation…"
+                  className="sc-input mt-1"
+                />
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={() => setRefundTarget(null)}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 sm:w-auto"
+                  onClick={() => {
+                    setRefundTarget(null);
+                    setModalErr(null);
+                  }}
+                  className="sc-btn-ghost w-full sm:w-auto"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  disabled={busy}
-                  className="w-full rounded-xl bg-forest-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto"
+                  disabled={busy || refundReason.trim().length < 5 || refundAmount <= 0}
+                  className="sc-btn-primary w-full sm:w-auto"
                 >
-                  Rembourser en espèces
+                  {busy ? 'Enregistrement…' : 'Confirmer le remboursement'}
                 </button>
               </div>
             </form>
           </div>
+        ) : null}
+
+        {/* Modale Ticket de caisse / Avoir (Lot 3) */}
+        {activeDoc && shopId ? (
+          <ReceiptModal
+            shopId={shopId}
+            document={activeDoc}
+            onClose={() => setActiveDoc(null)}
+            onUpdated={(d) => setActiveDoc(d)}
+          />
         ) : null}
       </div>
     </AppShell>

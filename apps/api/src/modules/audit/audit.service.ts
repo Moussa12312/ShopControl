@@ -352,7 +352,7 @@ export class AuditService {
       where: {
         merchantId,
         ...(query.shopId ? { shopId: query.shopId } : {}),
-        ...(query.action ? { action: query.action } : {}),
+        ...(query.action ? { action: { contains: query.action, mode: 'insensitive' } } : {}),
         ...(query.declaredOperatorId ? { declaredOperatorId: query.declaredOperatorId } : {}),
         ...(dateFilter ? { createdAt: dateFilter } : {}),
       },
@@ -376,7 +376,7 @@ export class AuditService {
           const client = await this.shopDbManager.getClientForShop(shop.id);
           const rows = await client.shopAuditLog.findMany({
             where: {
-              ...(query.action ? { action: query.action } : {}),
+              ...(query.action ? { action: { contains: query.action, mode: 'insensitive' } } : {}),
               ...(query.declaredOperatorId ? { declaredOperatorId: query.declaredOperatorId } : {}),
               ...(dateFilter ? { createdAt: dateFilter } : {}),
             },

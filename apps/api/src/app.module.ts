@@ -27,13 +27,20 @@ import { SalesModule } from './modules/sales/sales.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { ImportsModule } from './modules/imports/imports.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
+import { DocumentsModule } from './modules/documents/documents.module';
+import { TransfersModule } from './modules/transfers/transfers.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { MessagingModule } from './modules/messaging/messaging.module';
+import { PlatformModule } from './modules/platform/platform.module';
 
 @Module({
   imports: [
     ThrottlerModule.forRoot([
       {
         ttl: 60_000,
-        limit: process.env.NODE_ENV === 'test' ? 1000 : 120,
+        limit: process.env.NODE_ENV === 'test' ? 5000 : 600,
       },
     ]),
     DatabaseModule,
@@ -58,6 +65,13 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     ExpensesModule,
     ImportsModule,
     AnalyticsModule,
+    UploadsModule,
+    DocumentsModule,
+    TransfersModule,
+    ReportsModule,
+    OrdersModule,
+    MessagingModule,
+    PlatformModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

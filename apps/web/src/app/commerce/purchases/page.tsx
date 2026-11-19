@@ -103,14 +103,14 @@ export default function PurchasesPage() {
       setSuppliers(s);
       setOrders(o);
       setProducts(p.items);
-      if (s[0] && !poSupplierId) setPoSupplierId(s[0].id);
-      if (p.items[0] && !poProductId) setPoProductId(p.items[0].id);
+      if (s[0]) setPoSupplierId((prev) => (prev && s.some((x) => x.id === prev) ? prev : s[0].id));
+      if (p.items[0]) setPoProductId((prev) => (prev && p.items.some((x) => x.id === prev) ? prev : p.items[0].id));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur de chargement des achats.');
     } finally {
       setLoading(false);
     }
-  }, [shopId, poSupplierId, poProductId]);
+  }, [shopId]);
 
   useEffect(() => {
     void load();

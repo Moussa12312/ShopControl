@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Database, ExternalLink, Pencil, Plus } from 'lucide-react';
+import { Database, ExternalLink, Pencil, Plus, QrCode, Settings } from 'lucide-react';
 import {
   DEFAULT_CURRENCY,
   DEFAULT_DAILY_REPORT_TIME,
@@ -13,6 +13,8 @@ import {
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { AppShell } from '@/components/layout/AppShell';
+import { ShopQrModal } from '@/components/commerce/ShopQrModal';
+import { ImageUploader } from '@/components/ui/ImageUploader';
 import {
   EmptyState,
   ErrorState,
@@ -24,6 +26,7 @@ interface ShopRow {
   id: string;
   name: string;
   slug: string;
+  logoUrl?: string | null;
   status: string;
   dbName: string;
   dbStatus: string;
@@ -50,10 +53,12 @@ export default function OwnerShopsPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingShop, setEditingShop] = useState<ShopRow | null>(null);
+  const [qrShop, setQrShop] = useState<ShopRow | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
     slug: '',
+    logoUrl: null as string | null,
     phone: '',
     address: '',
     currency: DEFAULT_CURRENCY,
@@ -87,6 +92,7 @@ export default function OwnerShopsPage() {
     setForm({
       name: '',
       slug: '',
+      logoUrl: null,
       phone: '',
       address: '',
       currency: DEFAULT_CURRENCY,
@@ -105,6 +111,7 @@ export default function OwnerShopsPage() {
     setForm({
       name: shop.name,
       slug: shop.slug,
+      logoUrl: shop.logoUrl || null,
       phone: shop.phone || '',
       address: shop.address || '',
       currency: shop.currency,
@@ -125,6 +132,7 @@ export default function OwnerShopsPage() {
       const payload = {
         name: form.name,
         ...(form.slug.trim() ? { slug: form.slug.trim() } : {}),
+        logoUrl: form.logoUrl,
         phone: form.phone.trim() || undefined,
         address: form.address.trim() || undefined,
         currency: form.currency,
@@ -203,16 +211,30 @@ export default function OwnerShopsPage() {
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h2 className="text-lg font-bold text-slate-900">{shop.name}</h2>
-                      <Link
-                        href={`/s/${shop.slug}`}
-                        target="_blank"
-                        className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline"
-                      >
-                        Vitrine : /s/{shop.slug}
-                        <ExternalLink className="h-3 w-3" />
-                      </Link>
+                    <div className="flex items-center gap-3 min-w-0">
+                      {shop.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={shop.logoUrl}
+                          alt={shop.name}
+                          className="h-12 w-12 shrink-0 rounded-2xl border border-slate-200 bg-white object-contain p-1"
+                        />
+                      ) : (
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-forest-900 text-sm font-black text-limeglow-400">
+                          {shop.name.slice(0, 2).toUpperCase()}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <h2 className="truncate text-lg font-extrabold text-slate-900">{shop.name}</h2>
+                        <Link
+                          href={`/s/${shop.slug}`}
+                          target="_blank"
+                          className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"
+                        >
+                          Vitrine : /s/{shop.slug}
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <StatusBadge status={shop.status} />
@@ -242,21 +264,40 @@ export default function OwnerShopsPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
                   <span>
                     {shop.activeAgentsCount} agent(s) · {shop.activeOperatorsCount} opérateur(s) ·{' '}
                     {shop.activeTerminalsCount} terminal(aux)
                   </span>
-                  {!supportGrantId ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => openEdit(shop)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-100"
+                      onClick={() => setQrShop(shop)}
+                      className="inline-flex items-center gap-1 rounded-xl bg-forest-900 px-3 py-1.5 font-bold text-limeglow-400 hover:bg-forest-800"
                     >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Paramètres
+                      <QrCode className="h-3.5 w-3.5" />
+                      QR & Affiche
                     </button>
-                  ) : null}
+                    {!supportGrantId ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(shop)}
+                          className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-100"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Modifier
+                        </button>
+                        <Link
+                          href="/owner/settings"
+                          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-2.5 py-1.5 font-semibold text-slate-600 hover:bg-slate-50"
+                          title="Logo, Tickets & Livraison"
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                        </Link>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ))}
@@ -280,6 +321,13 @@ export default function OwnerShopsPage() {
               ) : null}
 
               <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+                <ImageUploader
+                  purpose="logo"
+                  aspect="wide"
+                  label="Logo de la boutique (optionnel)"
+                  value={form.logoUrl}
+                  onChange={(url) => setForm((f) => ({ ...f, logoUrl: url }))}
+                />
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-medium text-slate-700">
@@ -410,6 +458,15 @@ export default function OwnerShopsPage() {
               </form>
             </div>
           </div>
+        ) : null}
+
+        {qrShop ? (
+          <ShopQrModal
+            slug={qrShop.slug}
+            shopName={qrShop.name}
+            logoUrl={qrShop.logoUrl}
+            onClose={() => setQrShop(null)}
+          />
         ) : null}
       </div>
     </AppShell>

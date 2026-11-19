@@ -127,9 +127,12 @@ export const updateMerchantSchema = z.object({
   defaultTimezone: z.string().trim().min(3).max(60).optional(),
 });
 
+import { deliveryConfigSchema, receiptSettingsSchema } from './platform.schemas';
+
 export const createShopSchema = z.object({
   name: z.string().trim().min(2, 'Le nom de la boutique est requis.').max(120),
   slug: slugSchema.optional(),
+  logoUrl: z.string().trim().max(500).nullable().optional(),
   phone: z.string().trim().max(30).optional(),
   email: z.string().trim().email('E-mail boutique invalide.').toLowerCase().optional().or(z.literal('')),
   address: z.string().trim().max(255).optional(),
@@ -141,6 +144,8 @@ export const createShopSchema = z.object({
   requireOperatorPin: z.boolean().default(false),
   openingHours: openingHoursSchema.optional(),
   paymentMethods: z.array(paymentMethodConfigSchema).min(1).optional(),
+  deliveryConfig: deliveryConfigSchema.partial().optional(),
+  receiptSettings: receiptSettingsSchema.partial().optional(),
 });
 
 export const updateShopSchema = createShopSchema.partial();

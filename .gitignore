@@ -25,6 +25,7 @@ npm-debug.log*
 coverage/
 .nyc_output/
 .pgdata-dev/
+/uploads/
 
 # OS & IDE
 .DS_Store

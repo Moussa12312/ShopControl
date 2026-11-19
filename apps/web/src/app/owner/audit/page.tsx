@@ -57,13 +57,18 @@ export default function OwnerAuditPage() {
   }, [load]);
 
   const handleVerifyIntegrity = async () => {
-    const qs = selectedShopId !== 'ALL' ? `?shopId=${selectedShopId}` : '';
-    const res = await apiFetch<{
-      allValid: boolean;
-      control: { valid: boolean; checkedCount: number };
-      shops: Array<{ shopName: string; valid: boolean; checkedCount: number }>;
-    }>(`/audit-logs/verify-integrity${qs}`, { supportGrantId });
-    setIntegrity(res);
+    try {
+      setError(null);
+      const qs = selectedShopId !== 'ALL' ? `?shopId=${selectedShopId}` : '';
+      const res = await apiFetch<{
+        allValid: boolean;
+        control: { valid: boolean; checkedCount: number };
+        shops: Array<{ shopName: string; valid: boolean; checkedCount: number }>;
+      }>(`/audit-logs/verify-integrity${qs}`, { supportGrantId });
+      setIntegrity(res);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Vérification d’intégrité impossible.');
+    }
   };
 
   return (

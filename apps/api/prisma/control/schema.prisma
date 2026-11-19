@@ -70,6 +70,11 @@ model Merchant {
   notifications       Notification[]
   auditLogs           AuditLog[]
   companyExpenses     CompanyExpense[]
+  stockTransfers      StockTransfer[]
+  conversations       Conversation[]
+  subscription        MerchantSubscription?
+  platformPayments    PlatformPayment[]
+  supportTickets      SupportTicket[]
 
   @@index([status])
   @@index([createdAt])
@@ -108,6 +113,9 @@ model Shop {
   userAccesses   UserShopAccess[]
   notifications  Notification[]
   auditLogs      AuditLog[]
+  outgoingTransfers StockTransfer[] @relation("TransferSourceShop")
+  incomingTransfers StockTransfer[] @relation("TransferDestShop")
+  conversations  Conversation[]
 
   @@index([merchantId])
   @@index([status])
@@ -291,4 +299,199 @@ model CompanyExpense {
   @@index([merchantId, expenseDate])
   @@index([merchantId, status])
   @@map("company_expenses")
+}
+
+// ============================================================================
+// LOT 4 — TRANSFERTS INTER-BOUTIQUES (COORDINATION MULTI-BDD)
+// ============================================================================
+
+model StockTransfer {
+  id                      String    @id @default(uuid()) @db.Uuid
+  merchantId              String    @map("merchant_id") @db.Uuid
+  transferNumber          String    @unique @map("transfer_number") @db.VarChar(40)
+  sourceShopId            String    @map("source_shop_id") @db.Uuid
+  destShopId              String    @map("dest_shop_id") @db.Uuid
+  status                  String    @default("PENDING_APPROVAL") @db.VarChar(32)
+  requestedByUserId       String    @map("requested_by_user_id") @db.Uuid
+  requestedByOperatorName String?   @map("requested_by_operator_name") @db.VarChar(80)
+  approvedByUserId        String?   @map("approved_by_user_id") @db.Uuid
+  approvedAt              DateTime? @map("approved_at") @db.Timestamptz(6)
+  rejectedReason          String?   @map("rejected_reason") @db.VarChar(500)
+  dispatchedByUserId      String?   @map("dispatched_by_user_id") @db.Uuid
+  dispatchedByOperatorName String?  @map("dispatched_by_operator_name") @db.VarChar(80)
+  dispatchedAt            DateTime? @map("dispatched_at") @db.Timestamptz(6)
+  receivedByUserId        String?   @map("received_by_user_id") @db.Uuid
+  receivedByOperatorName  String?   @map("received_by_operator_name") @db.VarChar(80)
+  receivedAt              DateTime? @map("received_at") @db.Timestamptz(6)
+  hasDiscrepancy          Boolean   @default(false) @map("has_discrepancy")
+  notes                   String?   @db.VarChar(500)
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  merchant   Merchant            @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  sourceShop Shop                @relation("TransferSourceShop", fields: [sourceShopId], references: [id], onDelete: Restrict)
+  destShop   Shop                @relation("TransferDestShop", fields: [destShopId], references: [id], onDelete: Restrict)
+  items      StockTransferItem[]
+
+  @@index([merchantId, status, createdAt])
+  @@index([sourceShopId, status])
+  @@index([destShopId, status])
+  @@map("stock_transfers")
+}
+
+model StockTransferItem {
+  id                String  @id @default(uuid()) @db.Uuid
+  transferId        String  @map("transfer_id") @db.Uuid
+  sourceProductId   String  @map("source_product_id") @db.Uuid
+  destProductId     String? @map("dest_product_id") @db.Uuid
+  productSku        String  @map("product_sku") @db.VarChar(64)
+  productName       String  @map("product_name") @db.VarChar(160)
+  salePriceXof      Int     @default(0) @map("sale_price_xof")
+  unitCostXof       Int?    @map("unit_cost_xof")
+  requestedQty      Int     @map("requested_qty")
+  dispatchedQty     Int     @default(0) @map("dispatched_qty")
+  receivedQty       Int     @default(0) @map("received_qty")
+  discrepancyReason String? @map("discrepancy_reason") @db.VarChar(300)
+
+  transfer StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  @@index([transferId])
+  @@map("stock_transfer_items")
+}
+
+// ============================================================================
+// LOT 6 — MESSAGERIE UNIFIÉE (PROPRIÉTAIRE, AGENTS, CLIENTS, SUPPORT)
+// ============================================================================
+
+model Conversation {
+  id                  String   @id @default(uuid()) @db.Uuid
+  merchantId          String   @map("merchant_id") @db.Uuid
+  shopId              String?  @map("shop_id") @db.Uuid
+  type                String   @db.VarChar(32)
+  status              String   @default("OPEN") @db.VarChar(16)
+  subject             String   @db.VarChar(180)
+  orderId             String?  @map("order_id") @db.Uuid
+  orderNumber         String?  @map("order_number") @db.VarChar(40)
+  clientName          String?  @map("client_name") @db.VarChar(120)
+  clientPhone         String?  @map("client_phone") @db.VarChar(30)
+  clientSecretToken   String?  @unique @map("client_secret_token") @db.VarChar(96)
+  assignedAgentUserId String?  @map("assigned_agent_user_id") @db.Uuid
+  lastMessageAt       DateTime @default(now()) @map("last_message_at") @db.Timestamptz(6)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  merchant Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  shop     Shop?     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([merchantId, lastMessageAt])
+  @@index([shopId, lastMessageAt])
+  @@index([type, lastMessageAt])
+  @@map("conversations")
+}
+
+model Message {
+  id                   String   @id @default(uuid()) @db.Uuid
+  conversationId       String   @map("conversation_id") @db.Uuid
+  senderRole           String   @map("sender_role") @db.VarChar(24)
+  senderUserId         String?  @map("sender_user_id") @db.Uuid
+  senderName           String   @map("sender_name") @db.VarChar(120)
+  declaredOperatorName String?  @map("declared_operator_name") @db.VarChar(80)
+  body                 String   @db.VarChar(2000)
+  attachmentUrl        String?  @map("attachment_url") @db.VarChar(500)
+  isRead               Boolean  @default(false) @map("is_read")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// ============================================================================
+// LOT 7 — ADMINISTRATION PLATEFORME (ABONNEMENTS, MODULES, PAIEMENTS, SUPPORT, ANNONCES)
+// ============================================================================
+
+model MerchantSubscription {
+  id                   String   @id @default(uuid()) @db.Uuid
+  merchantId           String   @unique @map("merchant_id") @db.Uuid
+  planCode             String   @default("PRO") @map("plan_code") @db.VarChar(32)
+  monthlyPriceXof      Int      @default(25000) @map("monthly_price_xof")
+  maxShops             Int      @default(5) @map("max_shops")
+  maxAgentsPerShop     Int      @default(10) @map("max_agents_per_shop")
+  enabledModules       Json     @default("[\"POS\",\"INVENTORY\",\"PURCHASES\",\"MULTI_SHOP\",\"ECOMMERCE_QR\",\"MESSAGING\",\"REPORTS\"]") @map("enabled_modules")
+  currentPeriodStart   DateTime @default(now()) @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd     DateTime @map("current_period_end") @db.Timestamptz(6)
+  autoSuspendGraceDays Int      @default(7) @map("auto_suspend_grace_days")
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("merchant_subscriptions")
+}
+
+model PlatformPayment {
+  id                String   @id @default(uuid()) @db.Uuid
+  merchantId        String   @map("merchant_id") @db.Uuid
+  amountXof         Int      @map("amount_xof")
+  paymentMethodCode String   @map("payment_method_code") @db.VarChar(32)
+  reference         String?  @db.VarChar(120)
+  periodLabel       String   @map("period_label") @db.VarChar(80)
+  notes             String?  @db.VarChar(300)
+  recordedByUserId  String   @map("recorded_by_user_id") @db.Uuid
+  paidAt            DateTime @default(now()) @map("paid_at") @db.Timestamptz(6)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+
+  @@index([merchantId, paidAt])
+  @@map("platform_payments")
+}
+
+model SupportTicket {
+  id              String   @id @default(uuid()) @db.Uuid
+  ticketNumber    String   @unique @map("ticket_number") @db.VarChar(32)
+  merchantId      String   @map("merchant_id") @db.Uuid
+  createdByUserId String   @map("created_by_user_id") @db.Uuid
+  subject         String   @db.VarChar(180)
+  status          String   @default("OPEN") @db.VarChar(24)
+  priority        String   @default("INFO") @db.VarChar(16)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  merchant Merchant               @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  messages SupportTicketMessage[]
+
+  @@index([merchantId, status])
+  @@index([status, updatedAt])
+  @@map("support_tickets")
+}
+
+model SupportTicketMessage {
+  id           String   @id @default(uuid()) @db.Uuid
+  ticketId     String   @map("ticket_id") @db.Uuid
+  senderUserId String   @map("sender_user_id") @db.Uuid
+  senderRole   String   @map("sender_role") @db.VarChar(24)
+  senderName   String   @map("sender_name") @db.VarChar(120)
+  body         String   @db.VarChar(2000)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_messages")
+}
+
+model PlatformAnnouncement {
+  id                String    @id @default(uuid()) @db.Uuid
+  title             String    @db.VarChar(160)
+  body              String    @db.VarChar(1500)
+  priority          String    @default("INFO") @db.VarChar(16)
+  targetRole        String    @default("ALL") @map("target_role") @db.VarChar(16)
+  isActive          Boolean   @default(true) @map("is_active")
+  publishedByUserId String    @map("published_by_user_id") @db.Uuid
+  expiresAt         DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([isActive, createdAt])
+  @@map("platform_announcements")
 }

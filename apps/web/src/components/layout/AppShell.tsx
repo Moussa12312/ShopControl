@@ -5,24 +5,31 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   AlertTriangle,
+  ArrowLeftRight,
   Banknote,
+  BarChart3,
   Bell,
   Boxes,
   Building2,
   CheckCheck,
   ChevronLeft,
   ChevronRight,
+  Crown,
   Database,
   FileSearch,
+  FileText,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Menu,
+  MessageSquare,
   Package,
   Plus,
   Receipt,
   Search,
   Settings,
   ShieldCheck,
+  ShoppingBag,
   ShoppingCart,
   Store,
   Truck,
@@ -44,6 +51,7 @@ interface NavItem {
   href: string;
   label: string;
   shortLabel?: string;
+  group: string;
   icon: React.ComponentType<{ className?: string }>;
   requiredPerm?: PermissionKey;
   inTopBar?: boolean;
@@ -61,39 +69,57 @@ interface NotificationItem {
   createdAt: string;
 }
 
+interface AnnouncementItem {
+  id: string;
+  title: string;
+  body: string;
+  priority: 'INFO' | 'WARNING' | 'URGENT';
+}
+
 const NAV_BY_ROLE: Record<'SUPER_ADMIN' | 'OWNER' | 'AGENT', NavItem[]> = {
   SUPER_ADMIN: [
-    { href: '/admin', label: 'Tableau de bord', shortLabel: 'Accueil', icon: LayoutDashboard, inTopBar: true, inMobileDock: true },
-    { href: '/admin/merchants', label: 'Marchands', icon: Building2, inTopBar: true, inMobileDock: true },
-    { href: '/admin/shops', label: 'Boutiques & BDD', shortLabel: 'Boutiques', icon: Database, inTopBar: true, inMobileDock: true },
-    { href: '/admin/security', label: 'Sécurité & Audit', shortLabel: 'Sécurité', icon: ShieldCheck, inTopBar: true, inMobileDock: true },
+    { href: '/admin', label: 'Tableau de bord', shortLabel: 'Accueil', group: 'Plateforme', icon: LayoutDashboard, inTopBar: true, inMobileDock: true },
+    { href: '/admin/merchants', label: 'Marchands', group: 'Plateforme', icon: Building2, inTopBar: true, inMobileDock: true },
+    { href: '/admin/shops', label: 'Boutiques & BDD', shortLabel: 'Boutiques', group: 'Plateforme', icon: Database, inTopBar: true, inMobileDock: true },
+    { href: '/admin/platform', label: 'Abonnements & Support', shortLabel: 'SaaS', group: 'Plateforme', icon: Crown, inTopBar: true, inMobileDock: true },
+    { href: '/messaging', label: 'Messagerie', group: 'Communication', icon: MessageSquare, inTopBar: true },
+    { href: '/admin/security', label: 'Sécurité & Audit', shortLabel: 'Sécurité', group: 'Sécurité', icon: ShieldCheck },
   ],
   OWNER: [
-    { href: '/owner', label: 'Vue d’ensemble', shortLabel: 'Accueil', icon: LayoutDashboard, inTopBar: true, inMobileDock: true },
-    { href: '/pos', label: 'Ventes / POS', shortLabel: 'POS', icon: ShoppingCart, inTopBar: true, inMobileDock: true },
-    { href: '/commerce/products', label: 'Produits', icon: Package, inTopBar: true, inMobileDock: true },
-    { href: '/commerce/stock', label: 'Stocks', icon: Boxes, inTopBar: true },
-    { href: '/commerce/cash', label: 'Caisse', icon: Banknote, inTopBar: true, inMobileDock: true },
-    { href: '/commerce/purchases', label: 'Achats', icon: Truck },
-    { href: '/commerce/clients', label: 'Clients & Créances', shortLabel: 'Clients', icon: Receipt },
-    { href: '/commerce/expenses', label: 'Dépenses', icon: Wallet },
-    { href: '/commerce/import', label: 'Import CSV', icon: Upload },
-    { href: '/owner/shops', label: 'Boutiques', icon: Store },
-    { href: '/owner/agents', label: 'Agents', icon: Users },
-    { href: '/owner/operators', label: 'Opérateurs', icon: UserCheck },
-    { href: '/owner/audit', label: 'Journal d’audit', shortLabel: 'Audit', icon: FileSearch },
-    { href: '/owner/settings', label: 'Paramètres', icon: Settings },
+    { href: '/owner', label: 'Vue d’ensemble', shortLabel: 'Accueil', group: 'Pilotage', icon: LayoutDashboard, inTopBar: true, inMobileDock: true },
+    { href: '/pos', label: 'Ventes / POS', shortLabel: 'POS', group: 'Opérations', icon: ShoppingCart, inTopBar: true, inMobileDock: true },
+    { href: '/commerce/orders', label: 'Commandes QR', shortLabel: 'Commandes', group: 'Opérations', icon: ShoppingBag, inTopBar: true, inMobileDock: true },
+    { href: '/commerce/documents', label: 'Tickets & Avoirs', shortLabel: 'Tickets', group: 'Opérations', icon: FileText },
+    { href: '/commerce/cash', label: 'Caisse', group: 'Opérations', icon: Banknote, inTopBar: true },
+    { href: '/commerce/products', label: 'Produits', group: 'Catalogue & Stocks', icon: Package, inTopBar: true, inMobileDock: true },
+    { href: '/commerce/stock', label: 'Stocks', group: 'Catalogue & Stocks', icon: Boxes },
+    { href: '/commerce/transfers', label: 'Transferts', group: 'Catalogue & Stocks', icon: ArrowLeftRight },
+    { href: '/commerce/purchases', label: 'Achats', group: 'Catalogue & Stocks', icon: Truck },
+    { href: '/commerce/clients', label: 'Clients & Créances', shortLabel: 'Clients', group: 'Finances & Clients', icon: Receipt },
+    { href: '/commerce/expenses', label: 'Dépenses', group: 'Finances & Clients', icon: Wallet },
+    { href: '/owner/reports', label: 'Bilans & Exports', shortLabel: 'Bilans', group: 'Finances & Clients', icon: BarChart3, inTopBar: true },
+    { href: '/messaging', label: 'Messagerie', group: 'Communication', icon: MessageSquare },
+    { href: '/owner/shops', label: 'Boutiques & QR', shortLabel: 'Boutiques', group: 'Entreprise', icon: Store },
+    { href: '/owner/agents', label: 'Agents', group: 'Entreprise', icon: Users },
+    { href: '/owner/operators', label: 'Opérateurs', group: 'Entreprise', icon: UserCheck },
+    { href: '/commerce/import', label: 'Import CSV', group: 'Entreprise', icon: Upload },
+    { href: '/owner/audit', label: 'Journal d’audit', shortLabel: 'Audit', group: 'Entreprise', icon: FileSearch },
+    { href: '/owner/settings', label: 'Paramètres & Logo', shortLabel: 'Paramètres', group: 'Entreprise', icon: Settings },
   ],
   AGENT: [
-    { href: '/agent', label: 'Accueil boutique', shortLabel: 'Accueil', icon: Store, inTopBar: true, inMobileDock: true },
-    { href: '/pos', label: 'Ventes / POS', shortLabel: 'POS', icon: ShoppingCart, requiredPerm: 'sales:read', inTopBar: true, inMobileDock: true },
-    { href: '/commerce/products', label: 'Produits', icon: Package, requiredPerm: 'products:read', inTopBar: true, inMobileDock: true },
-    { href: '/commerce/stock', label: 'Stocks', icon: Boxes, requiredPerm: 'stock:read', inTopBar: true },
-    { href: '/commerce/cash', label: 'Caisse', icon: Banknote, requiredPerm: 'cash:read', inTopBar: true, inMobileDock: true },
-    { href: '/commerce/purchases', label: 'Achats', icon: Truck, requiredPerm: 'purchases:read' },
-    { href: '/commerce/clients', label: 'Clients', icon: Receipt, requiredPerm: 'clients:read' },
-    { href: '/commerce/expenses', label: 'Dépenses', icon: Wallet, requiredPerm: 'expenses:create' },
-    { href: '/agent/profile', label: 'Mon profil', icon: UserCheck },
+    { href: '/agent', label: 'Accueil boutique', shortLabel: 'Accueil', group: 'Comptoir', icon: Store, inTopBar: true, inMobileDock: true },
+    { href: '/pos', label: 'Ventes / POS', shortLabel: 'POS', group: 'Comptoir', icon: ShoppingCart, requiredPerm: 'sales:read', inTopBar: true, inMobileDock: true },
+    { href: '/commerce/orders', label: 'Commandes QR', shortLabel: 'Commandes', group: 'Comptoir', icon: ShoppingBag, requiredPerm: 'orders:read', inTopBar: true, inMobileDock: true },
+    { href: '/commerce/documents', label: 'Tickets & Avoirs', shortLabel: 'Tickets', group: 'Comptoir', icon: FileText, requiredPerm: 'sales:read' },
+    { href: '/commerce/cash', label: 'Caisse', group: 'Comptoir', icon: Banknote, requiredPerm: 'cash:read', inTopBar: true, inMobileDock: true },
+    { href: '/commerce/products', label: 'Produits', group: 'Gestion', icon: Package, requiredPerm: 'products:read', inTopBar: true },
+    { href: '/commerce/stock', label: 'Stocks', group: 'Gestion', icon: Boxes, requiredPerm: 'stock:read' },
+    { href: '/commerce/transfers', label: 'Transferts', group: 'Gestion', icon: ArrowLeftRight, requiredPerm: 'stock:read' },
+    { href: '/commerce/purchases', label: 'Achats', group: 'Gestion', icon: Truck, requiredPerm: 'purchases:read' },
+    { href: '/commerce/clients', label: 'Clients', group: 'Gestion', icon: Receipt, requiredPerm: 'clients:read' },
+    { href: '/commerce/expenses', label: 'Dépenses', group: 'Gestion', icon: Wallet, requiredPerm: 'expenses:create' },
+    { href: '/messaging', label: 'Messagerie', group: 'Communication', icon: MessageSquare },
+    { href: '/agent/profile', label: 'Mon profil', group: 'Compte', icon: UserCheck },
   ],
 };
 
@@ -127,13 +153,15 @@ export function AppShell({
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [dismissedAnn, setDismissedAnn] = useState<string[]>([]);
   const [quickJump, setQuickJump] = useState('');
 
   const loadNotifications = useCallback(async () => {
     if (!user) return;
     try {
       const res = await apiFetch<{ items: NotificationItem[]; unreadCount: number }>(
-        '/notifications?limit=10',
+        '/notifications?limit=12',
         { requiresOnline: false },
       );
       setNotifications(res.items);
@@ -152,13 +180,16 @@ export function AppShell({
   useEffect(() => {
     if (!user) return;
     void loadNotifications();
-    const timer = window.setInterval(loadNotifications, 20_000);
+    apiFetch<AnnouncementItem[]>('/announcements/active', { requiresOnline: false })
+      .then((list) => setAnnouncements(Array.isArray(list) ? list : []))
+      .catch(() => undefined);
+    const timer = window.setInterval(loadNotifications, 25_000);
     return () => window.clearInterval(timer);
   }, [user, loadNotifications]);
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full bg-[#f4f8f7] p-6">
+      <div className="min-h-screen w-full bg-porcelain-100 p-6">
         <LoadingSkeleton rows={6} />
       </div>
     );
@@ -172,7 +203,7 @@ export function AppShell({
 
   if (!effectiveAllowed) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-[#f4f8f7] p-6">
+      <div className="flex min-h-screen w-full items-center justify-center bg-porcelain-100 p-6">
         <AccessDeniedState />
       </div>
     );
@@ -191,12 +222,21 @@ export function AppShell({
   const topBarItems = navItems.filter((i) => i.inTopBar);
   const mobileDockItems = navItems.filter((i) => i.inMobileDock).slice(0, 4);
 
+  const groupedNav = navItems.reduce<Array<{ group: string; items: NavItem[] }>>((acc, item) => {
+    const existing = acc.find((g) => g.group === item.group);
+    if (existing) existing.items.push(item);
+    else acc.push({ group: item.group, items: [item] });
+    return acc;
+  }, []);
+
   const activeShop = shops.find((s) => s.shopId === selectedShopId);
   const isSuspended =
     merchant?.status === 'SUSPENDED' ||
     merchant?.status === 'TERMINATED' ||
     activeShop?.status === 'SUSPENDED';
   const isPastDue = merchant?.status === 'PAST_DUE';
+
+  const visibleAnnouncements = announcements.filter((a) => !dismissedAnn.includes(a.id));
 
   const isNavActive = (href: string) =>
     pathname === href ||
@@ -238,7 +278,9 @@ export function AppShell({
     e.preventDefault();
     const q = quickJump.trim().toLowerCase();
     if (!q) return;
-    const match = navItems.find((i) => i.label.toLowerCase().includes(q));
+    const match = navItems.find(
+      (i) => i.label.toLowerCase().includes(q) || (i.shortLabel || '').toLowerCase().includes(q),
+    );
     if (match) {
       router.push(match.href);
       setQuickJump('');
@@ -246,34 +288,34 @@ export function AppShell({
   };
 
   return (
-    <div className="flex min-h-screen w-full overflow-x-hidden bg-[#f4f8f7]">
+    <div className="flex min-h-screen w-full overflow-x-hidden bg-porcelain-100">
       {/* Overlay mobile drawer */}
       {mobileOpen ? (
         <div
-          className="fixed inset-0 z-40 bg-forest-950/60 backdrop-blur-xs lg:hidden"
+          className="fixed inset-0 z-40 bg-forest-950/65 backdrop-blur-xs lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       ) : null}
 
-      {/* Rail vertical plein écran Dark Forest Emerald (collé bord gauche, hauteur 100vh) */}
+      {/* Rail vertical plein écran Obsidian Emerald */}
       <aside
         aria-label="Navigation principale"
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-white/10 bg-forest-950 text-slate-200 transition-all duration-200 lg:sticky lg:top-0 ${
-          expanded ? 'w-60' : 'w-[70px]'
+        className={`no-print fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-white/[0.08] bg-forest-950 text-slate-200 transition-all duration-200 lg:sticky lg:top-0 ${
+          expanded ? 'w-64' : 'w-[72px]'
         } ${mobileOpen ? 'w-72 translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}`}
       >
-        <div className="flex h-16 items-center justify-between border-b border-white/10 px-3.5">
+        <div className="flex h-16 items-center justify-between border-b border-white/[0.08] px-3.5">
           <Link
             href={navItems[0]?.href || '/'}
             className="flex items-center gap-2.5 overflow-hidden"
             title="ShopControl"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 font-black tracking-tight text-white ring-1 ring-white/15">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-forest-700 font-black tracking-tight text-white shadow-sm ring-1 ring-white/20">
               SC
             </span>
             {expanded || mobileOpen ? (
               <div className="truncate">
-                <p className="truncate text-sm font-bold text-white">ShopControl</p>
+                <p className="truncate text-sm font-extrabold tracking-tight text-white">ShopControl</p>
                 <p className="truncate text-[11px] text-emerald-200/70">
                   {merchant?.name || USER_ROLE_LABELS[user.role]}
                 </p>
@@ -290,52 +332,62 @@ export function AppShell({
           </button>
         </div>
 
-        {/* Bouton d'action rapide vert lime (+) */}
+        {/* CTA Lime Signature */}
         <div className="px-3 pb-2 pt-3">
           <Link
             href={quickActionHref}
             onClick={() => setMobileOpen(false)}
             title={navRole === 'SUPER_ADMIN' ? 'Nouveau marchand' : 'Nouvelle vente POS'}
-            className={`flex items-center justify-center gap-2 rounded-2xl bg-limeglow-400 py-2.5 text-xs font-bold text-forest-950 shadow-sm transition hover:bg-lime-300 ${
+            className={`flex items-center justify-center gap-2 rounded-2xl bg-limeglow-400 py-2.5 text-xs font-extrabold text-forest-950 shadow-lime transition hover:bg-limeglow-300 ${
               expanded || mobileOpen ? 'px-3' : 'px-0'
             }`}
           >
-            <Plus className="h-4 w-4 shrink-0 stroke-[2.5]" />
+            <Plus className="h-4 w-4 shrink-0 stroke-[2.6]" />
             {expanded || mobileOpen ? (
-              <span>{navRole === 'SUPER_ADMIN' ? 'Nouveau marchand' : 'Nouvelle vente'}</span>
+              <span>{navRole === 'SUPER_ADMIN' ? 'Nouveau marchand' : 'Nouvelle vente POS'}</span>
             ) : null}
           </Link>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = isNavActive(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                title={!expanded && !mobileOpen ? item.label : undefined}
-                className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all ${
-                  active
-                    ? 'bg-white text-forest-900 shadow-sm'
-                    : 'text-[#8ea9a4] hover:bg-white/10 hover:text-white'
-                } ${!expanded && !mobileOpen ? 'justify-center px-0' : ''}`}
-              >
-                <Icon className="h-[18px] w-[18px] shrink-0" />
-                {expanded || mobileOpen ? <span className="truncate">{item.label}</span> : null}
-              </Link>
-            );
-          })}
+        {/* Navigation groupée */}
+        <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-2">
+          {groupedNav.map((section) => (
+            <div key={section.group} className="space-y-0.5">
+              {expanded || mobileOpen ? (
+                <p className="px-2.5 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-emerald-200/45">
+                  {section.group}
+                </p>
+              ) : null}
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const active = isNavActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    title={!expanded && !mobileOpen ? item.label : undefined}
+                    className={`flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-all ${
+                      active
+                        ? 'bg-white font-semibold text-forest-950 shadow-sm'
+                        : 'text-[#8aa8a2] hover:bg-white/[0.08] hover:text-white'
+                    } ${!expanded && !mobileOpen ? 'justify-center px-0' : ''}`}
+                  >
+                    <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-brand-700' : ''}`} />
+                    {expanded || mobileOpen ? <span className="truncate">{item.label}</span> : null}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
-        <div className="space-y-1.5 border-t border-white/10 p-3">
+        <div className="space-y-1.5 border-t border-white/[0.08] p-3">
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            aria-label={expanded ? 'Replier le rail en icônes' : 'Déplier le menu avec libellés'}
-            className={`hidden w-full items-center gap-3 rounded-2xl px-3 py-2 text-xs font-medium text-[#8ea9a4] hover:bg-white/10 hover:text-white lg:flex ${
+            aria-label={expanded ? 'Replier le menu' : 'Déplier le menu'}
+            className={`hidden w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium text-[#8aa8a2] hover:bg-white/10 hover:text-white lg:flex ${
               !expanded ? 'justify-center px-0' : ''
             }`}
           >
@@ -353,7 +405,7 @@ export function AppShell({
             type="button"
             onClick={handleLogout}
             title={!expanded && !mobileOpen ? 'Déconnexion' : undefined}
-            className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-xs font-medium text-[#8ea9a4] hover:bg-rose-500/20 hover:text-rose-200 ${
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium text-[#8aa8a2] hover:bg-rose-500/20 hover:text-rose-200 ${
               !expanded && !mobileOpen ? 'justify-center px-0' : ''
             }`}
           >
@@ -366,7 +418,7 @@ export function AppShell({
               !expanded && !mobileOpen ? 'justify-center' : 'px-1'
             }`}
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-forest-700 text-xs font-bold text-emerald-100 ring-2 ring-limeglow-400/40">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-forest-700 text-xs font-bold text-emerald-100 ring-2 ring-limeglow-400/50">
               {initials || 'SC'}
             </span>
             {expanded || mobileOpen ? (
@@ -381,11 +433,11 @@ export function AppShell({
         </div>
       </aside>
 
-      {/* Zone principale plein écran (edge-to-edge 100%) */}
+      {/* Zone principale plein écran edge-to-edge */}
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        {/* Bandeau supérieur Dark Forest Emerald */}
-        <div className="bg-forest-900 text-white">
-          <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-white/10 bg-forest-900/95 px-3 py-2.5 backdrop-blur-xs sm:px-5 lg:px-6">
+        {/* Bandeau supérieur Obsidian Emerald */}
+        <div className="no-print obsidian-hero text-white">
+          <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-white/[0.08] bg-forest-900/90 px-3 py-2.5 backdrop-blur-md sm:px-5 lg:px-6">
             <div className="flex min-w-0 items-center gap-2">
               <button
                 type="button"
@@ -396,9 +448,8 @@ export function AppShell({
                 <Menu className="h-5 w-5" />
               </button>
 
-              {/* Marque compacte mobile (masquée si sélecteur boutique affiché sur très petit écran) */}
               <span
-                className={`truncate text-sm font-bold text-white md:hidden ${
+                className={`truncate text-sm font-extrabold tracking-tight text-white md:hidden ${
                   user.role === 'OWNER' || (user.role === 'SUPER_ADMIN' && supportGrantId)
                     ? 'hidden sm:inline'
                     : ''
@@ -407,7 +458,7 @@ export function AppShell({
                 ShopControl
               </span>
 
-              {/* Pilules de navigation rapide en haut (tablette & desktop) */}
+              {/* Pilules de navigation rapide */}
               <div className="hidden items-center gap-1 md:flex">
                 {topBarItems.map((item) => {
                   const Icon = item.icon;
@@ -418,7 +469,7 @@ export function AppShell({
                       href={item.href}
                       className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
                         active
-                          ? 'bg-white text-forest-900 shadow-xs'
+                          ? 'bg-white text-forest-950 shadow-xs'
                           : 'text-[#9ab5b0] hover:bg-white/10 hover:text-white'
                       }`}
                     >
@@ -430,7 +481,7 @@ export function AppShell({
               </div>
             </div>
 
-            {/* Droite : Sélecteur boutique, recherche, statut réseau, cloche */}
+            {/* Droite : Quick jump, Sélecteur boutique, Statut réseau, Notifications */}
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
               <form onSubmit={handleQuickJumpSubmit} className="relative hidden xl:block">
                 <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-[#7d9c97]" />
@@ -439,7 +490,7 @@ export function AppShell({
                   value={quickJump}
                   onChange={(e) => setQuickJump(e.target.value)}
                   placeholder="Aller à une page…"
-                  className="w-44 rounded-full border border-white/10 bg-forest-800 py-1.5 pl-8 pr-3 text-xs text-white placeholder-[#7d9c97] focus:border-limeglow-400"
+                  className="w-44 rounded-full border border-white/10 bg-forest-800/80 py-1.5 pl-8 pr-3 text-xs text-white placeholder-[#7d9c97] focus:border-limeglow-400"
                 />
               </form>
 
@@ -452,7 +503,7 @@ export function AppShell({
                     id="shop-selector"
                     value={selectedShopId}
                     onChange={(e) => setSelectedShopId(e.target.value)}
-                    className="max-w-[165px] truncate rounded-full border border-white/15 bg-forest-800 px-2.5 py-1.5 text-xs font-medium text-white hover:border-limeglow-400/60 sm:max-w-[230px] sm:px-3"
+                    className="max-w-[165px] truncate rounded-full border border-white/15 bg-forest-800/90 px-2.5 py-1.5 text-xs font-semibold text-white hover:border-limeglow-400/60 sm:max-w-[230px] sm:px-3.5"
                   >
                     <option value="ALL" className="bg-forest-900 text-white">
                       Toutes (Consolidé)
@@ -508,7 +559,9 @@ export function AppShell({
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 ? (
-                    <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-forest-900" />
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-forest-900">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
                   ) : null}
                 </button>
 
@@ -540,13 +593,13 @@ export function AppShell({
                             key={n.id}
                             type="button"
                             onClick={() => handleMarkRead(n)}
-                            className={`block w-full px-4 py-3 text-left hover:bg-slate-50 ${
+                            className={`block w-full px-4 py-3 text-left transition hover:bg-slate-50 ${
                               !n.isRead ? 'bg-brand-50/50' : ''
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <span
-                                className={`text-xs font-semibold ${
+                                className={`text-xs font-bold ${
                                   n.priority === 'URGENT'
                                     ? 'text-rose-700'
                                     : n.priority === 'WARNING'
@@ -570,6 +623,35 @@ export function AppShell({
               </div>
             </div>
           </header>
+
+          {/* Annonces plateforme actives (Lot 7) */}
+          {visibleAnnouncements.slice(0, 1).map((ann) => (
+            <div
+              key={ann.id}
+              className={`flex items-center justify-between gap-3 px-4 py-2 text-xs font-medium lg:px-6 ${
+                ann.priority === 'URGENT'
+                  ? 'bg-rose-600 text-white'
+                  : ann.priority === 'WARNING'
+                    ? 'bg-amber-400 text-forest-950'
+                    : 'bg-brand-700/90 text-white'
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Megaphone className="h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  <strong>{ann.title} :</strong> {ann.body}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDismissedAnn((prev) => [...prev, ann.id])}
+                aria-label="Masquer l’annonce"
+                className="rounded-lg p-1 hover:bg-black/10"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
 
           {/* Bandeaux contextuels */}
           {user.mustSetupTwoFactor ? (
@@ -624,13 +706,13 @@ export function AppShell({
           {hero ? <div className="px-4 pb-6 pt-5 sm:px-5 lg:px-6">{hero}</div> : null}
         </div>
 
-        {/* Contenu principal plein écran (padding bas mobile pour la barre dock) */}
+        {/* Contenu principal plein écran */}
         <main className="w-full flex-1 p-3 pb-24 sm:p-5 sm:pb-24 lg:p-6 lg:pb-6">{children}</main>
 
-        {/* Barre de navigation mobile fixe en bas (< lg) pour une UX native sur téléphone */}
+        {/* Dock mobile natif */}
         <nav
           aria-label="Navigation rapide mobile"
-          className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950/95 px-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 text-[10px] font-semibold text-[#8ea9a4] backdrop-blur-md lg:hidden"
+          className="no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950/95 px-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 text-[10px] font-semibold text-[#8aa8a2] backdrop-blur-md lg:hidden"
         >
           {mobileDockItems.map((item) => {
             const Icon = item.icon;
@@ -640,7 +722,7 @@ export function AppShell({
                 key={item.href}
                 href={item.href}
                 className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1.5 py-1 transition ${
-                  active ? 'bg-white text-forest-900' : 'hover:text-white'
+                  active ? 'bg-white text-forest-950' : 'hover:text-white'
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0" />

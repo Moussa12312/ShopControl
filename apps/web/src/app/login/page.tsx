@@ -84,40 +84,40 @@ export default function LoginPage() {
 
   return (
     <div className="grid min-h-screen w-full bg-white lg:grid-cols-12">
-      {/* Panneau gauche Dark Forest Emerald plein écran */}
-      <div className="flex flex-col justify-between bg-forest-900 px-6 py-8 text-white sm:px-10 lg:col-span-5 lg:min-h-screen lg:px-12 lg:py-12">
+      {/* Panneau gauche Obsidian Emerald plein écran */}
+      <div className="obsidian-hero flex flex-col justify-between px-6 py-8 text-white sm:px-10 lg:col-span-5 lg:min-h-screen lg:px-12 lg:py-12">
         <div>
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 font-black text-white ring-1 ring-white/15">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-forest-700 font-black text-white shadow-sm ring-1 ring-white/20">
               SC
             </span>
             <div>
-              <p className="text-lg font-bold tracking-tight">ShopControl</p>
-              <p className="text-xs text-emerald-200/70">SaaS Commercial Multi-Boutiques</p>
+              <p className="text-lg font-extrabold tracking-tight">ShopControl</p>
+              <p className="text-xs text-emerald-200/75">SaaS Commercial & E-commerce QR</p>
             </div>
           </div>
 
-          <h1 className="mt-6 text-2xl font-bold leading-snug text-white sm:text-3xl lg:mt-14">
-            Pilotez toutes vos boutiques en temps réel.
+          <h1 className="mt-6 text-2xl font-extrabold leading-snug text-white sm:text-3xl lg:mt-14">
+            Pilotez toutes vos boutiques et vos vitrines QR en temps réel.
           </h1>
           <p className="mt-3 max-w-md text-xs leading-relaxed text-[#9bb5b0] sm:text-sm">
-            Ventes au comptoir résilientes, caisse, stocks, achats CMP, créances et supervision
-            consolidée depuis un seul espace sécurisé.
+            Comptoir POS hors-ligne, tickets 58/80 mm & PDF, caisse, stocks, transferts
+            multi-boutiques, vitrine QR sans compte et bilans consolidés.
           </p>
         </div>
 
-        <div className="lime-glow-card mt-6 hidden space-y-2.5 rounded-2xl border border-limeglow-400/20 p-5 text-xs lg:block">
-          <div className="flex items-center gap-2 font-semibold text-limeglow-400">
+        <div className="lime-glow-card mt-6 hidden space-y-2.5 rounded-2xl border border-limeglow-400/25 p-5 text-xs lg:block">
+          <div className="flex items-center gap-2 font-bold text-limeglow-400">
             <Sparkles className="h-4 w-4" />
-            <span>Architecture isolée & fiable</span>
+            <span>Plateforme complète Lots 1 à 7</span>
           </div>
-          <p className="flex items-center gap-2 text-emerald-100/85">
-            <Database className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
-            1 base PostgreSQL dédiée par boutique
+          <p className="flex items-center gap-2 text-emerald-100/90">
+            <Database className="h-3.5 w-3.5 shrink-0 text-limeglow-300" />
+            1 base PostgreSQL dédiée & isolée par boutique
           </p>
-          <p className="flex items-center gap-2 text-emerald-100/85">
-            <Store className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
-            Comptoir PWA hors-ligne · Entiers XOF
+          <p className="flex items-center gap-2 text-emerald-100/90">
+            <Store className="h-3.5 w-3.5 shrink-0 text-limeglow-300" />
+            Vitrine QR temps réel · Comptoir PWA · Entiers XOF
           </p>
         </div>
       </div>

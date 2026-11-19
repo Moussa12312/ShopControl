@@ -8,8 +8,10 @@ import {
 import {
   DEFAULT_CURRENCY,
   DEFAULT_DAILY_REPORT_TIME,
+  DEFAULT_DELIVERY_CONFIG,
   DEFAULT_OPENING_HOURS,
   DEFAULT_PAYMENT_METHODS,
+  DEFAULT_RECEIPT_SETTINGS,
   DEFAULT_TIMEZONE,
   slugifyShopName,
   TaxMode,
@@ -24,6 +26,7 @@ import { RequestMeta } from '../auth/auth.service';
 export interface CreateShopPayload {
   name: string;
   slug?: string;
+  logoUrl?: string | null;
   phone?: string;
   email?: string;
   address?: string;
@@ -35,6 +38,8 @@ export interface CreateShopPayload {
   requireOperatorPin?: boolean;
   openingHours?: unknown;
   paymentMethods?: unknown;
+  deliveryConfig?: unknown;
+  receiptSettings?: unknown;
 }
 
 @Injectable()
@@ -126,6 +131,7 @@ export class ShopsService {
         status: 'ACTIVE',
         dbName,
         dbStatus: 'PROVISIONING',
+        logoUrl: input.logoUrl || null,
         phone: input.phone || null,
         email: input.email || null,
         address: input.address || null,
@@ -137,6 +143,8 @@ export class ShopsService {
         requireOperatorPin: input.requireOperatorPin ?? false,
         openingHours: openingHours as object,
         paymentMethods: paymentMethods as object,
+        deliveryConfig: { ...DEFAULT_DELIVERY_CONFIG, ...((input.deliveryConfig as object) || {}) } as object,
+        receiptSettings: { ...DEFAULT_RECEIPT_SETTINGS, ...((input.receiptSettings as object) || {}) } as object,
       },
     });
 
@@ -267,6 +275,7 @@ export class ShopsService {
           dbName: shop.dbName,
           dbStatus: shop.dbStatus,
           dbSchemaVersion: shop.dbSchemaVersion,
+          logoUrl: shop.logoUrl,
           phone: shop.phone,
           email: shop.email,
           address: shop.address,
@@ -278,6 +287,8 @@ export class ShopsService {
           requireOperatorPin: shop.requireOperatorPin,
           openingHours: shop.openingHours,
           paymentMethods: shop.paymentMethods,
+          deliveryConfig: { ...DEFAULT_DELIVERY_CONFIG, ...((shop.deliveryConfig as object) || {}) },
+          receiptSettings: { ...DEFAULT_RECEIPT_SETTINGS, ...((shop.receiptSettings as object) || {}) },
           activeAgentsCount: shop._count.userAccesses,
           activeOperatorsCount: operatorsCount,
           activeTerminalsCount: terminalsCount,
@@ -297,7 +308,11 @@ export class ShopsService {
     if (!shop) {
       throw new NotFoundException({ code: 'SHOP_NOT_FOUND', message: 'Boutique introuvable.' });
     }
-    return shop;
+    return {
+      ...shop,
+      deliveryConfig: { ...DEFAULT_DELIVERY_CONFIG, ...((shop.deliveryConfig as object) || {}) },
+      receiptSettings: { ...DEFAULT_RECEIPT_SETTINGS, ...((shop.receiptSettings as object) || {}) },
+    };
   }
 
   async updateShop(
@@ -354,6 +369,7 @@ export class ShopsService {
         data: {
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(slugChanged ? { slug: nextSlug } : {}),
+          ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl || null } : {}),
           ...(input.phone !== undefined ? { phone: input.phone || null } : {}),
           ...(input.email !== undefined ? { email: input.email || null } : {}),
           ...(input.address !== undefined ? { address: input.address || null } : {}),
@@ -368,6 +384,24 @@ export class ShopsService {
           ...(input.openingHours !== undefined ? { openingHours: input.openingHours as object } : {}),
           ...(input.paymentMethods !== undefined
             ? { paymentMethods: input.paymentMethods as object }
+            : {}),
+          ...(input.deliveryConfig !== undefined
+            ? {
+                deliveryConfig: {
+                  ...DEFAULT_DELIVERY_CONFIG,
+                  ...((existing.deliveryConfig as object) || {}),
+                  ...(input.deliveryConfig as object),
+                } as object,
+              }
+            : {}),
+          ...(input.receiptSettings !== undefined
+            ? {
+                receiptSettings: {
+                  ...DEFAULT_RECEIPT_SETTINGS,
+                  ...((existing.receiptSettings as object) || {}),
+                  ...(input.receiptSettings as object),
+                } as object,
+              }
             : {}),
         },
       });
@@ -566,11 +600,15 @@ export class ShopsService {
         id: shop.id,
         name: shop.name,
         slug: shop.slug,
+        logoUrl: shop.logoUrl,
         phone: shop.phone,
+        email: shop.email,
         address: shop.address,
         currency: shop.currency,
         timezone: shop.timezone,
         openingHours: shop.openingHours,
+        deliveryConfig: { ...DEFAULT_DELIVERY_CONFIG, ...((shop.deliveryConfig as object) || {}) },
+        receiptSettings: { ...DEFAULT_RECEIPT_SETTINGS, ...((shop.receiptSettings as object) || {}) },
       },
     };
   }
