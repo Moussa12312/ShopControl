@@ -1,0 +1,271 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../src/generated/prisma-control"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  OWNER
+  AGENT
+  CLIENT
+}
+
+enum TenantStatus {
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  TERMINATED
+}
+
+enum ShopDbStatus {
+  PROVISIONING
+  READY
+  MIGRATION_FAILED
+}
+
+enum TaxMode {
+  NONE
+  TTC
+  HT
+}
+
+enum NotificationType {
+  ORDER
+  MESSAGING
+  STOCK
+  CASH_FINANCE
+  TRANSFER
+  SECURITY
+  PLATFORM
+}
+
+enum NotificationPriority {
+  INFO
+  WARNING
+  URGENT
+}
+
+model Merchant {
+  id                String       @id @default(uuid()) @db.Uuid
+  name              String       @db.VarChar(120)
+  legalName         String?      @map("legal_name") @db.VarChar(160)
+  phone             String       @db.VarChar(30)
+  email             String       @db.VarChar(160)
+  status            TenantStatus @default(ACTIVE)
+  statusReason      String?      @map("status_reason") @db.VarChar(500)
+  gracePeriodEndsAt DateTime?    @map("grace_period_ends_at") @db.Timestamptz(6)
+  currency          String       @default("XOF") @db.VarChar(5)
+  defaultTimezone   String       @default("Africa/Bamako") @map("default_timezone") @db.VarChar(60)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  shops               Shop[]
+  users               User[]
+  supportAccessGrants SupportAccessGrant[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("merchants")
+}
+
+model Shop {
+  id                 String       @id @default(uuid()) @db.Uuid
+  merchantId         String       @map("merchant_id") @db.Uuid
+  name               String       @db.VarChar(120)
+  slug               String       @unique @db.VarChar(64)
+  status             TenantStatus @default(ACTIVE)
+  statusReason       String?      @map("status_reason") @db.VarChar(500)
+  dbName             String       @unique @map("db_name") @db.VarChar(63)
+  dbStatus           ShopDbStatus @default(PROVISIONING) @map("db_status")
+  dbSchemaVersion    String?      @map("db_schema_version") @db.VarChar(64)
+  logoUrl            String?      @map("logo_url") @db.VarChar(500)
+  phone              String?      @db.VarChar(30)
+  email              String?      @db.VarChar(160)
+  address            String?      @db.VarChar(255)
+  openingHours       Json         @map("opening_hours")
+  currency           String       @default("XOF") @db.VarChar(5)
+  timezone           String       @default("Africa/Bamako") @db.VarChar(60)
+  dailyReportTime    String       @default("22:00") @map("daily_report_time") @db.VarChar(5)
+  taxMode            TaxMode      @default(NONE) @map("tax_mode")
+  defaultTaxRateBps  Int          @default(0) @map("default_tax_rate_bps")
+  paymentMethods     Json         @map("payment_methods")
+  deliveryConfig     Json         @default("{}") @map("delivery_config")
+  receiptSettings    Json         @default("{}") @map("receipt_settings")
+  requireOperatorPin Boolean      @default(false) @map("require_operator_pin")
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  merchant       Merchant           @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  slugRedirects  ShopSlugRedirect[]
+  userAccesses   UserShopAccess[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+
+  @@index([merchantId])
+  @@index([status])
+  @@index([merchantId, status])
+  @@map("shops")
+}
+
+model ShopSlugRedirect {
+  id        String   @id @default(uuid()) @db.Uuid
+  oldSlug   String   @unique @map("old_slug") @db.VarChar(64)
+  shopId    String   @map("shop_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId])
+  @@map("shop_slug_redirects")
+}
+
+model User {
+  id                  String    @id @default(uuid()) @db.Uuid
+  merchantId          String?   @map("merchant_id") @db.Uuid
+  role                UserRole
+  email               String    @unique @db.VarChar(160)
+  phone               String?   @db.VarChar(30)
+  fullName            String    @map("full_name") @db.VarChar(120)
+  passwordHash        String    @map("password_hash")
+  isActive            Boolean   @default(true) @map("is_active")
+  totpSecretEncrypted String?   @map("totp_secret_encrypted")
+  totpEnabled         Boolean   @default(false) @map("totp_enabled")
+  failedLoginCount    Int       @default(0) @map("failed_login_count")
+  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt         DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  merchant            Merchant?            @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  shopAccesses        UserShopAccess[]
+  sessions            UserSession[]
+  notifications       Notification[]
+  supportGrantsIssued SupportAccessGrant[] @relation("SuperAdminGrants")
+  auditLogs           AuditLog[]
+
+  @@index([merchantId])
+  @@index([role])
+  @@index([merchantId, role])
+  @@map("users")
+}
+
+model UserShopAccess {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String   @map("user_id") @db.Uuid
+  shopId              String   @map("shop_id") @db.Uuid
+  permissions         Json
+  maxDiscountPercent  Int      @default(0) @map("max_discount_percent")
+  maxExpenseAmountXof Int      @default(0) @map("max_expense_amount_xof")
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shopId])
+  @@index([shopId])
+  @@map("user_shop_access")
+}
+
+model UserSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash") @db.VarChar(128)
+  deviceName       String?   @map("device_name") @db.VarChar(120)
+  userAgent        String?   @map("user_agent") @db.VarChar(500)
+  ipAddress        String?   @map("ip_address") @db.VarChar(64)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  lastActiveAt     DateTime  @default(now()) @map("last_active_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedByUserId  String?   @map("revoked_by_user_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+model SupportAccessGrant {
+  id              String    @id @default(uuid()) @db.Uuid
+  superAdminId    String    @map("super_admin_id") @db.Uuid
+  merchantId      String    @map("merchant_id") @db.Uuid
+  reason          String    @db.VarChar(500)
+  readOnly        Boolean   @default(true) @map("read_only")
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedByUserId String?   @map("revoked_by_user_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  superAdmin User     @relation("SuperAdminGrants", fields: [superAdminId], references: [id], onDelete: Restrict)
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+
+  @@index([superAdminId, merchantId, expiresAt])
+  @@index([merchantId, createdAt])
+  @@map("support_access_grants")
+}
+
+model Notification {
+  id              String               @id @default(uuid()) @db.Uuid
+  merchantId      String?              @map("merchant_id") @db.Uuid
+  shopId          String?              @map("shop_id") @db.Uuid
+  recipientUserId String               @map("recipient_user_id") @db.Uuid
+  type            NotificationType
+  priority        NotificationPriority @default(INFO)
+  title           String               @db.VarChar(180)
+  message         String               @db.VarChar(1000)
+  targetPath      String?              @map("target_path") @db.VarChar(255)
+  isRead          Boolean              @default(false) @map("is_read")
+  readAt          DateTime?            @map("read_at") @db.Timestamptz(6)
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  merchant  Merchant? @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  shop      Shop?     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  recipient User      @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUserId, isRead, createdAt])
+  @@index([merchantId, createdAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id                   String    @id @default(uuid()) @db.Uuid
+  sequenceNumber       BigInt    @unique @default(autoincrement()) @map("sequence_number")
+  merchantId           String?   @map("merchant_id") @db.Uuid
+  shopId               String?   @map("shop_id") @db.Uuid
+  actorUserId          String?   @map("actor_user_id") @db.Uuid
+  actorRole            UserRole? @map("actor_role")
+  declaredOperatorId   String?   @map("declared_operator_id") @db.Uuid
+  declaredOperatorName String?   @map("declared_operator_name") @db.VarChar(80)
+  action               String    @db.VarChar(80)
+  entityType           String    @map("entity_type") @db.VarChar(80)
+  entityId             String?   @map("entity_id") @db.VarChar(120)
+  beforeData           Json?     @map("before_data")
+  afterData            Json?     @map("after_data")
+  reason               String?   @db.VarChar(500)
+  ipAddress            String?   @map("ip_address") @db.VarChar(64)
+  userAgent            String?   @map("user_agent") @db.VarChar(500)
+  correlationId        String?   @map("correlation_id") @db.VarChar(120)
+  prevHash             String    @map("prev_hash") @db.VarChar(64)
+  entryHash            String    @map("entry_hash") @db.VarChar(64)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  merchant Merchant? @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  shop     Shop?     @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  actor    User?     @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([merchantId, createdAt])
+  @@index([shopId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
