@@ -2,12 +2,14 @@
 
 Plateforme web SaaS de gestion commerciale multi-boutiques avec **isolation physique par base de données PostgreSQL dédiée par boutique**, journal d'audit immuable (chaîné SHA-256 + trigger PostgreSQL) et socle PWA/mode dégradé comptoir (Option B).
 
-## Architecture (Lot 1 — Fondations)
+## Architecture (Lots 1 & 2 — Fondations & Gestion commerciale)
 
 - **Monorepo TypeScript (`npm workspaces`)**
-  - `packages/shared` (`@shopcontrol/shared`) : enums, catalogue de permissions granulaires, schémas de validation Zod, formateurs XOF & fuseau `Africa/Bamako`.
+  - `packages/shared` (`@shopcontrol/shared`) : enums, catalogue de permissions granulaires, moteur de calcul XOF/taxes/arrondis & CMP, schémas de validation Zod, formateurs `Africa/Bamako`.
   - `apps/api` (`@shopcontrol/api`) : NestJS 11, Prisma 6 **double schéma** (`control` + `shop`), provisionnement dynamique de base PostgreSQL par boutique (`CREATE DATABASE shopcontrol_shop_<id>` + migrations SQL versionnées), Redis 7, Argon2id, 2FA TOTP, Swagger `/api/docs`.
-  - `apps/web` (`@shopcontrol/web`) : Next.js 15 (App Router), Tailwind CSS, PWA (`manifest.json` + Service Worker), IndexedDB (`dexie`), espaces Super Admin, Propriétaire, Agent et statut vitrine publique `/s/[slug]`.
+    - **Lot 1** : Auth/2FA/Sessions, Super Admin minimal + accès support borné, Marchands, Boutiques + redirections slugs, Agents/RBAC, Opérateurs déclarés, Terminaux Option B, Audit immuable chaîné SHA-256, Notifications.
+    - **Lot 2** : Catégories & Produits (coûts masqués si Agent non autorisé), Stocks & Mouvements immuables (`SELECT ... FOR UPDATE`), Inventaire physique, Fournisseurs & Achats (réceptions partielles + recalcul CMP + dettes), Clients & Créances (plafonds crédit), Caisse (sessions uniques, passations, clôture immuable + écart notifié + régularisation), Ventes POS (XOF entiers, Mobile Money réf unique, sync hors-ligne Option B, annulation/retour/remboursement), Dépenses (boutique + entreprise consolidée), Import CSV (aperçu, erreurs ligne par ligne, commit, rollback).
+  - `apps/web` (`@shopcontrol/web`) : Next.js 15 (App Router, 26 routes), Tailwind CSS, PWA (`manifest.json` + Service Worker), IndexedDB (`dexie` — cache catalogue + file de ventes comptoir hors-ligne).
 
 ### Isolation Multi-Bases (1 Control Plane DB + 1 BDD dédiée par boutique)
 
