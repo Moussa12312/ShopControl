@@ -70,7 +70,7 @@ export class SalesService {
   async listSales(
     shopId: string,
     user: AuthenticatedUser,
-    params: { status?: string; search?: string; page?: number; limit?: number },
+    params: { status?: string; search?: string; serial?: string; page?: number; limit?: number },
   ) {
     const client = await this.shopDbManager.getClientForShop(shopId);
     const page = Math.max(1, params.page || 1);
@@ -79,12 +79,20 @@ export class SalesService {
 
     const where: Record<string, unknown> = {};
     if (params.status) where.status = params.status;
+    if (params.serial?.trim()) {
+      where.lines = {
+        some: {
+          serialNumber: { contains: params.serial.trim(), mode: 'insensitive' },
+        },
+      };
+    }
     if (params.search?.trim()) {
       const q = params.search.trim();
       where.OR = [
         { saleNumber: { contains: q, mode: 'insensitive' } },
         { client: { fullName: { contains: q, mode: 'insensitive' } } },
         { client: { phone: { contains: q, mode: 'insensitive' } } },
+        { lines: { some: { serialNumber: { contains: q, mode: 'insensitive' } } } },
       ];
     }
 
@@ -174,13 +182,22 @@ export class SalesService {
     const negativeConflicts: Array<{ productName: string; qtyAfter: number }> = [];
 
     const createdSale = await shopClient.$transaction(async (tx) => {
-      // 1. Charge produits et résout prix/coûts
+      // 1. Charge produits et résout prix/coûts, Gros/Détail, Vente au montant/fraction, N° de série & Garantie
       const resolvedLines: Array<{
         productId: string;
         variantId: string | null;
         productName: string;
         sku: string;
         quantity: number;
+        unitLabel: string;
+        soldInBulk: boolean;
+        bulkMultiplier: number;
+        fractionalQtyMilli: number | null;
+        customAmountXof: number | null;
+        stockDeductionMilli: number;
+        serialNumber: string | null;
+        warrantyMonths: number | null;
+        warrantyEndsAt: Date | null;
         unitPriceXof: number;
         unitCostXof: number | null;
         discountType: 'NONE' | 'PERCENT' | 'AMOUNT';
@@ -199,20 +216,108 @@ export class SalesService {
           });
         }
 
-        let unitPriceXof = product.salePriceXof;
-        let unitCostXof = product.costPriceXof;
+        let basePriceXof = product.salePriceXof;
+        let baseCostXof = product.costPriceXof;
         let sku = product.sku;
-        let displayName = product.name;
+        let baseDisplayName = product.name;
 
         if (reqLine.variantId) {
           const variant = product.variants.find((v) => v.id === reqLine.variantId && v.isActive);
           if (!variant) {
             throw new NotFoundException({ code: 'VARIANT_NOT_FOUND', message: 'Variante introuvable.' });
           }
-          unitPriceXof = variant.salePriceXof ?? product.salePriceXof;
-          unitCostXof = variant.costPriceXof ?? product.costPriceXof;
+          basePriceXof = variant.salePriceXof ?? product.salePriceXof;
+          baseCostXof = variant.costPriceXof ?? product.costPriceXof;
           sku = variant.sku || product.sku;
-          displayName = `${product.name} (${variant.name})`;
+          baseDisplayName = `${product.name} (${variant.name})`;
+        }
+
+        // Validation N° de série / IMEI & calcul Garantie (Lot 10)
+        const serialNumber = reqLine.serialNumber?.trim() || null;
+        if (product.trackSerialNumber && !serialNumber && !isOfflineSync) {
+          throw new BadRequestException({
+            code: 'SERIAL_NUMBER_REQUIRED',
+            message: `Le numéro de série / IMEI est obligatoire pour « ${product.name} ».`,
+          });
+        }
+        const warrantyMonths =
+          product.warrantyMonths && product.warrantyMonths > 0 ? product.warrantyMonths : null;
+        let warrantyEndsAt: Date | null = null;
+        if (warrantyMonths) {
+          warrantyEndsAt = new Date();
+          warrantyEndsAt.setMonth(warrantyEndsAt.getMonth() + warrantyMonths);
+        }
+
+        let quantity = reqLine.quantity || 1;
+        let unitPriceXof = basePriceXof;
+        let unitCostXof = baseCostXof;
+        let unitLabel = product.unit || 'unité';
+        let soldInBulk = false;
+        let bulkMultiplier = 1;
+        let fractionalQtyMilli: number | null = null;
+        let customAmountXof: number | null = null;
+        let stockDeductionMilli = quantity * 1000;
+        let displayName = baseDisplayName;
+
+        if (reqLine.soldInBulk) {
+          if (!product.unitsPerBulk || product.unitsPerBulk < 2) {
+            throw new BadRequestException({
+              code: 'BULK_NOT_CONFIGURED',
+              message: `Le conditionnement de gros n’est pas configuré sur « ${product.name} ».`,
+            });
+          }
+          soldInBulk = true;
+          bulkMultiplier = product.unitsPerBulk;
+          unitLabel = product.bulkUnitLabel || 'carton';
+          unitPriceXof = product.bulkSalePriceXof ?? basePriceXof * bulkMultiplier;
+          unitCostXof = baseCostXof !== null ? baseCostXof * bulkMultiplier : null;
+          stockDeductionMilli = quantity * bulkMultiplier * 1000;
+          displayName = `${baseDisplayName} [${unitLabel} ×${bulkMultiplier}]`;
+        } else if (
+          (reqLine.customAmountXof !== undefined && reqLine.customAmountXof !== null) ||
+          (reqLine.fractionalQtyMilli !== undefined && reqLine.fractionalQtyMilli !== null)
+        ) {
+          if (!product.allowFractionalSale) {
+            throw new BadRequestException({
+              code: 'FRACTIONAL_SALE_DISABLED',
+              message: `La vente au montant / fraction n’est pas activée sur « ${product.name} ».`,
+            });
+          }
+          if (basePriceXof <= 0) {
+            throw new BadRequestException({
+              code: 'INVALID_UNIT_PRICE',
+              message: `Le prix unitaire de « ${product.name} » doit être supérieur à 0 XOF pour une vente au montant.`,
+            });
+          }
+
+          let computedMilli: number;
+          let computedAmount: number;
+          if (reqLine.customAmountXof !== undefined && reqLine.customAmountXof !== null) {
+            computedAmount = Number(reqLine.customAmountXof);
+            computedMilli =
+              reqLine.fractionalQtyMilli !== undefined && reqLine.fractionalQtyMilli !== null
+                ? Number(reqLine.fractionalQtyMilli)
+                : Math.max(1, Math.round((computedAmount * 1000) / basePriceXof));
+          } else {
+            computedMilli = Number(reqLine.fractionalQtyMilli);
+            computedAmount = Math.max(
+              1,
+              Math.round((basePriceXof * computedMilli) / 1000),
+            );
+          }
+
+          customAmountXof = computedAmount;
+          fractionalQtyMilli = computedMilli;
+          unitPriceXof = computedAmount;
+          quantity = 1;
+          unitCostXof =
+            baseCostXof !== null ? Math.round((baseCostXof * computedMilli) / 1000) : null;
+          stockDeductionMilli = computedMilli;
+          const decStr = Number((computedMilli / 1000).toFixed(3))
+            .toString()
+            .replace('.', ',');
+          unitLabel = `${decStr} ${product.unit}`;
+          displayName = `${baseDisplayName} (${decStr} ${product.unit})`;
         }
 
         resolvedLines.push({
@@ -220,7 +325,16 @@ export class SalesService {
           variantId: reqLine.variantId ?? null,
           productName: displayName,
           sku,
-          quantity: reqLine.quantity,
+          quantity,
+          unitLabel,
+          soldInBulk,
+          bulkMultiplier,
+          fractionalQtyMilli,
+          customAmountXof,
+          stockDeductionMilli,
+          serialNumber,
+          warrantyMonths,
+          warrantyEndsAt,
           unitPriceXof,
           unitCostXof,
           discountType: reqLine.discountType || 'NONE',
@@ -389,23 +503,32 @@ export class SalesService {
         saleNumber = `VTE-${String(Number(seqRows[0].nextval)).padStart(6, '0')}`;
       }
 
-      // 8. Décrément atomique du stock avec verrou FOR UPDATE (Critère #17)
+      // 8. Décrément atomique du stock avec verrou FOR UPDATE (Critère #17) + FEFO DLC (Lot 10)
       let hadStockConflict = false;
       for (const line of resolvedLines) {
+        const isFractional = line.fractionalQtyMilli !== null;
+        const wholeUnitsDeducted = Math.round(line.stockDeductionMilli / 1000);
         const move = await this.inventoryService.applyMovementInTx(tx, {
           productId: line.productId,
           variantId: line.variantId,
           movementType: 'SALE_OUT',
-          quantityDelta: -line.quantity,
+          quantityDelta: isFractional ? 0 : -wholeUnitsDeducted,
+          ...(isFractional ? { quantityDeltaMilli: -line.stockDeductionMilli } : {}),
           unitCostXof: line.unitCostXof,
           referenceType: 'SALE',
           referenceId: saleNumber,
-          reason: isOfflineSync ? `Synchronisation vente hors-ligne ${saleNumber}` : `Vente ${saleNumber}`,
+          reason: isOfflineSync
+            ? `Synchronisation vente hors-ligne ${saleNumber}`
+            : `Vente ${saleNumber}${isFractional ? ` (${line.unitLabel})` : line.soldInBulk ? ` (${line.quantity} ${line.unitLabel})` : ''}`,
           actorUserId: actor.userId,
           declaredOperatorId: operator?.id ?? null,
           declaredOperatorName: operator?.firstName ?? null,
           allowNegativeStock: isOfflineSync, // En ligne: JAMAIS négatif ; Hors-ligne sync: accepté avec conflit signalé (14.3)
         });
+
+        if (!isFractional && wholeUnitsDeducted > 0) {
+          await this.inventoryService.deductBatchesFefoInTx(tx, line.productId, wholeUnitsDeducted);
+        }
 
         if (move.becameNegative) {
           hadStockConflict = true;
@@ -449,6 +572,12 @@ export class SalesService {
               productName: l.productName,
               sku: l.sku,
               quantity: l.quantity,
+              unitLabel: l.unitLabel,
+              soldInBulk: l.soldInBulk,
+              bulkMultiplier: l.bulkMultiplier,
+              fractionalQtyMilli: l.fractionalQtyMilli,
+              serialNumber: l.serialNumber,
+              warrantyEndsAt: l.warrantyEndsAt,
               unitPriceXof: l.unitPriceXof,
               unitCostXof: l.unitCostXof,
               discountXof: calc.lines[idx].discountXof,
@@ -529,10 +658,18 @@ export class SalesService {
             issuedAt: sale.createdAt.toISOString(),
             client: clientRow,
             operatorName: operator?.firstName ?? actor.fullName,
-            lines: sale.lines.map((l) => ({
+            lines: sale.lines.map((l, idx) => ({
               productName: l.productName,
               sku: l.sku,
               quantity: l.quantity,
+              unitLabel: l.unitLabel,
+              soldInBulk: l.soldInBulk,
+              bulkMultiplier: l.bulkMultiplier,
+              fractionalQtyMilli: l.fractionalQtyMilli,
+              customAmountXof: resolvedLines[idx]?.customAmountXof ?? null,
+              serialNumber: l.serialNumber,
+              warrantyMonths: resolvedLines[idx]?.warrantyMonths ?? null,
+              warrantyEndsAt: l.warrantyEndsAt ? l.warrantyEndsAt.toISOString() : null,
               unitPriceXof: l.unitPriceXof,
               discountXof: l.discountXof,
               lineTotalXof: l.lineTotalXof,
@@ -632,15 +769,15 @@ export class SalesService {
         });
       }
 
-      // Réintègre les quantités non encore retournées
+      // Réintègre les quantités non encore retournées (y compris Gros/Détail, Fraction & Lots FEFO)
       for (const line of sale.lines) {
-        const qtyToRestore = Math.max(0, line.quantity - line.returnedQty);
-        if (qtyToRestore > 0) {
+        if (line.fractionalQtyMilli && line.fractionalQtyMilli > 0 && line.returnedQty === 0) {
           await this.inventoryService.applyMovementInTx(tx, {
             productId: line.productId,
             variantId: line.variantId,
             movementType: 'SALE_CANCEL_IN',
-            quantityDelta: qtyToRestore,
+            quantityDelta: 0,
+            quantityDeltaMilli: line.fractionalQtyMilli,
             unitCostXof: line.unitCostXof,
             referenceType: 'SALE_CANCEL',
             referenceId: sale.saleNumber,
@@ -649,6 +786,25 @@ export class SalesService {
             declaredOperatorId: operator?.id ?? null,
             declaredOperatorName: operator?.firstName ?? null,
           });
+        } else {
+          const multiplier = line.bulkMultiplier && line.bulkMultiplier > 1 ? line.bulkMultiplier : 1;
+          const qtyToRestore = Math.max(0, line.quantity - line.returnedQty) * multiplier;
+          if (qtyToRestore > 0) {
+            await this.inventoryService.applyMovementInTx(tx, {
+              productId: line.productId,
+              variantId: line.variantId,
+              movementType: 'SALE_CANCEL_IN',
+              quantityDelta: qtyToRestore,
+              unitCostXof: line.unitCostXof,
+              referenceType: 'SALE_CANCEL',
+              referenceId: sale.saleNumber,
+              reason: input.reason,
+              actorUserId: actor.userId,
+              declaredOperatorId: operator?.id ?? null,
+              declaredOperatorName: operator?.firstName ?? null,
+            });
+            await this.inventoryService.restoreBatchesInTx(tx, line.productId, qtyToRestore);
+          }
         }
       }
 
@@ -771,11 +927,13 @@ export class SalesService {
         }
 
         if (item.condition === 'RESELLABLE') {
+          const multiplier = line.bulkMultiplier && line.bulkMultiplier > 1 ? line.bulkMultiplier : 1;
+          const baseUnitsReturned = item.quantity * multiplier;
           await this.inventoryService.applyMovementInTx(tx, {
             productId: line.productId,
             variantId: line.variantId,
             movementType: 'RETURN_RESELLABLE_IN',
-            quantityDelta: item.quantity,
+            quantityDelta: baseUnitsReturned,
             unitCostXof: line.unitCostXof,
             referenceType: 'SALE_RETURN',
             referenceId: sale.saleNumber,
@@ -784,6 +942,7 @@ export class SalesService {
             declaredOperatorId: operator?.id ?? null,
             declaredOperatorName: operator?.firstName ?? null,
           });
+          await this.inventoryService.restoreBatchesInTx(tx, line.productId, baseUnitsReturned);
         } else {
           // Non revendable : enregistré comme perte (delta = 0 sur stock physique, trace explicite dans stock_movements)
           await this.inventoryService.applyMovementInTx(tx, {
@@ -1020,18 +1179,20 @@ export class SalesController {
   @Get()
   @Roles('OWNER', 'AGENT')
   @RequirePermissions('sales:read')
-  @ApiOperation({ summary: 'Lister les ventes validées et annulées de la boutique' })
+  @ApiOperation({ summary: 'Lister les ventes validées et annulées de la boutique (recherche par numéro, client ou IMEI/série)' })
   list(
     @Param('shopId') shopId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('serial') serial?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.salesService.listSales(shopId, user, {
       status,
       search,
+      serial,
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 25,
     });

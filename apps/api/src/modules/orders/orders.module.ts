@@ -38,6 +38,8 @@ import {
   DEFAULT_RECEIPT_SETTINGS,
   DeliveryConfig,
   formatXof,
+  normalizeBusinessProfile,
+  normalizeShopType,
   OnlineOrderStatus,
   PaymentMethodConfig,
   TaxMode,
@@ -188,7 +190,17 @@ export class OrdersService {
       imageUrls: string[];
       availableSizes: string[];
       availableColors: string[];
+      brand: string | null;
+      modelName: string | null;
+      volumeLabel: string | null;
+      bulkUnitLabel: string | null;
+      unitsPerBulk: number | null;
+      bulkSalePriceXof: number | null;
+      allowFractionalSale: boolean;
+      warrantyMonths: number | null;
+      trackSerialNumber: boolean;
       stockAvailable: number;
+      stockAvailableDecimal: number;
       inStock: boolean;
     }> = [];
 
@@ -202,7 +214,7 @@ export class OrdersService {
         }),
         client.product.findMany({
           where: { status: 'PUBLISHED' },
-          orderBy: { name: 'asc' },
+          orderBy: [{ isPinnedPos: 'desc' }, { name: 'asc' }],
           include: {
             category: { select: { name: true } },
             stockBalances: { where: { variantKey: 'BASE' } },
@@ -213,6 +225,10 @@ export class OrdersService {
       products = prods.map((p) => {
         const bal = p.stockBalances[0];
         const available = Math.max(0, (bal?.physicalQty ?? 0) - (bal?.reservedQty ?? 0));
+        const rem = bal?.fractionalRemainderMilli ?? 0;
+        const availableDecimal = Number(
+          (Math.max(0, available * 1000 + rem) / 1000).toFixed(3),
+        );
         return {
           id: p.id,
           name: p.name,
@@ -225,12 +241,23 @@ export class OrdersService {
           imageUrls: Array.isArray(p.imageUrls) ? (p.imageUrls as string[]) : [],
           availableSizes: Array.isArray(p.availableSizes) ? (p.availableSizes as string[]) : [],
           availableColors: Array.isArray(p.availableColors) ? (p.availableColors as string[]) : [],
+          brand: p.brand,
+          modelName: p.modelName,
+          volumeLabel: p.volumeLabel,
+          bulkUnitLabel: p.bulkUnitLabel,
+          unitsPerBulk: p.unitsPerBulk,
+          bulkSalePriceXof: p.bulkSalePriceXof,
+          allowFractionalSale: p.allowFractionalSale,
+          warrantyMonths: p.warrantyMonths,
+          trackSerialNumber: p.trackSerialNumber,
           stockAvailable: available,
-          inStock: available > 0,
+          stockAvailableDecimal: availableDecimal,
+          inStock: available > 0 || availableDecimal > 0,
         };
       });
     }
 
+    const shopType = normalizeShopType(shop.shopType);
     return {
       redirectToSlug: null,
       available: true,
@@ -240,6 +267,8 @@ export class OrdersService {
         id: shop.id,
         name: shop.name,
         slug: shop.slug,
+        shopType,
+        businessProfile: normalizeBusinessProfile(shopType, shop.businessProfile),
         logoUrl: shop.logoUrl,
         slogan: (receiptSettings as any).slogan || '',
         phone: shop.phone,
@@ -399,6 +428,9 @@ export class OrdersService {
       sku: string;
       selectedSize: string | null;
       selectedColor: string | null;
+      soldInBulk: boolean;
+      unitLabel: string;
+      bulkMultiplier: number;
       orderedQty: number;
       unitPriceXof: number;
       lineTotalXof: number;
@@ -417,23 +449,48 @@ export class OrdersService {
       }
       const bal = prod.stockBalances[0];
       const available = Math.max(0, (bal?.physicalQty ?? 0) - (bal?.reservedQty ?? 0));
-      if (item.quantity > available) {
+
+      let soldInBulk = false;
+      let bulkMultiplier = 1;
+      let unitLabel = prod.unit || 'unité';
+      let unitPriceXof = prod.salePriceXof;
+      let productName = prod.name;
+
+      if (item.soldInBulk) {
+        if (!prod.unitsPerBulk || prod.unitsPerBulk < 2) {
+          throw new BadRequestException({
+            code: 'BULK_NOT_CONFIGURED',
+            message: `Le conditionnement de gros n’est pas activé sur « ${prod.name} ».`,
+          });
+        }
+        soldInBulk = true;
+        bulkMultiplier = prod.unitsPerBulk;
+        unitLabel = prod.bulkUnitLabel || 'carton';
+        unitPriceXof = prod.bulkSalePriceXof ?? prod.salePriceXof * bulkMultiplier;
+        productName = `${prod.name} [${unitLabel} ×${bulkMultiplier}]`;
+      }
+
+      const requiredUnits = item.quantity * bulkMultiplier;
+      if (requiredUnits > available) {
         throw new BadRequestException({
           code: 'INSUFFICIENT_STOCK',
-          message: `Stock insuffisant pour « ${prod.name} » (disponible : ${available}).`,
+          message: `Stock insuffisant pour « ${prod.name} » (disponible : ${available} ${prod.unit}, demandé : ${requiredUnits} ${prod.unit}).`,
         });
       }
-      const lineTotal = prod.salePriceXof * item.quantity;
+      const lineTotal = unitPriceXof * item.quantity;
       subtotalXof += lineTotal;
       resolvedLines.push({
         productId: prod.id,
         variantId: null,
-        productName: prod.name,
+        productName,
         sku: prod.sku,
         selectedSize: item.selectedSize?.trim() || null,
         selectedColor: item.selectedColor?.trim() || null,
+        soldInBulk,
+        unitLabel,
+        bulkMultiplier,
         orderedQty: item.quantity,
-        unitPriceXof: prod.salePriceXof,
+        unitPriceXof,
         lineTotalXof: lineTotal,
       });
     }
@@ -769,15 +826,16 @@ export class OrdersService {
         `;
         const bal = rows[0];
         const available = (bal?.physical_qty ?? 0) - (bal?.reserved_qty ?? 0);
-        if (line.orderedQty > available) {
+        const unitsToReserve = line.orderedQty * (line.bulkMultiplier || 1);
+        if (unitsToReserve > available) {
           throw new BadRequestException({
             code: 'INSUFFICIENT_STOCK_FOR_RESERVATION',
-            message: `Stock insuffisant pour réserver « ${line.productName} » (disponible : ${available}, demandé : ${line.orderedQty}).`,
+            message: `Stock insuffisant pour réserver « ${line.productName} » (disponible : ${available}, demandé : ${unitsToReserve}).`,
           });
         }
         await tx.stockBalance.update({
           where: { id: bal.id },
-          data: { reservedQty: bal.reserved_qty + line.orderedQty },
+          data: { reservedQty: bal.reserved_qty + unitsToReserve },
         });
       }
 
@@ -871,9 +929,10 @@ export class OrdersService {
             FOR UPDATE
           `;
           if (rows[0]) {
+            const unitsToRelease = line.orderedQty * (line.bulkMultiplier || 1);
             await tx.stockBalance.update({
               where: { id: rows[0].id },
-              data: { reservedQty: Math.max(0, rows[0].reserved_qty - line.orderedQty) },
+              data: { reservedQty: Math.max(0, rows[0].reserved_qty - unitsToRelease) },
             });
           }
         }
@@ -1004,6 +1063,9 @@ export class OrdersService {
         productName: string;
         sku: string;
         quantity: number;
+        unitLabel: string;
+        soldInBulk: boolean;
+        bulkMultiplier: number;
         unitPriceXof: number;
         unitCostXof: number | null;
       }> = [];
@@ -1013,6 +1075,7 @@ export class OrdersService {
         const deliveredQty = deliveredMap.has(line.id)
           ? Math.min(line.orderedQty, Math.max(0, deliveredMap.get(line.id)!))
           : line.orderedQty;
+        const multiplier = line.bulkMultiplier && line.bulkMultiplier > 1 ? line.bulkMultiplier : 1;
 
         const rows = await tx.$queryRaw<Array<{ id: string; reserved_qty: number }>>`
           SELECT id, reserved_qty FROM stock_balances
@@ -1022,7 +1085,7 @@ export class OrdersService {
         if (rows[0]) {
           await tx.stockBalance.update({
             where: { id: rows[0].id },
-            data: { reservedQty: Math.max(0, rows[0].reserved_qty - line.orderedQty) },
+            data: { reservedQty: Math.max(0, rows[0].reserved_qty - line.orderedQty * multiplier) },
           });
         }
 
@@ -1039,8 +1102,11 @@ export class OrdersService {
             productName: variantTag ? `${line.productName} (${variantTag})` : line.productName,
             sku: line.sku,
             quantity: deliveredQty,
+            unitLabel: line.unitLabel || prod?.unit || 'unité',
+            soldInBulk: Boolean(line.soldInBulk),
+            bulkMultiplier: multiplier,
             unitPriceXof: line.unitPriceXof,
-            unitCostXof: prod?.costPriceXof ?? null,
+            unitCostXof: prod?.costPriceXof != null ? prod.costPriceXof * multiplier : null,
           });
         }
       }
@@ -1077,20 +1143,22 @@ export class OrdersService {
       const seqRows = await tx.$queryRaw<Array<{ nextval: bigint }>>`SELECT nextval('sale_number_seq')`;
       const saleNumber = `VTE-${String(Number(seqRows[0].nextval)).padStart(6, '0')}`;
 
-      // 2. Décrémente stock physique (SALE_OUT)
+      // 2. Décrémente stock physique (SALE_OUT) + Lots FEFO
       for (const l of saleLinesData) {
+        const unitsToDeduct = l.quantity * (l.bulkMultiplier || 1);
         await this.inventoryService.applyMovementInTx(tx, {
           productId: l.productId,
           movementType: 'SALE_OUT',
-          quantityDelta: -l.quantity,
-          unitCostXof: l.unitCostXof,
+          quantityDelta: -unitsToDeduct,
+          unitCostXof: l.unitCostXof != null ? Math.round(l.unitCostXof / (l.bulkMultiplier || 1)) : null,
           referenceType: 'ONLINE_ORDER_SALE',
           referenceId: saleNumber,
-          reason: `Remise commande ${order.orderNumber} → ${saleNumber}`,
+          reason: `Remise commande ${order.orderNumber} → ${saleNumber}${l.soldInBulk ? ` (${l.quantity} ${l.unitLabel})` : ''}`,
           actorUserId: actor.userId,
           declaredOperatorId: operator?.id ?? null,
           declaredOperatorName: operator?.firstName ?? null,
         });
+        await this.inventoryService.deductBatchesFefoInTx(tx, l.productId, unitsToDeduct);
       }
 
       // 3. Crée la vente
@@ -1119,6 +1187,9 @@ export class OrdersService {
               productName: l.productName,
               sku: l.sku,
               quantity: l.quantity,
+              unitLabel: l.unitLabel,
+              soldInBulk: l.soldInBulk,
+              bulkMultiplier: l.bulkMultiplier,
               unitPriceXof: l.unitPriceXof,
               unitCostXof: l.unitCostXof,
               discountXof: calc.lines[idx].discountXof,

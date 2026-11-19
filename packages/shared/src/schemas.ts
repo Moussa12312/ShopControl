@@ -133,10 +133,13 @@ export const updateMerchantSchema = z.object({
 });
 
 import { deliveryConfigSchema, receiptSettingsSchema } from './platform.schemas';
+import { businessProfileSchema, SHOP_TYPES } from './shop-profiles';
 
 export const createShopSchema = z.object({
   name: z.string().trim().min(2, 'Le nom de la boutique est requis.').max(120),
   slug: slugSchema.optional(),
+  shopType: z.enum(SHOP_TYPES).default('GENERAL'),
+  businessProfile: businessProfileSchema.partial().optional(),
   logoUrl: z.string().trim().max(500).nullable().optional(),
   phone: z.string().trim().max(30).optional(),
   email: z.string().trim().email('E-mail boutique invalide.').toLowerCase().optional().or(z.literal('')),

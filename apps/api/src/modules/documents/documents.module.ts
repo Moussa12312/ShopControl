@@ -105,6 +105,12 @@ export class DocumentsService {
               productName: l.productName,
               sku: l.sku,
               quantity: l.quantity,
+              unitLabel: l.unitLabel,
+              soldInBulk: l.soldInBulk,
+              bulkMultiplier: l.bulkMultiplier,
+              fractionalQtyMilli: l.fractionalQtyMilli,
+              serialNumber: l.serialNumber,
+              warrantyEndsAt: l.warrantyEndsAt ? l.warrantyEndsAt.toISOString() : null,
               unitPriceXof: l.unitPriceXof,
               discountXof: l.discountXof,
               lineTotalXof: l.lineTotalXof,
@@ -331,6 +337,17 @@ export class DocumentsService {
             .font('Helvetica-Bold')
             .fillColor('#0f172a')
             .text(formatXof(line.lineTotalXof), { align: 'right' });
+          if (line.serialNumber || line.warrantyEndsAt) {
+            const parts: string[] = [];
+            if (line.serialNumber) parts.push(`N° Série / IMEI : ${line.serialNumber}`);
+            if (line.warrantyEndsAt) {
+              const endStr = new Date(line.warrantyEndsAt).toLocaleDateString('fr-FR');
+              parts.push(
+                `Garantie${line.warrantyMonths ? ` (${line.warrantyMonths} mois)` : ''} jusqu'au ${endStr}`,
+              );
+            }
+            pdf.fontSize(7.5).font('Helvetica-Oblique').fillColor('#0f766e').text(`  ${parts.join(' · ')}`);
+          }
         }
 
         pdf.moveDown(0.5);

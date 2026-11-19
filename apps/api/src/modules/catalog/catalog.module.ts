@@ -17,6 +17,8 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   createCategorySchema,
   createProductSchema,
+  normalizeShopType,
+  SHOP_TYPE_SUGGESTED_CATEGORIES,
   updateCategorySchema,
   updateProductSchema,
 } from '@shopcontrol/shared';
@@ -31,6 +33,7 @@ import {
   DeclaredOperatorContext,
   RequestWithAuth,
 } from '../../common/auth/request-context.types';
+import { ControlPrismaService } from '../../common/database/control-prisma.service';
 import { ShopDatabaseManagerService } from '../../common/database/shop-database-manager.service';
 import { OperatorGuard } from '../../common/guards/operator.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -43,6 +46,7 @@ import { RequestMeta } from '../auth/auth.service';
 @Injectable()
 export class CatalogService {
   constructor(
+    private readonly controlPrisma: ControlPrismaService,
     private readonly shopDbManager: ShopDatabaseManagerService,
     private readonly inventoryService: InventoryService,
     private readonly auditService: AuditService,
@@ -112,6 +116,31 @@ export class CatalogService {
     });
   }
 
+  async seedSuggestedCategories(shopId: string) {
+    const shop = await this.controlPrisma.shop.findUnique({
+      where: { id: shopId },
+      select: { shopType: true },
+    });
+    const shopType = normalizeShopType(shop?.shopType);
+    const suggested = SHOP_TYPE_SUGGESTED_CATEGORIES[shopType] || [];
+    const client = await this.shopDbManager.getClientForShop(shopId);
+
+    let createdCount = 0;
+    for (let i = 0; i < suggested.length; i += 1) {
+      const name = suggested[i];
+      const existing = await client.category.findUnique({ where: { name } });
+      if (!existing) {
+        await client.category.create({
+          data: { name, sortOrder: i, isActive: true },
+        });
+        createdCount += 1;
+      }
+    }
+
+    const categories = await this.listCategories(shopId);
+    return { shopType, createdCount, categories };
+  }
+
   async listProducts(
     shopId: string,
     user: AuthenticatedUser,
@@ -137,6 +166,8 @@ export class CatalogService {
         { name: { contains: q, mode: 'insensitive' } },
         { sku: { contains: q, mode: 'insensitive' } },
         { barcode: { contains: q, mode: 'insensitive' } },
+        { brand: { contains: q, mode: 'insensitive' } },
+        { modelName: { contains: q, mode: 'insensitive' } },
       ];
     }
 
@@ -144,13 +175,17 @@ export class CatalogService {
       client.product.count({ where }),
       client.product.findMany({
         where,
-        orderBy: [{ name: 'asc' }],
+        orderBy: [{ isPinnedPos: 'desc' }, { name: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
         include: {
           category: { select: { id: true, name: true } },
           variants: { where: { isActive: true }, orderBy: { name: 'asc' } },
           stockBalances: true,
+          batches: {
+            where: { status: 'ACTIVE', remainingQty: { gt: 0 } },
+            orderBy: { expiryDate: 'asc' },
+          },
         },
       }),
     ]);
@@ -159,7 +194,14 @@ export class CatalogService {
       items: products.map((p) => {
         const baseBal = p.stockBalances.find((b) => b.variantKey === 'BASE');
         const stockPhysical = baseBal?.physicalQty ?? 0;
+        const stockRemainderMilli = baseBal?.fractionalRemainderMilli ?? 0;
         const stockReserved = baseBal?.reservedQty ?? 0;
+        const stockPhysicalDecimal = Number(
+          ((stockPhysical * 1000 + stockRemainderMilli) / 1000).toFixed(3),
+        );
+        const stockAvailableDecimal = Number(
+          (((stockPhysical - stockReserved) * 1000 + stockRemainderMilli) / 1000).toFixed(3),
+        );
         return {
           id: p.id,
           name: p.name,
@@ -177,9 +219,30 @@ export class CatalogService {
           imageUrls: Array.isArray(p.imageUrls) ? p.imageUrls : [],
           availableSizes: Array.isArray(p.availableSizes) ? p.availableSizes : [],
           availableColors: Array.isArray(p.availableColors) ? p.availableColors : [],
+          brand: p.brand,
+          modelName: p.modelName,
+          volumeLabel: p.volumeLabel,
+          isPinnedPos: p.isPinnedPos,
+          bulkUnitLabel: p.bulkUnitLabel,
+          unitsPerBulk: p.unitsPerBulk,
+          bulkSalePriceXof: p.bulkSalePriceXof,
+          allowFractionalSale: p.allowFractionalSale,
+          expiryDate: p.expiryDate ? p.expiryDate.toISOString() : null,
+          warrantyMonths: p.warrantyMonths,
+          trackSerialNumber: p.trackSerialNumber,
           stockPhysical,
+          stockRemainderMilli,
+          stockPhysicalDecimal,
           stockReserved,
           stockAvailable: stockPhysical - stockReserved,
+          stockAvailableDecimal,
+          activeBatches: p.batches.map((b) => ({
+            id: b.id,
+            batchNumber: b.batchNumber,
+            expiryDate: b.expiryDate.toISOString(),
+            initialQty: b.initialQty,
+            remainingQty: b.remainingQty,
+          })),
           variants: p.variants.map((v) => {
             const vBal = p.stockBalances.find((b) => b.variantKey === v.id);
             const vPhys = vBal?.physicalQty ?? 0;
@@ -223,6 +286,7 @@ export class CatalogService {
     }
 
     const created = await client.$transaction(async (tx) => {
+      const parsedExpiry = input.expiryDate ? new Date(input.expiryDate) : null;
       const product = await tx.product.create({
         data: {
           name: input.name,
@@ -238,6 +302,17 @@ export class CatalogService {
           imageUrls: input.imageUrls || [],
           availableSizes: input.availableSizes || [],
           availableColors: input.availableColors || [],
+          brand: input.brand?.trim() || null,
+          modelName: input.modelName?.trim() || null,
+          volumeLabel: input.volumeLabel?.trim() || null,
+          isPinnedPos: Boolean(input.isPinnedPos),
+          bulkUnitLabel: input.bulkUnitLabel?.trim() || null,
+          unitsPerBulk: input.unitsPerBulk ?? null,
+          bulkSalePriceXof: input.bulkSalePriceXof ?? null,
+          allowFractionalSale: Boolean(input.allowFractionalSale),
+          expiryDate: parsedExpiry,
+          warrantyMonths: input.warrantyMonths ?? null,
+          trackSerialNumber: Boolean(input.trackSerialNumber),
           ...(input.variants?.length
             ? {
                 variants: {
@@ -270,6 +345,20 @@ export class CatalogService {
           declaredOperatorId: operator?.id ?? null,
           declaredOperatorName: operator?.firstName ?? null,
         });
+
+        if (parsedExpiry) {
+          await tx.productBatch.create({
+            data: {
+              productId: product.id,
+              batchNumber: input.batchNumber?.trim() || 'LOT-INIT',
+              expiryDate: parsedExpiry,
+              initialQty: input.initialStockQty,
+              remainingQty: input.initialStockQty,
+              status: 'ACTIVE',
+              notes: 'Lot initial créé à l’ajout du produit',
+            },
+          });
+        }
       }
 
       return product;
@@ -338,6 +427,23 @@ export class CatalogService {
         ...(input.imageUrls !== undefined ? { imageUrls: input.imageUrls } : {}),
         ...(input.availableSizes !== undefined ? { availableSizes: input.availableSizes } : {}),
         ...(input.availableColors !== undefined ? { availableColors: input.availableColors } : {}),
+        ...(input.brand !== undefined ? { brand: input.brand?.trim() || null } : {}),
+        ...(input.modelName !== undefined ? { modelName: input.modelName?.trim() || null } : {}),
+        ...(input.volumeLabel !== undefined ? { volumeLabel: input.volumeLabel?.trim() || null } : {}),
+        ...(input.isPinnedPos !== undefined ? { isPinnedPos: Boolean(input.isPinnedPos) } : {}),
+        ...(input.bulkUnitLabel !== undefined ? { bulkUnitLabel: input.bulkUnitLabel?.trim() || null } : {}),
+        ...(input.unitsPerBulk !== undefined ? { unitsPerBulk: input.unitsPerBulk } : {}),
+        ...(input.bulkSalePriceXof !== undefined ? { bulkSalePriceXof: input.bulkSalePriceXof } : {}),
+        ...(input.allowFractionalSale !== undefined
+          ? { allowFractionalSale: Boolean(input.allowFractionalSale) }
+          : {}),
+        ...(input.expiryDate !== undefined
+          ? { expiryDate: input.expiryDate ? new Date(input.expiryDate) : null }
+          : {}),
+        ...(input.warrantyMonths !== undefined ? { warrantyMonths: input.warrantyMonths } : {}),
+        ...(input.trackSerialNumber !== undefined
+          ? { trackSerialNumber: Boolean(input.trackSerialNumber) }
+          : {}),
       },
     });
 
@@ -393,6 +499,14 @@ export class CatalogController {
     @Body(new ZodValidationPipe(createCategorySchema)) body: any,
   ) {
     return this.catalogService.createCategory(shopId, body);
+  }
+
+  @Post('categories/seed-suggested')
+  @Roles('OWNER', 'AGENT')
+  @RequirePermissions('products:create')
+  @ApiOperation({ summary: 'Créer en 1 clic les catégories recommandées pour le secteur de la boutique' })
+  seedSuggestedCategories(@Param('shopId') shopId: string) {
+    return this.catalogService.seedSuggestedCategories(shopId);
   }
 
   @Patch('categories/:categoryId')

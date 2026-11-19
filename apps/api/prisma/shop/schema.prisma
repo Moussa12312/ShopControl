@@ -18,6 +18,8 @@ model ShopLocalConfig {
   merchantId         String   @map("merchant_id") @db.Uuid
   shopName           String   @map("shop_name") @db.VarChar(120)
   slug               String   @db.VarChar(64)
+  shopType           String   @default("GENERAL") @map("shop_type") @db.VarChar(24)
+  businessProfile    Json     @default("{}") @map("business_profile")
   currency           String   @default("XOF") @db.VarChar(5)
   timezone           String   @default("Africa/Bamako") @db.VarChar(60)
   dailyReportTime    String   @default("22:00") @map("daily_report_time") @db.VarChar(5)
@@ -134,23 +136,34 @@ model Category {
 }
 
 model Product {
-  id             String   @id @default(uuid()) @db.Uuid
-  categoryId     String?  @map("category_id") @db.Uuid
-  name           String   @db.VarChar(140)
-  sku            String   @unique @db.VarChar(64)
-  barcode        String?  @db.VarChar(64)
-  description    String?  @db.VarChar(2000)
-  unit           String   @default("unité") @db.VarChar(24)
-  salePriceXof   Int      @map("sale_price_xof")
-  costPriceXof   Int?     @map("cost_price_xof")
-  alertThreshold Int      @default(5) @map("alert_threshold")
-  status          String   @default("DRAFT") @db.VarChar(20)
-  imageUrls       Json     @default("[]") @map("image_urls")
-  availableSizes  Json     @default("[]") @map("available_sizes")
-  availableColors Json     @default("[]") @map("available_colors")
-  importBatchId   String?  @map("import_batch_id") @db.Uuid
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                  String    @id @default(uuid()) @db.Uuid
+  categoryId          String?   @map("category_id") @db.Uuid
+  name                String    @db.VarChar(140)
+  sku                 String    @unique @db.VarChar(64)
+  barcode             String?   @db.VarChar(64)
+  description         String?   @db.VarChar(2000)
+  unit                String    @default("unité") @db.VarChar(24)
+  salePriceXof        Int       @map("sale_price_xof")
+  costPriceXof        Int?      @map("cost_price_xof")
+  alertThreshold      Int       @default(5) @map("alert_threshold")
+  status              String    @default("DRAFT") @db.VarChar(20)
+  imageUrls           Json      @default("[]") @map("image_urls")
+  availableSizes      Json      @default("[]") @map("available_sizes")
+  availableColors     Json      @default("[]") @map("available_colors")
+  brand               String?   @db.VarChar(80)
+  modelName           String?   @map("model_name") @db.VarChar(100)
+  volumeLabel         String?   @map("volume_label") @db.VarChar(40)
+  isPinnedPos         Boolean   @default(false) @map("is_pinned_pos")
+  bulkUnitLabel       String?   @map("bulk_unit_label") @db.VarChar(32)
+  unitsPerBulk        Int?      @map("units_per_bulk")
+  bulkSalePriceXof    Int?      @map("bulk_sale_price_xof")
+  allowFractionalSale Boolean   @default(false) @map("allow_fractional_sale")
+  expiryDate          DateTime? @map("expiry_date") @db.Timestamptz(6)
+  warrantyMonths      Int?      @map("warranty_months")
+  trackSerialNumber   Boolean   @default(false) @map("track_serial_number")
+  importBatchId       String?   @map("import_batch_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   category       Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   variants       ProductVariant[]
@@ -158,12 +171,34 @@ model Product {
   stockMovements StockMovement[]
   costHistory    ProductCostHistory[]
   saleLines      SaleLine[]
+  batches        ProductBatch[]
 
   @@index([categoryId])
   @@index([status])
   @@index([barcode])
   @@index([importBatchId])
+  @@index([isPinnedPos])
+  @@index([expiryDate])
   @@map("products")
+}
+
+model ProductBatch {
+  id           String   @id @default(uuid()) @db.Uuid
+  productId    String   @map("product_id") @db.Uuid
+  batchNumber  String?  @map("batch_number") @db.VarChar(60)
+  expiryDate   DateTime @map("expiry_date") @db.Timestamptz(6)
+  initialQty   Int      @map("initial_qty")
+  remainingQty Int      @map("remaining_qty")
+  status       String   @default("ACTIVE") @db.VarChar(24)
+  notes        String?  @db.VarChar(300)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, status, expiryDate])
+  @@index([expiryDate, status])
+  @@map("product_batches")
 }
 
 model ProductVariant {
@@ -188,13 +223,14 @@ model ProductVariant {
 }
 
 model StockBalance {
-  id          String   @id @default(uuid()) @db.Uuid
-  productId   String   @map("product_id") @db.Uuid
-  variantId   String?  @map("variant_id") @db.Uuid
-  variantKey  String   @default("BASE") @map("variant_key") @db.VarChar(40)
-  physicalQty Int      @default(0) @map("physical_qty")
-  reservedQty Int      @default(0) @map("reserved_qty")
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                       String   @id @default(uuid()) @db.Uuid
+  productId                String   @map("product_id") @db.Uuid
+  variantId                String?  @map("variant_id") @db.Uuid
+  variantKey               String   @default("BASE") @map("variant_key") @db.VarChar(40)
+  physicalQty              Int      @default(0) @map("physical_qty")
+  fractionalRemainderMilli Int      @default(0) @map("fractional_remainder_milli")
+  reservedQty              Int      @default(0) @map("reserved_qty")
+  updatedAt                DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
@@ -495,25 +531,32 @@ model Sale {
 }
 
 model SaleLine {
-  id           String  @id @default(uuid()) @db.Uuid
-  saleId       String  @map("sale_id") @db.Uuid
-  productId    String  @map("product_id") @db.Uuid
-  variantId    String? @map("variant_id") @db.Uuid
-  productName  String  @map("product_name") @db.VarChar(160)
-  sku          String  @db.VarChar(64)
-  quantity     Int
-  returnedQty  Int     @default(0) @map("returned_qty")
-  unitPriceXof Int     @map("unit_price_xof")
-  unitCostXof  Int?    @map("unit_cost_xof")
-  discountXof  Int     @default(0) @map("discount_xof")
-  taxXof       Int     @default(0) @map("tax_xof")
-  lineTotalXof Int     @map("line_total_xof")
+  id                 String    @id @default(uuid()) @db.Uuid
+  saleId             String    @map("sale_id") @db.Uuid
+  productId          String    @map("product_id") @db.Uuid
+  variantId          String?   @map("variant_id") @db.Uuid
+  productName        String    @map("product_name") @db.VarChar(160)
+  sku                String    @db.VarChar(64)
+  quantity           Int
+  soldInBulk         Boolean   @default(false) @map("sold_in_bulk")
+  bulkMultiplier     Int       @default(1) @map("bulk_multiplier")
+  unitLabel          String?   @map("unit_label") @db.VarChar(32)
+  fractionalQtyMilli Int?      @map("fractional_qty_milli")
+  serialNumber       String?   @map("serial_number") @db.VarChar(120)
+  warrantyEndsAt     DateTime? @map("warranty_ends_at") @db.Timestamptz(6)
+  returnedQty        Int       @default(0) @map("returned_qty")
+  unitPriceXof       Int       @map("unit_price_xof")
+  unitCostXof        Int?      @map("unit_cost_xof")
+  discountXof        Int       @default(0) @map("discount_xof")
+  taxXof             Int       @default(0) @map("tax_xof")
+  lineTotalXof       Int       @map("line_total_xof")
 
   sale    Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
   returns SaleReturn[]
 
   @@index([saleId])
+  @@index([serialNumber])
   @@map("sale_lines")
 }
 
@@ -756,18 +799,21 @@ model OnlineOrder {
 }
 
 model OnlineOrderLine {
-  id           String  @id @default(uuid()) @db.Uuid
-  orderId      String  @map("order_id") @db.Uuid
-  productId    String  @map("product_id") @db.Uuid
-  variantId    String? @map("variant_id") @db.Uuid
-  productName   String  @map("product_name") @db.VarChar(160)
-  sku           String  @db.VarChar(64)
-  selectedSize  String? @map("selected_size") @db.VarChar(32)
-  selectedColor String? @map("selected_color") @db.VarChar(40)
-  orderedQty    Int     @map("ordered_qty")
-  deliveredQty Int     @default(0) @map("delivered_qty")
-  unitPriceXof Int     @map("unit_price_xof")
-  lineTotalXof Int     @map("line_total_xof")
+  id             String  @id @default(uuid()) @db.Uuid
+  orderId        String  @map("order_id") @db.Uuid
+  productId      String  @map("product_id") @db.Uuid
+  variantId      String? @map("variant_id") @db.Uuid
+  productName    String  @map("product_name") @db.VarChar(160)
+  sku            String  @db.VarChar(64)
+  selectedSize   String? @map("selected_size") @db.VarChar(32)
+  selectedColor  String? @map("selected_color") @db.VarChar(40)
+  soldInBulk     Boolean @default(false) @map("sold_in_bulk")
+  bulkMultiplier Int     @default(1) @map("bulk_multiplier")
+  unitLabel      String? @map("unit_label") @db.VarChar(32)
+  orderedQty     Int     @map("ordered_qty")
+  deliveredQty   Int     @default(0) @map("delivered_qty")
+  unitPriceXof   Int     @map("unit_price_xof")
+  lineTotalXof   Int     @map("line_total_xof")
 
   order OnlineOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 

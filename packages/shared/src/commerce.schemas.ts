@@ -45,13 +45,38 @@ export const createProductSchema = z.object({
   imageUrls: z.array(z.string().trim().max(500)).max(10).default([]),
   availableSizes: z.array(z.string().trim().min(1).max(32)).max(30).default([]),
   availableColors: z.array(z.string().trim().min(1).max(40)).max(30).default([]),
+  // Attributs sectoriels (Lots 8, 9, 10)
+  brand: z.string().trim().max(80).nullable().optional(),
+  modelName: z.string().trim().max(100).nullable().optional(),
+  volumeLabel: z.string().trim().max(40).nullable().optional(),
+  isPinnedPos: z.boolean().default(false),
+  bulkUnitLabel: z.string().trim().max(32).nullable().optional(),
+  unitsPerBulk: z.number().int().min(2).max(10000).nullable().optional(),
+  bulkSalePriceXof: xofInt.nullable().optional(),
+  allowFractionalSale: z.boolean().default(false),
+  expiryDate: z.string().datetime().nullable().optional(),
+  batchNumber: z.string().trim().max(60).nullable().optional(),
+  warrantyMonths: z.number().int().min(0).max(120).nullable().optional(),
+  trackSerialNumber: z.boolean().default(false),
   initialStockQty: z.number().int().min(0).optional(),
   variants: z.array(productVariantInputSchema).max(50).optional(),
 });
 
 export const updateProductSchema = createProductSchema
-  .omit({ initialStockQty: true })
+  .omit({ initialStockQty: true, batchNumber: true })
   .partial();
+
+export const createProductBatchSchema = z.object({
+  productId: z.string().uuid('Produit requis.'),
+  batchNumber: z.string().trim().max(60).optional(),
+  expiryDate: z.string().datetime('Date de péremption invalide.'),
+  quantity: positiveInt,
+  notes: z.string().trim().max(300).optional(),
+});
+
+export const writeOffBatchSchema = z.object({
+  reason: z.string().trim().min(4, 'Motif de mise au rebut requis.').max(400),
+});
 
 // --- Stocks & Inventaire ---
 export const stockAdjustmentSchema = z.object({
@@ -116,6 +141,9 @@ export const receivePurchaseOrderSchema = z.object({
         purchaseOrderItemId: z.string().uuid(),
         receivedQty: positiveInt,
         unitCostXof: xofInt.optional(),
+        receivedInBulk: z.boolean().default(false),
+        expiryDate: z.string().datetime().nullable().optional(),
+        batchNumber: z.string().trim().max(60).nullable().optional(),
       }),
     )
     .min(1, 'Renseignez au moins une ligne reçue.'),
@@ -199,7 +227,11 @@ export const regularizeCashSessionSchema = z.object({
 export const saleLineInputSchema = z.object({
   productId: z.string().uuid(),
   variantId: z.string().uuid().nullable().optional(),
-  quantity: positiveInt,
+  quantity: positiveInt.default(1),
+  soldInBulk: z.boolean().default(false),
+  customAmountXof: z.number().int().min(1).max(100_000_000).nullable().optional(),
+  fractionalQtyMilli: z.number().int().min(1).max(100_000_000).nullable().optional(),
+  serialNumber: z.string().trim().max(120).nullable().optional(),
   discountType: z.enum(DISCOUNT_TYPES).default('NONE'),
   discountValue: z.number().min(0).default(0),
 });

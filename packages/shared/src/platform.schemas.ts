@@ -149,6 +149,7 @@ export const createPublicOrderSchema = z.object({
         variantId: z.string().uuid().nullable().optional(),
         selectedSize: z.string().trim().max(32).nullable().optional(),
         selectedColor: z.string().trim().max(40).nullable().optional(),
+        soldInBulk: z.boolean().default(false),
         quantity: positiveInt,
       }),
     )

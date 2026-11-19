@@ -1,12 +1,30 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Package, Palette, Pencil, Plus, Ruler, Search, Tag, X } from 'lucide-react';
+import {
+  Boxes,
+  CalendarClock,
+  Package,
+  Palette,
+  Pencil,
+  Pin,
+  Plus,
+  Ruler,
+  Scale,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Tag,
+  X,
+} from 'lucide-react';
 import {
   formatXof,
+  normalizeBusinessProfile,
+  normalizeShopType,
   PRODUCT_STATUSES,
   PRODUCT_STATUS_LABELS,
   ProductStatus,
+  SHOP_TYPE_SHORT_LABELS,
 } from '@shopcontrol/shared';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { AppShell } from '@/components/layout/AppShell';
@@ -14,7 +32,7 @@ import {
   ShopPickerInline,
   useActiveOperationalShop,
 } from '@/components/commerce/ActiveShopHeader';
-import { MultiImageUploader } from '@/components/ui/ImageUploader';
+import { ImageUploader, MultiImageUploader } from '@/components/ui/ImageUploader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateViews';
 
 const PRESET_CLOTHING_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Taille unique'];
@@ -66,14 +84,30 @@ interface ProductRow {
   imageUrls?: string[];
   availableSizes?: string[];
   availableColors?: string[];
+  brand?: string | null;
+  modelName?: string | null;
+  volumeLabel?: string | null;
+  isPinnedPos?: boolean;
+  bulkUnitLabel?: string | null;
+  unitsPerBulk?: number | null;
+  bulkSalePriceXof?: number | null;
+  allowFractionalSale?: boolean;
+  expiryDate?: string | null;
+  warrantyMonths?: number | null;
+  trackSerialNumber?: boolean;
   stockPhysical: number;
+  stockRemainderMilli?: number;
+  stockPhysicalDecimal?: number;
   stockAvailable: number;
+  stockAvailableDecimal?: number;
 }
 
 export default function ProductsPage() {
   const { shopId, activeShop, selectShop, isOwner } = useActiveOperationalShop();
   const canWrite = isOwner || Boolean(activeShop?.permissions['products:create']);
   const canReadCost = isOwner || Boolean(activeShop?.permissions['finance:read_margins']);
+  const shopType = normalizeShopType(activeShop?.shopType);
+  const profile = normalizeBusinessProfile(shopType, activeShop?.businessProfile);
 
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -106,6 +140,18 @@ export default function ProductsPage() {
     imageUrls: [] as string[],
     availableSizes: [] as string[],
     availableColors: [] as string[],
+    brand: '',
+    modelName: '',
+    volumeLabel: '',
+    isPinnedPos: false,
+    bulkUnitLabel: '',
+    unitsPerBulk: '',
+    bulkSalePriceXof: '',
+    allowFractionalSale: false,
+    expiryDate: '',
+    batchNumber: '',
+    warrantyMonths: '',
+    trackSerialNumber: false,
   });
 
   const load = useCallback(async () => {
@@ -152,6 +198,22 @@ export default function ProductsPage() {
     }
   };
 
+  const handleSeedCategories = async () => {
+    if (!shopId) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/shops/${shopId}/categories/seed-suggested`, {
+        method: 'POST',
+        shopId,
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Impossible de créer les catégories suggérées.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openCreate = () => {
     setEditing(null);
     setFormErr(null);
@@ -163,7 +225,7 @@ export default function ProductsPage() {
       barcode: '',
       description: '',
       categoryId: '',
-      unit: 'unité',
+      unit: profile.defaultUnits[0] || 'unité',
       salePriceXof: 0,
       costPriceXof: '',
       alertThreshold: 5,
@@ -172,6 +234,18 @@ export default function ProductsPage() {
       imageUrls: [],
       availableSizes: [],
       availableColors: [],
+      brand: '',
+      modelName: '',
+      volumeLabel: '',
+      isPinnedPos: false,
+      bulkUnitLabel: '',
+      unitsPerBulk: '',
+      bulkSalePriceXof: '',
+      allowFractionalSale: false,
+      expiryDate: '',
+      batchNumber: '',
+      warrantyMonths: '',
+      trackSerialNumber: false,
     });
     setModalOpen(true);
   };
@@ -196,6 +270,18 @@ export default function ProductsPage() {
       imageUrls: Array.isArray(p.imageUrls) ? p.imageUrls : [],
       availableSizes: Array.isArray(p.availableSizes) ? p.availableSizes : [],
       availableColors: Array.isArray(p.availableColors) ? p.availableColors : [],
+      brand: p.brand || '',
+      modelName: p.modelName || '',
+      volumeLabel: p.volumeLabel || '',
+      isPinnedPos: Boolean(p.isPinnedPos),
+      bulkUnitLabel: p.bulkUnitLabel || '',
+      unitsPerBulk: p.unitsPerBulk ? String(p.unitsPerBulk) : '',
+      bulkSalePriceXof: p.bulkSalePriceXof !== null && p.bulkSalePriceXof !== undefined ? String(p.bulkSalePriceXof) : '',
+      allowFractionalSale: Boolean(p.allowFractionalSale),
+      expiryDate: p.expiryDate ? p.expiryDate.slice(0, 10) : '',
+      batchNumber: '',
+      warrantyMonths: p.warrantyMonths !== null && p.warrantyMonths !== undefined ? String(p.warrantyMonths) : '',
+      trackSerialNumber: Boolean(p.trackSerialNumber),
     });
     setModalOpen(true);
   };
@@ -254,8 +340,37 @@ export default function ProductsPage() {
         alertThreshold: Math.round(Number(form.alertThreshold) || 0),
         status: form.status,
         imageUrls: form.imageUrls,
-        availableSizes: form.availableSizes,
-        availableColors: form.availableColors,
+        availableSizes: profile.enableSizes ? form.availableSizes : [],
+        availableColors: profile.enableColors ? form.availableColors : [],
+        brand: profile.enableBrandModel ? form.brand.trim() || null : null,
+        modelName: profile.enableBrandModel ? form.modelName.trim() || null : null,
+        volumeLabel: profile.enableBrandModel ? form.volumeLabel.trim() || null : null,
+        isPinnedPos: profile.enableFastPosFavorites ? Boolean(form.isPinnedPos) : false,
+        bulkUnitLabel:
+          profile.enableBulkUnits && form.unitsPerBulk.trim() !== ''
+            ? form.bulkUnitLabel.trim() || 'carton'
+            : null,
+        unitsPerBulk:
+          profile.enableBulkUnits && form.unitsPerBulk.trim() !== ''
+            ? Math.max(2, Math.round(Number(form.unitsPerBulk)))
+            : null,
+        bulkSalePriceXof:
+          profile.enableBulkUnits && form.bulkSalePriceXof.trim() !== ''
+            ? Math.round(Number(form.bulkSalePriceXof))
+            : null,
+        allowFractionalSale: profile.enableAmountSale ? Boolean(form.allowFractionalSale) : false,
+        expiryDate:
+          profile.enableExpiryTracking && form.expiryDate.trim() !== ''
+            ? new Date(`${form.expiryDate.trim()}T23:59:59.000Z`).toISOString()
+            : null,
+        ...(!editing && profile.enableExpiryTracking && form.batchNumber.trim() !== ''
+          ? { batchNumber: form.batchNumber.trim() }
+          : {}),
+        warrantyMonths:
+          profile.enableSerialWarranty && form.warrantyMonths.trim() !== ''
+            ? Math.max(0, Math.round(Number(form.warrantyMonths)))
+            : null,
+        trackSerialNumber: profile.enableSerialWarranty ? Boolean(form.trackSerialNumber) : false,
         ...(!editing && form.initialStockQty > 0 ? { initialStockQty: form.initialStockQty } : {}),
       };
 
@@ -326,23 +441,35 @@ export default function ProductsPage() {
               </button>
             ))}
             {canWrite ? (
-              <form
-                onSubmit={handleCreateCategory}
-                className="flex w-full gap-1.5 pt-1 sm:ml-auto sm:w-auto sm:pt-0"
-              >
-                <input
-                  value={newCatName}
-                  onChange={(e) => setNewCatName(e.target.value)}
-                  placeholder="Nouvelle catégorie…"
-                  className="flex-1 rounded-xl border border-slate-200 bg-porcelain-50 px-3 py-1.5 text-xs sm:w-44 sm:flex-none"
-                />
+              <div className="flex w-full flex-wrap items-center gap-1.5 pt-1 sm:ml-auto sm:w-auto sm:pt-0">
                 <button
-                  type="submit"
-                  className="rounded-xl bg-forest-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-forest-800"
+                  type="button"
+                  disabled={busy}
+                  onClick={handleSeedCategories}
+                  className="inline-flex items-center gap-1 rounded-xl border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs font-bold text-brand-800 hover:bg-brand-100"
+                  title={`Créer les catégories recommandées pour ${SHOP_TYPE_SHORT_LABELS[shopType]}`}
                 >
-                  +
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Catégories {SHOP_TYPE_SHORT_LABELS[shopType]}
                 </button>
-              </form>
+                <form
+                  onSubmit={handleCreateCategory}
+                  className="flex flex-1 gap-1.5 sm:flex-none"
+                >
+                  <input
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    placeholder="Nouvelle catégorie…"
+                    className="flex-1 rounded-xl border border-slate-200 bg-porcelain-50 px-3 py-1.5 text-xs sm:w-44 sm:flex-none"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-forest-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-forest-800"
+                  >
+                    +
+                  </button>
+                </form>
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -406,28 +533,56 @@ export default function ProductsPage() {
                         </span>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-bold text-slate-900">{p.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate font-bold text-slate-900">{p.name}</p>
+                          {p.isPinnedPos ? (
+                            <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-extrabold text-amber-800">
+                              Favori POS
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="truncate text-xs text-slate-500">
                           <code className="font-mono">{p.sku}</code>
                           {p.categoryName ? ` · ${p.categoryName}` : ''}
+                          {p.brand ? ` · ${p.brand}` : ''}
+                          {p.modelName ? ` (${p.modelName})` : ''}
                         </p>
-                        {(sizes.length > 0 || colors.length > 0) && (
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                            {sizes.slice(0, 4).map((s) => (
-                              <span key={s} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
-                                {s}
-                              </span>
-                            ))}
-                            {colors.slice(0, 4).map((c) => (
-                              <span
-                                key={c}
-                                title={c}
-                                className="h-3.5 w-3.5 rounded-full border border-slate-300"
-                                style={{ backgroundColor: getColorHex(c) }}
-                              />
-                            ))}
-                          </div>
-                        )}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                          {p.unitsPerBulk && p.unitsPerBulk >= 2 ? (
+                            <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                              {p.bulkUnitLabel || 'carton'} ×{p.unitsPerBulk}
+                              {p.bulkSalePriceXof ? ` (${formatXof(p.bulkSalePriceXof)})` : ''}
+                            </span>
+                          ) : null}
+                          {p.allowFractionalSale ? (
+                            <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">
+                              Vente au montant
+                            </span>
+                          ) : null}
+                          {p.expiryDate ? (
+                            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                              DLC {new Date(p.expiryDate).toLocaleDateString('fr-FR')}
+                            </span>
+                          ) : null}
+                          {p.warrantyMonths ? (
+                            <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800">
+                              Garantie {p.warrantyMonths}m
+                            </span>
+                          ) : null}
+                          {sizes.slice(0, 4).map((s) => (
+                            <span key={s} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
+                              {s}
+                            </span>
+                          ))}
+                          {colors.slice(0, 4).map((c) => (
+                            <span
+                              key={c}
+                              title={c}
+                              className="h-3.5 w-3.5 rounded-full border border-slate-300"
+                              style={{ backgroundColor: getColorHex(c) }}
+                            />
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -459,7 +614,7 @@ export default function ProductsPage() {
                                 : 'text-emerald-700'
                           }`}
                         >
-                          {p.stockAvailable} {p.unit}
+                          {(p.stockAvailableDecimal ?? p.stockAvailable)} {p.unit}
                         </p>
                       </div>
                     </div>
@@ -522,11 +677,51 @@ export default function ProductsPage() {
                               </span>
                             )}
                             <div className="min-w-0">
-                              <p className="font-bold text-slate-900">{p.name}</p>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <p className="font-bold text-slate-900">{p.name}</p>
+                                {p.isPinnedPos ? (
+                                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-800">
+                                    ★ POS
+                                  </span>
+                                ) : null}
+                                {p.brand || p.modelName ? (
+                                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
+                                    {[p.brand, p.modelName].filter(Boolean).join(' · ')}
+                                  </span>
+                                ) : null}
+                                {p.volumeLabel ? (
+                                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                                    {p.volumeLabel}
+                                  </span>
+                                ) : null}
+                              </div>
                               <p className="text-xs text-slate-500">
                                 SKU : <code className="font-mono">{p.sku}</code>
                                 {p.categoryName ? ` · ${p.categoryName}` : ''}
                               </p>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {p.unitsPerBulk && p.unitsPerBulk >= 2 ? (
+                                  <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                                    {p.bulkUnitLabel || 'carton'} ×{p.unitsPerBulk}
+                                    {p.bulkSalePriceXof ? ` · ${formatXof(p.bulkSalePriceXof)}` : ''}
+                                  </span>
+                                ) : null}
+                                {p.allowFractionalSale ? (
+                                  <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">
+                                    Vente au montant
+                                  </span>
+                                ) : null}
+                                {p.expiryDate ? (
+                                  <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                                    DLC : {new Date(p.expiryDate).toLocaleDateString('fr-FR')}
+                                  </span>
+                                ) : null}
+                                {p.warrantyMonths ? (
+                                  <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800">
+                                    Garantie {p.warrantyMonths} mois{p.trackSerialNumber ? ' · IMEI' : ''}
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -594,7 +789,7 @@ export default function ProductsPage() {
                                   : 'text-emerald-700'
                             }`}
                           >
-                            {p.stockAvailable} {p.unit}
+                            {(p.stockAvailableDecimal ?? p.stockAvailable)} {p.unit}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -639,9 +834,14 @@ export default function ProductsPage() {
               className="max-h-[92vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6"
             >
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h2 className="text-lg font-extrabold text-slate-900">
-                  {editing ? `Modifier ${editing.name}` : 'Créer un nouveau produit'}
-                </h2>
+                <div>
+                  <h2 className="text-lg font-extrabold text-slate-900">
+                    {editing ? `Modifier ${editing.name}` : 'Créer un nouveau produit'}
+                  </h2>
+                  <p className="text-[11px] font-semibold text-brand-700">
+                    Profil actif : {SHOP_TYPE_SHORT_LABELS[shopType]} (modifiable dans Paramètres)
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
@@ -658,14 +858,24 @@ export default function ProductsPage() {
                 </div>
               ) : null}
 
-              <MultiImageUploader
-                purpose="product"
-                maxImages={10}
-                label="Photos du produit (jusqu’à 10 photos — POS & Vitrine QR)"
-                hint="Vous pouvez ajouter 5 photos ou plus d’un coup. La photo #1 est l’image principale."
-                values={form.imageUrls}
-                onChange={(urls) => setForm((f) => ({ ...f, imageUrls: urls }))}
-              />
+              {profile.enableMultiPhotos ? (
+                <MultiImageUploader
+                  purpose="product"
+                  maxImages={10}
+                  label="Photos du produit (jusqu’à 10 photos — POS & Vitrine QR)"
+                  hint="Vous pouvez ajouter 5 photos ou plus d’un coup. La photo #1 est l’image principale."
+                  values={form.imageUrls}
+                  onChange={(urls) => setForm((f) => ({ ...f, imageUrls: urls }))}
+                />
+              ) : (
+                <ImageUploader
+                  purpose="product"
+                  aspect="square"
+                  label="Photo du produit (optionnelle pour la saisie rapide)"
+                  value={form.imageUrls[0] || null}
+                  onChange={(url) => setForm((f) => ({ ...f, imageUrls: url ? [url] : [] }))}
+                />
+              )}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
@@ -674,7 +884,13 @@ export default function ProductsPage() {
                     required
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Ex. Veste Blazer Classique"
+                    placeholder={
+                      shopType === 'GROCERY'
+                        ? 'Ex. Lait Bonnet Rouge / Sucre en poudre'
+                        : shopType === 'ELECTRONICS'
+                          ? 'Ex. Samsung Galaxy A55 5G'
+                          : 'Ex. Veste Blazer Classique'
+                    }
                     className="sc-input mt-1"
                   />
                 </div>
@@ -684,165 +900,202 @@ export default function ProductsPage() {
                     required
                     value={form.sku}
                     onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                    placeholder="Ex. VEST-001"
+                    placeholder="Ex. REF-001"
                     className="sc-input mt-1 font-mono"
                   />
                 </div>
               </div>
 
+              {/* Marque, Modèle & Contenance (Mode, Cosmétique, Électronique) */}
+              {profile.enableBrandModel ? (
+                <div className="grid gap-3 rounded-2xl border border-slate-200 bg-porcelain-50 p-3.5 sm:grid-cols-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">Marque</label>
+                    <input
+                      value={form.brand}
+                      onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                      placeholder="Ex. Samsung, Nivea, Zara…"
+                      className="sc-input mt-1 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">Modèle / Série</label>
+                    <input
+                      value={form.modelName}
+                      onChange={(e) => setForm({ ...form, modelName: e.target.value })}
+                      placeholder="Ex. SM-A556 / 256Go"
+                      className="sc-input mt-1 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">Contenance / Format</label>
+                    <input
+                      value={form.volumeLabel}
+                      onChange={(e) => setForm({ ...form, volumeLabel: e.target.value })}
+                      placeholder="Ex. 250 ml, 500 g…"
+                      className="sc-input mt-1 bg-white"
+                    />
+                  </div>
+                </div>
+              ) : null}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700">
-                  Description détaillée (affichée sur « Voir plus » de la vitrine)
+                  Description (optionnelle — affichée sur « Voir plus » de la vitrine)
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Décrivez la matière, la coupe, les détails d’entretien ou les points forts du produit…"
+                  placeholder="Détails ou caractéristiques utiles aux clients…"
                   className="sc-input mt-1"
                 />
               </div>
 
-              {/* Sélection des Tailles disponibles */}
-              <div className="rounded-2xl border border-slate-200 bg-porcelain-50 p-3.5 space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
-                    <Ruler className="h-3.5 w-3.5 text-brand-700" />
-                    Tailles disponibles ({form.availableSizes.length})
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowShoeSizes((v) => !v)}
-                    className="text-[11px] font-bold text-brand-700 hover:underline"
-                  >
-                    {showShoeSizes ? 'Masquer pointures' : '+ Pointures (36-45)'}
-                  </button>
-                </div>
+              {/* Sélection des Tailles disponibles (uniquement si enableSizes est actif) */}
+              {profile.enableSizes ? (
+                <div className="rounded-2xl border border-slate-200 bg-porcelain-50 p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+                      <Ruler className="h-3.5 w-3.5 text-brand-700" />
+                      Tailles disponibles ({form.availableSizes.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowShoeSizes((v) => !v)}
+                      className="text-[11px] font-bold text-brand-700 hover:underline"
+                    >
+                      {showShoeSizes ? 'Masquer pointures' : '+ Pointures (36-45)'}
+                    </button>
+                  </div>
 
-                <div className="flex flex-wrap gap-1.5">
-                  {[...PRESET_CLOTHING_SIZES, ...(showShoeSizes ? PRESET_SHOE_SIZES : [])].map(
-                    (size) => {
-                      const active = form.availableSizes.includes(size);
+                  <div className="flex flex-wrap gap-1.5">
+                    {[...PRESET_CLOTHING_SIZES, ...(showShoeSizes ? PRESET_SHOE_SIZES : [])].map(
+                      (size) => {
+                        const active = form.availableSizes.includes(size);
+                        return (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() => toggleSize(size)}
+                            className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${
+                              active
+                                ? 'bg-forest-900 text-limeglow-400 shadow-xs'
+                                : 'border border-slate-200 bg-white text-slate-700 hover:border-brand-400'
+                            }`}
+                          >
+                            {size}
+                          </button>
+                        );
+                      },
+                    )}
+                    {form.availableSizes
+                      .filter(
+                        (s) => !PRESET_CLOTHING_SIZES.includes(s) && !PRESET_SHOE_SIZES.includes(s),
+                      )
+                      .map((custom) => (
+                        <button
+                          key={custom}
+                          type="button"
+                          onClick={() => toggleSize(custom)}
+                          className="inline-flex items-center gap-1 rounded-xl bg-forest-900 px-2.5 py-1 text-xs font-bold text-limeglow-400"
+                        >
+                          {custom} ×
+                        </button>
+                      ))}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      value={customSize}
+                      onChange={(e) => setCustomSize(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addCustomSize();
+                        }
+                      }}
+                      placeholder="Autre taille (ex. 46, 2 ans, 50ml)…"
+                      className="sc-input py-1.5 text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={addCustomSize}
+                      className="sc-btn-ghost shrink-0 py-1.5 text-xs"
+                    >
+                      Ajouter
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Sélection des Couleurs disponibles (uniquement si enableColors est actif) */}
+              {profile.enableColors ? (
+                <div className="rounded-2xl border border-slate-200 bg-porcelain-50 p-3.5 space-y-2.5">
+                  <span className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+                    <Palette className="h-3.5 w-3.5 text-brand-700" />
+                    Couleurs disponibles ({form.availableColors.length})
+                  </span>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {PRESET_COLORS.map((c) => {
+                      const active = form.availableColors.includes(c.name);
                       return (
                         <button
-                          key={size}
+                          key={c.name}
                           type="button"
-                          onClick={() => toggleSize(size)}
-                          className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${
+                          onClick={() => toggleColor(c.name)}
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition ${
                             active
-                              ? 'bg-forest-900 text-limeglow-400 shadow-xs'
+                              ? 'bg-forest-900 text-white ring-2 ring-limeglow-400'
                               : 'border border-slate-200 bg-white text-slate-700 hover:border-brand-400'
                           }`}
                         >
-                          {size}
+                          <span
+                            className="h-3 w-3 shrink-0 rounded-full border border-slate-300"
+                            style={{ backgroundColor: c.hex }}
+                          />
+                          {c.name}
                         </button>
                       );
-                    },
-                  )}
-                  {form.availableSizes
-                    .filter(
-                      (s) => !PRESET_CLOTHING_SIZES.includes(s) && !PRESET_SHOE_SIZES.includes(s),
-                    )
-                    .map((custom) => (
-                      <button
-                        key={custom}
-                        type="button"
-                        onClick={() => toggleSize(custom)}
-                        className="inline-flex items-center gap-1 rounded-xl bg-forest-900 px-2.5 py-1 text-xs font-bold text-limeglow-400"
-                      >
-                        {custom} ×
-                      </button>
-                    ))}
-                </div>
+                    })}
+                    {form.availableColors
+                      .filter((c) => !PRESET_COLORS.some((p) => p.name === c))
+                      .map((custom) => (
+                        <button
+                          key={custom}
+                          type="button"
+                          onClick={() => toggleColor(custom)}
+                          className="inline-flex items-center gap-1 rounded-full bg-forest-900 px-2.5 py-1 text-xs font-bold text-limeglow-400"
+                        >
+                          {custom} ×
+                        </button>
+                      ))}
+                  </div>
 
-                <div className="flex gap-2">
-                  <input
-                    value={customSize}
-                    onChange={(e) => setCustomSize(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addCustomSize();
-                      }
-                    }}
-                    placeholder="Autre taille (ex. 46, 2 ans, 50ml)…"
-                    className="sc-input py-1.5 text-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={addCustomSize}
-                    className="sc-btn-ghost shrink-0 py-1.5 text-xs"
-                  >
-                    Ajouter
-                  </button>
+                  <div className="flex gap-2">
+                    <input
+                      value={customColor}
+                      onChange={(e) => setCustomColor(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addCustomColor();
+                        }
+                      }}
+                      placeholder="Autre couleur (ex. Bordeaux, Turquoise)…"
+                      className="sc-input py-1.5 text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={addCustomColor}
+                      className="sc-btn-ghost shrink-0 py-1.5 text-xs"
+                    >
+                      Ajouter
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-              {/* Sélection des Couleurs disponibles */}
-              <div className="rounded-2xl border border-slate-200 bg-porcelain-50 p-3.5 space-y-2.5">
-                <span className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
-                  <Palette className="h-3.5 w-3.5 text-brand-700" />
-                  Couleurs disponibles ({form.availableColors.length})
-                </span>
-
-                <div className="flex flex-wrap gap-1.5">
-                  {PRESET_COLORS.map((c) => {
-                    const active = form.availableColors.includes(c.name);
-                    return (
-                      <button
-                        key={c.name}
-                        type="button"
-                        onClick={() => toggleColor(c.name)}
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition ${
-                          active
-                            ? 'bg-forest-900 text-white ring-2 ring-limeglow-400'
-                            : 'border border-slate-200 bg-white text-slate-700 hover:border-brand-400'
-                        }`}
-                      >
-                        <span
-                          className="h-3 w-3 shrink-0 rounded-full border border-slate-300"
-                          style={{ backgroundColor: c.hex }}
-                        />
-                        {c.name}
-                      </button>
-                    );
-                  })}
-                  {form.availableColors
-                    .filter((c) => !PRESET_COLORS.some((p) => p.name === c))
-                    .map((custom) => (
-                      <button
-                        key={custom}
-                        type="button"
-                        onClick={() => toggleColor(custom)}
-                        className="inline-flex items-center gap-1 rounded-full bg-forest-900 px-2.5 py-1 text-xs font-bold text-limeglow-400"
-                      >
-                        {custom} ×
-                      </button>
-                    ))}
-                </div>
-
-                <div className="flex gap-2">
-                  <input
-                    value={customColor}
-                    onChange={(e) => setCustomColor(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addCustomColor();
-                      }
-                    }}
-                    placeholder="Autre couleur (ex. Bordeaux, Turquoise)…"
-                    className="sc-input py-1.5 text-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={addCustomColor}
-                    className="sc-btn-ghost shrink-0 py-1.5 text-xs"
-                  >
-                    Ajouter
-                  </button>
-                </div>
-              </div>
+              ) : null}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
@@ -872,7 +1125,9 @@ export default function ProductsPage() {
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700">Prix vente (XOF) *</label>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Prix vente détail (XOF) *
+                  </label>
                   <input
                     type="number"
                     min={0}
@@ -883,7 +1138,9 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700">Coût achat (XOF)</label>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Coût achat détail (XOF)
+                  </label>
                   <input
                     type="number"
                     min={0}
@@ -907,12 +1164,30 @@ export default function ProductsPage() {
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700">Unité</label>
+                  <label className="block text-xs font-semibold text-slate-700">Unité de base</label>
                   <input
                     value={form.unit}
                     onChange={(e) => setForm({ ...form, unit: e.target.value })}
                     className="sc-input mt-1"
                   />
+                  {profile.defaultUnits.length > 0 ? (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {profile.defaultUnits.slice(0, 8).map((u) => (
+                        <button
+                          key={u}
+                          type="button"
+                          onClick={() => setForm((f) => ({ ...f, unit: u }))}
+                          className={`rounded-lg px-2 py-0.5 text-[10px] font-bold transition ${
+                            form.unit === u
+                              ? 'bg-forest-900 text-limeglow-400'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {u}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700">Statut vitrine</label>
@@ -930,7 +1205,9 @@ export default function ProductsPage() {
                 </div>
                 {!editing ? (
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700">Stock initial</label>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Stock initial ({form.unit})
+                    </label>
                     <input
                       type="number"
                       min={0}
@@ -943,6 +1220,158 @@ export default function ProductsPage() {
                   </div>
                 ) : null}
               </div>
+
+              {/* Lot 9 : Conditionnement Gros ↔ Détail (Carton / Sac / Pack) */}
+              {profile.enableBulkUnits ? (
+                <div className="space-y-2.5 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3.5">
+                  <span className="flex items-center gap-1.5 text-xs font-extrabold text-emerald-950">
+                    <Boxes className="h-3.5 w-3.5 text-brand-700" />
+                    Conditionnement Gros ↔ Détail (Carton / Sac / Pack — optionnel)
+                  </span>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Libellé unité gros
+                      </label>
+                      <input
+                        value={form.bulkUnitLabel}
+                        onChange={(e) => setForm({ ...form, bulkUnitLabel: e.target.value })}
+                        placeholder="Ex. carton, sac, pack…"
+                        className="sc-input mt-1 bg-white py-1.5 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Nb d’unités détail / gros
+                      </label>
+                      <input
+                        type="number"
+                        min={2}
+                        value={form.unitsPerBulk}
+                        onChange={(e) => setForm({ ...form, unitsPerBulk: e.target.value })}
+                        placeholder="Ex. 24"
+                        className="sc-input mt-1 bg-white py-1.5 text-xs tabular"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Prix vente en gros (XOF)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={form.bulkSalePriceXof}
+                        onChange={(e) => setForm({ ...form, bulkSalePriceXof: e.target.value })}
+                        placeholder={
+                          form.unitsPerBulk && form.salePriceXof
+                            ? String(Number(form.unitsPerBulk) * Number(form.salePriceXof))
+                            : 'Ex. 11000'
+                        }
+                        className="sc-input mt-1 bg-white py-1.5 text-xs tabular"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Lot 9 : Vente au montant / fraction & Favori POS Express */}
+              {profile.enableAmountSale || profile.enableFastPosFavorites ? (
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  {profile.enableAmountSale ? (
+                    <label className="flex items-center gap-2.5 rounded-2xl border border-sky-200 bg-sky-50/50 p-3 text-xs font-semibold text-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={form.allowFractionalSale}
+                        onChange={(e) =>
+                          setForm({ ...form, allowFractionalSale: e.target.checked })
+                        }
+                        className="h-4 w-4 accent-brand-700"
+                      />
+                      <span className="flex items-center gap-1.5">
+                        <Scale className="h-3.5 w-3.5 text-sky-700" />
+                        Autoriser la vente au montant / fraction (ex. 250 F de {form.name || 'sucre'})
+                      </span>
+                    </label>
+                  ) : null}
+                  {profile.enableFastPosFavorites ? (
+                    <label className="flex items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/50 p-3 text-xs font-semibold text-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={form.isPinnedPos}
+                        onChange={(e) => setForm({ ...form, isPinnedPos: e.target.checked })}
+                        className="h-4 w-4 accent-brand-700"
+                      />
+                      <span className="flex items-center gap-1.5">
+                        <Pin className="h-3.5 w-3.5 text-amber-700" />
+                        Épingler en haut du comptoir POS Express (vente 1 clic)
+                      </span>
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {/* Lot 10 : Date de péremption (DLC) & Lot initial */}
+              {profile.enableExpiryTracking ? (
+                <div className="grid gap-3 rounded-2xl border border-amber-200 bg-amber-50/40 p-3.5 sm:grid-cols-2">
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-extrabold text-amber-950">
+                      <CalendarClock className="h-3.5 w-3.5 text-amber-700" />
+                      Date de péremption (DLC — optionnelle)
+                    </label>
+                    <input
+                      type="date"
+                      value={form.expiryDate}
+                      onChange={(e) => setForm({ ...form, expiryDate: e.target.value })}
+                      className="sc-input mt-1 bg-white py-1.5 text-xs"
+                    />
+                  </div>
+                  {!editing ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700">
+                        N° de lot initial (optionnel)
+                      </label>
+                      <input
+                        value={form.batchNumber}
+                        onChange={(e) => setForm({ ...form, batchNumber: e.target.value })}
+                        placeholder="Ex. LOT-2026-11"
+                        className="sc-input mt-1 bg-white py-1.5 text-xs font-mono"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {/* Lot 10 : Garantie & Numéro de série / IMEI */}
+              {profile.enableSerialWarranty ? (
+                <div className="grid gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/40 p-3.5 sm:grid-cols-2">
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-extrabold text-indigo-950">
+                      <ShieldCheck className="h-3.5 w-3.5 text-indigo-700" />
+                      Durée de garantie (en mois)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={120}
+                      value={form.warrantyMonths}
+                      onChange={(e) => setForm({ ...form, warrantyMonths: e.target.value })}
+                      placeholder="Ex. 12 (imprimé sur ticket & PDF)"
+                      className="sc-input mt-1 bg-white py-1.5 text-xs tabular"
+                    />
+                  </div>
+                  <label className="mt-4 flex items-center gap-2.5 rounded-xl border border-indigo-200 bg-white p-2.5 text-xs font-semibold text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={form.trackSerialNumber}
+                      onChange={(e) =>
+                        setForm({ ...form, trackSerialNumber: e.target.checked })
+                      }
+                      className="h-4 w-4 accent-brand-700"
+                    />
+                    <span>Exiger la saisie du N° de série / IMEI lors de la vente POS</span>
+                  </label>
+                </div>
+              ) : null}
 
               <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
                 <button type="button" onClick={() => setModalOpen(false)} className="sc-btn-ghost">

@@ -1,7 +1,13 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { PermissionMap, TenantStatus, UserRole } from '@shopcontrol/shared';
+import {
+  BusinessProfileConfig,
+  PermissionMap,
+  ShopType,
+  TenantStatus,
+  UserRole,
+} from '@shopcontrol/shared';
 import { apiFetch } from '@/lib/api-client';
 import { getLocalTerminalMeta, saveLocalTerminalMeta } from '@/lib/local-db';
 
@@ -31,6 +37,8 @@ export interface AuthShopAccess {
   shopName: string;
   slug: string;
   logoUrl?: string | null;
+  shopType?: ShopType;
+  businessProfile?: BusinessProfileConfig;
   status: TenantStatus;
   dbStatus: string;
   permissions: PermissionMap;

@@ -30,7 +30,10 @@ interface ProductOpt {
   id: string;
   name: string;
   sku: string;
+  unit?: string;
   costPriceXof: number | null;
+  bulkUnitLabel?: string | null;
+  unitsPerBulk?: number | null;
 }
 
 interface PurchaseOrderRow {
@@ -77,10 +80,13 @@ export default function PurchasesPage() {
   const [poQty, setPoQty] = useState(10);
   const [poUnitCost, setPoUnitCost] = useState(1000);
 
-  // Réception partielle/totale
+  // Réception partielle/totale (avec option Gros/Carton & DLC Lot 9/10)
   const [receiveTarget, setReceiveTarget] = useState<PurchaseOrderRow | null>(null);
   const [receiveQtys, setReceiveQtys] = useState<Record<string, number>>({});
   const [receiveCosts, setReceiveCosts] = useState<Record<string, number>>({});
+  const [receiveInBulkMap, setReceiveInBulkMap] = useState<Record<string, boolean>>({});
+  const [receiveExpiryMap, setReceiveExpiryMap] = useState<Record<string, string>>({});
+  const [receiveBatchMap, setReceiveBatchMap] = useState<Record<string, string>>({});
 
   // Paiement fournisseur
   const [paymentMethods, setPaymentMethods] = useState<Array<{ code: string; label: string; enabled: boolean; affectsCashDrawer: boolean }>>([]);
@@ -177,12 +183,21 @@ export default function PurchasesPage() {
   const openReceive = (po: PurchaseOrderRow) => {
     const qMap: Record<string, number> = {};
     const cMap: Record<string, number> = {};
+    const bMap: Record<string, boolean> = {};
+    const eMap: Record<string, string> = {};
+    const lMap: Record<string, string> = {};
     for (const item of po.items) {
       qMap[item.id] = Math.max(0, item.orderedQty - item.receivedQty);
       cMap[item.id] = item.unitCostXof;
+      bMap[item.id] = false;
+      eMap[item.id] = '';
+      lMap[item.id] = '';
     }
     setReceiveQtys(qMap);
     setReceiveCosts(cMap);
+    setReceiveInBulkMap(bMap);
+    setReceiveExpiryMap(eMap);
+    setReceiveBatchMap(lMap);
     setReceiveTarget(po);
   };
 
@@ -194,6 +209,13 @@ export default function PurchasesPage() {
         purchaseOrderItemId: i.id,
         receivedQty: Math.round(Number(receiveQtys[i.id]) || 0),
         unitCostXof: Math.round(Number(receiveCosts[i.id]) || i.unitCostXof),
+        receivedInBulk: Boolean(receiveInBulkMap[i.id]),
+        ...(receiveExpiryMap[i.id]?.trim()
+          ? {
+              expiryDate: new Date(`${receiveExpiryMap[i.id].trim()}T23:59:59.000Z`).toISOString(),
+            }
+          : {}),
+        ...(receiveBatchMap[i.id]?.trim() ? { batchNumber: receiveBatchMap[i.id].trim() } : {}),
       }))
       .filter((i) => i.receivedQty > 0);
     if (items.length === 0) return;
@@ -486,44 +508,108 @@ export default function PurchasesPage() {
               <p className="text-xs text-slate-600">
                 Saisissez uniquement les quantités réellement livrées ; le CMP sera recalculé automatiquement.
               </p>
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {receiveTarget.items.map((item) => {
                   const rem = item.orderedQty - item.receivedQty;
+                  const prodInfo = products.find((p) => p.id === item.productId);
+                  const canBulk = Boolean(prodInfo?.unitsPerBulk && prodInfo.unitsPerBulk >= 2);
                   return (
                     <div
                       key={item.id}
-                      className="grid grid-cols-2 items-center gap-2 rounded-xl bg-slate-50 p-3 text-xs sm:grid-cols-12"
+                      className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs"
                     >
-                      <div className="col-span-2 sm:col-span-6">
-                        <p className="font-semibold text-slate-900">{item.productName}</p>
-                        <p className="text-slate-500">Reliquat : {rem} / {item.orderedQty}</p>
+                      <div className="grid grid-cols-2 items-center gap-2 sm:grid-cols-12">
+                        <div className="col-span-2 sm:col-span-6">
+                          <p className="font-semibold text-slate-900">{item.productName}</p>
+                          <p className="text-slate-500">Reliquat : {rem} / {item.orderedQty}</p>
+                        </div>
+                        <div className="sm:col-span-3">
+                          <label className="mb-0.5 block text-[10px] text-slate-500">Qté reçue</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={rem}
+                            value={receiveQtys[item.id] ?? 0}
+                            onChange={(e) =>
+                              setReceiveQtys({ ...receiveQtys, [item.id]: Number(e.target.value) || 0 })
+                            }
+                            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5"
+                            placeholder="Qté"
+                          />
+                        </div>
+                        <div className="sm:col-span-3">
+                          <label className="mb-0.5 block text-[10px] text-slate-500">Coût XOF</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={receiveCosts[item.id] ?? item.unitCostXof}
+                            onChange={(e) =>
+                              setReceiveCosts({ ...receiveCosts, [item.id]: Number(e.target.value) || 0 })
+                            }
+                            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5"
+                            placeholder="Coût XOF"
+                          />
+                        </div>
                       </div>
-                      <div className="sm:col-span-3">
-                        <label className="mb-0.5 block text-[10px] text-slate-500">Qté reçue</label>
-                        <input
-                          type="number"
-                          min={0}
-                          max={rem}
-                          value={receiveQtys[item.id] ?? 0}
-                          onChange={(e) =>
-                            setReceiveQtys({ ...receiveQtys, [item.id]: Number(e.target.value) || 0 })
-                          }
-                          className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5"
-                          placeholder="Qté"
-                        />
-                      </div>
-                      <div className="sm:col-span-3">
-                        <label className="mb-0.5 block text-[10px] text-slate-500">Coût XOF</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={receiveCosts[item.id] ?? item.unitCostXof}
-                          onChange={(e) =>
-                            setReceiveCosts({ ...receiveCosts, [item.id]: Number(e.target.value) || 0 })
-                          }
-                          className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5"
-                          placeholder="Coût XOF"
-                        />
+
+                      {canBulk ? (
+                        <label className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-950">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(receiveInBulkMap[item.id])}
+                            onChange={(e) =>
+                              setReceiveInBulkMap({
+                                ...receiveInBulkMap,
+                                [item.id]: e.target.checked,
+                              })
+                            }
+                            className="h-3.5 w-3.5 accent-brand-700"
+                          />
+                          <span>
+                            Reçu en gros ({prodInfo?.bulkUnitLabel || 'carton'} de{' '}
+                            {prodInfo?.unitsPerBulk} {prodInfo?.unit || 'unités'} → crédite{' '}
+                            <strong>
+                              {(receiveQtys[item.id] || 0) * (prodInfo?.unitsPerBulk || 1)}{' '}
+                              {prodInfo?.unit || 'unités'}
+                            </strong>
+                            )
+                          </span>
+                        </label>
+                      ) : null}
+
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-0.5 block text-[10px] text-slate-500">
+                            Date de péremption (DLC — optionnelle)
+                          </label>
+                          <input
+                            type="date"
+                            value={receiveExpiryMap[item.id] || ''}
+                            onChange={(e) =>
+                              setReceiveExpiryMap({
+                                ...receiveExpiryMap,
+                                [item.id]: e.target.value,
+                              })
+                            }
+                            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-0.5 block text-[10px] text-slate-500">
+                            N° de lot (optionnel)
+                          </label>
+                          <input
+                            value={receiveBatchMap[item.id] || ''}
+                            onChange={(e) =>
+                              setReceiveBatchMap({
+                                ...receiveBatchMap,
+                                [item.id]: e.target.value,
+                              })
+                            }
+                            placeholder="Ex. LOT-2026"
+                            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 font-mono text-xs"
+                          />
+                        </div>
                       </div>
                     </div>
                   );

@@ -91,6 +91,8 @@ model Shop {
   dbName             String       @unique @map("db_name") @db.VarChar(63)
   dbStatus           ShopDbStatus @default(PROVISIONING) @map("db_status")
   dbSchemaVersion    String?      @map("db_schema_version") @db.VarChar(64)
+  shopType           String       @default("GENERAL") @map("shop_type") @db.VarChar(24)
+  businessProfile    Json         @default("{}") @map("business_profile")
   logoUrl            String?      @map("logo_url") @db.VarChar(500)
   phone              String?      @db.VarChar(30)
   email              String?      @db.VarChar(160)

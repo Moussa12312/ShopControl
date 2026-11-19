@@ -7,3 +7,4 @@ export * from './commerce.calc';
 export * from './commerce.schemas';
 export * from './platform.enums';
 export * from './platform.schemas';
+export * from './shop-profiles';

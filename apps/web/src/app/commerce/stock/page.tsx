@@ -1,9 +1,17 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ClipboardCheck } from 'lucide-react';
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  ClipboardCheck,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import {
   formatDateTimeInTimezone,
+  formatXof,
   STOCK_MOVEMENT_LABELS,
   StockMovementType,
 } from '@shopcontrol/shared';
@@ -43,21 +51,59 @@ interface ProductOpt {
   id: string;
   name: string;
   sku: string;
+  unit?: string;
   stockPhysical: number;
+  stockPhysicalDecimal?: number;
+}
+
+interface ExpiryItem {
+  batchId: string | null;
+  productId: string;
+  productName: string;
+  sku: string;
+  unit: string;
+  batchNumber: string | null;
+  expiryDate: string;
+  remainingQty: number;
+  initialQty: number;
+  daysRemaining: number;
+  severity: 'EXPIRED' | 'EXPIRING_7D' | 'EXPIRING_30D' | 'OK';
+  estimatedLossCostXof: number;
+  notes: string | null;
+}
+
+interface ExpiryAlertsResponse {
+  summary: {
+    expiredCount: number;
+    expiring7dCount: number;
+    expiring30dCount: number;
+    totalTrackedBatches: number;
+    expiredEstimatedCostXof: number;
+  };
+  items: ExpiryItem[];
 }
 
 export default function StockPage() {
   const { activeOperator } = useAuth();
   const { shopId, selectShop } = useActiveOperationalShop();
 
-  const [tab, setTab] = useState<'movements' | 'adjust' | 'inventory'>('movements');
+  const [tab, setTab] = useState<'movements' | 'adjust' | 'inventory' | 'expiry'>('movements');
   const [alerts, setAlerts] = useState<StockAlert[]>([]);
   const [movements, setMovements] = useState<MovementRow[]>([]);
   const [products, setProducts] = useState<ProductOpt[]>([]);
+  const [expiryData, setExpiryData] = useState<ExpiryAlertsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const [batchForm, setBatchForm] = useState({
+    productId: '',
+    batchNumber: '',
+    expiryDate: '',
+    quantity: 10,
+    notes: '',
+  });
 
   const [adjForm, setAdjForm] = useState({
     productId: '',
@@ -81,16 +127,29 @@ export default function StockPage() {
     setLoading(true);
     setError(null);
     try {
-      const [al, mv, pr] = await Promise.all([
+      const [al, mv, pr, ex] = await Promise.all([
         apiFetch<StockAlert[]>(`/shops/${shopId}/stock/alerts`, { shopId }),
         apiFetch<{ items: MovementRow[] }>(`/shops/${shopId}/stock/movements?limit=50`, { shopId }),
         apiFetch<{ items: ProductOpt[] }>(`/shops/${shopId}/products?limit=200`, { shopId }),
+        apiFetch<ExpiryAlertsResponse>(`/shops/${shopId}/stock/expiry-alerts`, { shopId }).catch(
+          () => null,
+        ),
       ]);
       setAlerts(al);
       setMovements(mv.items);
       setProducts(pr.items);
+      setExpiryData(ex);
       if (pr.items[0]) {
-        setAdjForm((f) => (f.productId && pr.items.some((p) => p.id === f.productId) ? f : { ...f, productId: pr.items[0].id }));
+        setAdjForm((f) =>
+          f.productId && pr.items.some((p) => p.id === f.productId)
+            ? f
+            : { ...f, productId: pr.items[0].id },
+        );
+        setBatchForm((f) =>
+          f.productId && pr.items.some((p) => p.id === f.productId)
+            ? f
+            : { ...f, productId: pr.items[0].id },
+        );
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur de chargement des stocks.');
@@ -162,6 +221,60 @@ export default function StockPage() {
     }
   };
 
+  const handleCreateBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shopId || !batchForm.productId || !batchForm.expiryDate) return;
+    setBusy(true);
+    setMsg(null);
+    setError(null);
+    try {
+      await apiFetch(`/shops/${shopId}/stock/batches`, {
+        method: 'POST',
+        shopId,
+        operatorId: activeOperator?.id,
+        body: {
+          productId: batchForm.productId,
+          batchNumber: batchForm.batchNumber.trim() || undefined,
+          expiryDate: new Date(`${batchForm.expiryDate}T23:59:59.000Z`).toISOString(),
+          quantity: Math.max(1, Math.round(Number(batchForm.quantity) || 1)),
+          notes: batchForm.notes.trim() || undefined,
+        },
+      });
+      setMsg('Lot enregistré avec succès et stock crédité.');
+      setBatchForm((f) => ({ ...f, batchNumber: '', expiryDate: '', quantity: 10, notes: '' }));
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Création du lot impossible.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleWriteOffBatch = async (item: ExpiryItem) => {
+    if (!shopId || !item.batchId) return;
+    setBusy(true);
+    setMsg(null);
+    setError(null);
+    try {
+      await apiFetch(`/shops/${shopId}/stock/batches/${item.batchId}/write-off`, {
+        method: 'POST',
+        shopId,
+        operatorId: activeOperator?.id,
+        body: {
+          reason: `Mise au rebut lot ${item.batchNumber || item.sku} (DLC ${new Date(item.expiryDate).toLocaleDateString('fr-FR')})`,
+        },
+      });
+      setMsg(
+        `Lot ${item.batchNumber || ''} de « ${item.productName} » (${item.remainingQty} ${item.unit}) mis au rebut et sorti du stock en perte.`,
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Mise au rebut refusée.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <AppShell
       allowedRoles={['OWNER', 'AGENT']}
@@ -197,6 +310,21 @@ export default function StockPage() {
               }`}
             >
               Inventaire
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('expiry')}
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 transition ${
+                tab === 'expiry' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+              }`}
+            >
+              <span>Péremptions (DLC)</span>
+              {expiryData &&
+              expiryData.summary.expiredCount + expiryData.summary.expiring7dCount > 0 ? (
+                <span className="rounded-full bg-rose-600 px-1.5 py-0.2 text-[10px] font-extrabold text-white">
+                  {expiryData.summary.expiredCount + expiryData.summary.expiring7dCount}
+                </span>
+              ) : null}
             </button>
           </div>
         </>
@@ -405,7 +533,7 @@ export default function StockPage() {
               Valider le mouvement tracé
             </button>
           </form>
-        ) : (
+        ) : tab === 'inventory' ? (
           <form onSubmit={handleSubmitInventory} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
@@ -487,6 +615,198 @@ export default function StockPage() {
               Valider l’inventaire et corriger les écarts
             </button>
           </form>
+        ) : (
+          /* Onglet Péremptions (DLC) & Lots FEFO (Lot 10) */
+          <div className="space-y-5">
+            {expiryData ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                  <p className="text-xs font-bold text-rose-700">Lots périmés</p>
+                  <p className="mt-1 text-2xl font-black text-rose-800 tabular">
+                    {expiryData.summary.expiredCount}
+                  </p>
+                  {expiryData.summary.expiredEstimatedCostXof > 0 ? (
+                    <p className="mt-0.5 text-[11px] font-semibold text-rose-700">
+                      Coût : {formatXof(expiryData.summary.expiredEstimatedCostXof)}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-xs font-bold text-amber-800">Expirent sous 7 jours</p>
+                  <p className="mt-1 text-2xl font-black text-amber-900 tabular">
+                    {expiryData.summary.expiring7dCount}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4">
+                  <p className="text-xs font-bold text-yellow-800">Expirent sous 30 jours</p>
+                  <p className="mt-1 text-2xl font-black text-yellow-900 tabular">
+                    {expiryData.summary.expiring30dCount}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-xs font-bold text-slate-500">Total lots suivis (FEFO)</p>
+                  <p className="mt-1 text-2xl font-black text-slate-900 tabular">
+                    {expiryData.summary.totalTrackedBatches}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Formulaire entrée nouveau lot DLC */}
+            <form
+              onSubmit={handleCreateBatch}
+              className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
+            >
+              <div className="flex items-center gap-2">
+                <CalendarClock className="h-5 w-5 text-brand-700" />
+                <h2 className="text-base font-extrabold text-slate-900">
+                  Enregistrer un nouveau lot avec date de péremption (DLC)
+                </h2>
+              </div>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Crédite le stock et active l’écoulement automatique FEFO (les lots qui expirent en premier sont déduits en premier lors des ventes).
+              </p>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-12">
+                <div className="sm:col-span-4">
+                  <label className="block text-xs font-semibold text-slate-700">Produit *</label>
+                  <select
+                    required
+                    value={batchForm.productId}
+                    onChange={(e) => setBatchForm({ ...batchForm, productId: e.target.value })}
+                    className="sc-input mt-1"
+                  >
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.sku})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700">Quantité *</label>
+                  <input
+                    type="number"
+                    min={1}
+                    required
+                    value={batchForm.quantity}
+                    onChange={(e) =>
+                      setBatchForm({ ...batchForm, quantity: Number(e.target.value) || 1 })
+                    }
+                    className="sc-input mt-1 tabular"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Date de péremption *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={batchForm.expiryDate}
+                    onChange={(e) => setBatchForm({ ...batchForm, expiryDate: e.target.value })}
+                    className="sc-input mt-1"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="block text-xs font-semibold text-slate-700">N° de lot</label>
+                  <div className="mt-1 flex gap-1.5">
+                    <input
+                      value={batchForm.batchNumber}
+                      onChange={(e) => setBatchForm({ ...batchForm, batchNumber: e.target.value })}
+                      placeholder="Ex. LOT-11"
+                      className="sc-input font-mono"
+                    />
+                    <button
+                      type="submit"
+                      disabled={busy || !batchForm.expiryDate}
+                      className="sc-btn-primary shrink-0 px-3"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Ajouter
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+
+            {/* Liste des lots & alertes DLC */}
+            {!expiryData || expiryData.items.length === 0 ? (
+              <EmptyState
+                title="Aucun lot avec date de péremption"
+                description="Renseignez une DLC lors de la création produit, d’une réception fournisseur ou via le formulaire ci-dessus."
+              />
+            ) : (
+              <div className="space-y-2.5">
+                {expiryData.items.map((item, idx) => (
+                  <div
+                    key={item.batchId || `${item.productId}-${idx}`}
+                    className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4 text-xs ${
+                      item.severity === 'EXPIRED'
+                        ? 'border-rose-300 bg-rose-50/70'
+                        : item.severity === 'EXPIRING_7D'
+                          ? 'border-amber-300 bg-amber-50/70'
+                          : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-extrabold text-slate-900">
+                          {item.productName}
+                        </span>
+                        <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">
+                          {item.sku}
+                        </code>
+                        {item.batchNumber ? (
+                          <span className="rounded bg-forest-900 px-2 py-0.5 font-mono text-[10px] font-bold text-limeglow-400">
+                            Lot : {item.batchNumber}
+                          </span>
+                        ) : null}
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                            item.severity === 'EXPIRED'
+                              ? 'bg-rose-600 text-white'
+                              : item.severity === 'EXPIRING_7D'
+                                ? 'bg-amber-600 text-white'
+                                : item.severity === 'EXPIRING_30D'
+                                  ? 'bg-yellow-200 text-yellow-950'
+                                  : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {item.severity === 'EXPIRED'
+                            ? `PÉRIMÉ (${Math.abs(item.daysRemaining)} j)`
+                            : `DLC dans ${item.daysRemaining} j`}
+                        </span>
+                      </div>
+                      <p className="text-slate-600">
+                        Expire le :{' '}
+                        <strong>{new Date(item.expiryDate).toLocaleDateString('fr-FR')}</strong> ·
+                        Quantité restante dans ce lot :{' '}
+                        <strong>
+                          {item.remainingQty} / {item.initialQty} {item.unit}
+                        </strong>
+                        {item.estimatedLossCostXof > 0 ? (
+                          <span> · Valeur coût : {formatXof(item.estimatedLossCostXof)}</span>
+                        ) : null}
+                      </p>
+                    </div>
+
+                    {item.batchId ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleWriteOffBatch(item)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Mettre au rebut (Perte)
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </AppShell>

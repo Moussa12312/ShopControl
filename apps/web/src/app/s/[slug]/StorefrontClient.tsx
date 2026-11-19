@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
+  Boxes,
   Camera,
   Check,
   CheckCircle2,
@@ -21,9 +22,11 @@ import {
   Phone,
   Plus,
   Receipt,
+  RotateCcw,
   Ruler,
   Search,
   Send,
+  ShieldCheck,
   ShoppingBag,
   Store,
   Trash2,
@@ -32,11 +35,15 @@ import {
   X,
 } from 'lucide-react';
 import {
+  BusinessProfileConfig,
   formatDateTimeInTimezone,
   formatXof,
   FulfillmentMode,
+  normalizeBusinessProfile,
+  normalizeShopType,
   ONLINE_ORDER_STATUS_LABELS,
   OnlineOrderStatus,
+  ShopType,
 } from '@shopcontrol/shared';
 import { apiFetch, ApiError } from '@/lib/api-client';
 
@@ -76,7 +83,17 @@ interface StorefrontProduct {
   imageUrls: string[];
   availableSizes?: string[];
   availableColors?: string[];
+  brand?: string | null;
+  modelName?: string | null;
+  volumeLabel?: string | null;
+  bulkUnitLabel?: string | null;
+  unitsPerBulk?: number | null;
+  bulkSalePriceXof?: number | null;
+  allowFractionalSale?: boolean;
+  warrantyMonths?: number | null;
+  trackSerialNumber?: boolean;
   stockAvailable: number;
+  stockAvailableDecimal?: number;
   inStock: boolean;
 }
 
@@ -89,6 +106,8 @@ interface StorefrontData {
     id: string;
     name: string;
     slug: string;
+    shopType?: ShopType;
+    businessProfile?: BusinessProfileConfig;
     logoUrl: string | null;
     slogan: string;
     phone: string | null;
@@ -113,6 +132,7 @@ interface CartItem {
   product: StorefrontProduct;
   selectedSize: string;
   selectedColor: string;
+  soldInBulk: boolean;
   qty: number;
 }
 
@@ -168,9 +188,14 @@ interface CustomerProfileData {
 export function StorefrontClient({ initialData }: { initialData: StorefrontData }) {
   const { shop, categories, products, isOpenNow } = initialData;
   const deliveryCfg = shop.deliveryConfig;
+  const shopType = normalizeShopType(shop.shopType);
+  const profile = normalizeBusinessProfile(shopType, shop.businessProfile);
+  const layout = profile.storefrontLayout;
 
   const [search, setSearch] = useState('');
   const [catId, setCatId] = useState('');
+  const [sizeFilter, setSizeFilter] = useState('');
+  const [colorFilter, setColorFilter] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
 
@@ -179,6 +204,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   const [detailPhotoIndex, setDetailPhotoIndex] = useState(0);
   const [detailSize, setDetailSize] = useState('');
   const [detailColor, setDetailColor] = useState('');
+  const [detailSoldInBulk, setDetailSoldInBulk] = useState(false);
   const [detailQty, setDetailQty] = useState(1);
 
   // Formulaire commande sans compte
@@ -325,25 +351,60 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
     }
   }, [chatMessages.length, chatOpen]);
 
+  const allSizes = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of products) {
+      for (const sz of p.availableSizes || []) s.add(sz);
+    }
+    return Array.from(s);
+  }, [products]);
+
+  const allColors = useMemo(() => {
+    const c = new Set<string>();
+    for (const p of products) {
+      for (const col of p.availableColors || []) c.add(col);
+    }
+    return Array.from(c);
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products.filter((p) => {
       if (catId && p.categoryId !== catId) return false;
+      if (sizeFilter && !(p.availableSizes || []).includes(sizeFilter)) return false;
+      if (colorFilter && !(p.availableColors || []).includes(colorFilter)) return false;
       if (!q) return true;
       return (
         p.name.toLowerCase().includes(q) ||
         (p.description && p.description.toLowerCase().includes(q)) ||
+        (p.brand && p.brand.toLowerCase().includes(q)) ||
+        (p.modelName && p.modelName.toLowerCase().includes(q)) ||
         p.sku.toLowerCase().includes(q)
       );
     });
-  }, [products, search, catId]);
+  }, [products, search, catId, sizeFilter, colorFilter]);
 
   const openProductDetail = (p: StorefrontProduct) => {
     setDetailProduct(p);
     setDetailPhotoIndex(0);
     setDetailSize(p.availableSizes?.[0] || '');
     setDetailColor(p.availableColors?.[0] || '');
+    setDetailSoldInBulk(false);
     setDetailQty(1);
+  };
+
+  const resolveProductUnitPrice = (p: StorefrontProduct, soldInBulk: boolean): number => {
+    if (soldInBulk && p.unitsPerBulk && p.unitsPerBulk >= 2) {
+      return p.bulkSalePriceXof ?? p.salePriceXof * p.unitsPerBulk;
+    }
+    return p.salePriceXof;
+  };
+
+  const getMaxOrderableQty = (p: StorefrontProduct, soldInBulk: boolean): number => {
+    if (soldInBulk && p.unitsPerBulk && p.unitsPerBulk >= 2) {
+      return Math.max(0, Math.floor(p.stockAvailable / p.unitsPerBulk));
+    }
+    return p.stockAvailable;
   };
 
   const addItemToCart = (
@@ -351,17 +412,20 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
     size = '',
     color = '',
     qtyToAdd = 1,
+    soldInBulk = false,
   ) => {
     if (!product.inStock) return;
+    const maxQty = getMaxOrderableQty(product, soldInBulk);
+    if (maxQty <= 0) return;
     const chosenSize = size || product.availableSizes?.[0] || '';
     const chosenColor = color || product.availableColors?.[0] || '';
-    const key = `${product.id}__${chosenSize}__${chosenColor}`;
+    const key = `${product.id}__${chosenSize}__${chosenColor}__${soldInBulk ? 'BULK' : 'UNIT'}`;
     setCart((prev) => {
       const existing = prev.find((i) => i.key === key);
       if (existing) {
         return prev.map((i) =>
           i.key === key
-            ? { ...i, qty: Math.min(product.stockAvailable, i.qty + qtyToAdd) }
+            ? { ...i, qty: Math.min(maxQty, i.qty + qtyToAdd) }
             : i,
         );
       }
@@ -372,7 +436,8 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
           product,
           selectedSize: chosenSize,
           selectedColor: chosenColor,
-          qty: Math.min(product.stockAvailable, qtyToAdd),
+          soldInBulk,
+          qty: Math.min(maxQty, qtyToAdd),
         },
       ];
     });
@@ -383,9 +448,33 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
       prev
         .map((i) =>
           i.key === key
-            ? { ...i, qty: Math.min(i.product.stockAvailable, i.qty + delta) }
+            ? {
+                ...i,
+                qty: Math.min(
+                  getMaxOrderableQty(i.product, i.soldInBulk),
+                  i.qty + delta,
+                ),
+              }
             : i,
         )
+        .filter((i) => i.qty > 0),
+    );
+  };
+
+  const toggleCartItemBulk = (key: string, soldInBulk: boolean) => {
+    setCart((prev) =>
+      prev
+        .map((i) => {
+          if (i.key !== key) return i;
+          const maxQty = getMaxOrderableQty(i.product, soldInBulk);
+          if (maxQty <= 0) return i;
+          return {
+            ...i,
+            key: `${i.product.id}__${i.selectedSize}__${i.selectedColor}__${soldInBulk ? 'BULK' : 'UNIT'}__${Math.random().toString(36).slice(2, 5)}`,
+            soldInBulk,
+            qty: Math.min(maxQty, i.qty),
+          };
+        })
         .filter((i) => i.qty > 0),
     );
   };
@@ -398,7 +487,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         const nextColor = field === 'selectedColor' ? val : i.selectedColor;
         return {
           ...i,
-          key: `${i.product.id}__${nextSize}__${nextColor}__${Math.random().toString(36).slice(2, 5)}`,
+          key: `${i.product.id}__${nextSize}__${nextColor}__${i.soldInBulk ? 'BULK' : 'UNIT'}__${Math.random().toString(36).slice(2, 5)}`,
           selectedSize: nextSize,
           selectedColor: nextColor,
         };
@@ -406,7 +495,10 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
     );
   };
 
-  const subtotalXof = cart.reduce((a, i) => a + i.product.salePriceXof * i.qty, 0);
+  const subtotalXof = cart.reduce(
+    (a, i) => a + resolveProductUnitPrice(i.product, i.soldInBulk) * i.qty,
+    0,
+  );
   const deliveryFeeXof = fulfillmentMode === 'DELIVERY' ? deliveryCfg.defaultDeliveryFeeXof : 0;
   const grandTotalXof = subtotalXof + deliveryFeeXof;
   const totalItems = cart.reduce((a, i) => a + i.qty, 0);
@@ -430,6 +522,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
           items: cart.map((c) => ({
             productId: c.product.id,
             quantity: c.qty,
+            soldInBulk: c.soldInBulk,
             selectedSize: c.selectedSize || null,
             selectedColor: c.selectedColor || null,
           })),
@@ -639,10 +732,86 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               </div>
             ) : null}
           </div>
+
+          {/* Filtres rapides par Taille & Couleur (Mode & Cosmétique — Lot 11) */}
+          {(profile.enableSizes && allSizes.length > 0) ||
+          (profile.enableColors && allColors.length > 0) ? (
+            <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-2.5 text-xs">
+              {profile.enableSizes && allSizes.length > 0 ? (
+                <div className="flex items-center gap-1 overflow-x-auto">
+                  <span className="shrink-0 text-[11px] font-bold text-emerald-200/80">
+                    Taille :
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSizeFilter('')}
+                    className={`rounded-lg px-2 py-0.5 text-[11px] font-bold ${
+                      sizeFilter === ''
+                        ? 'bg-limeglow-400 text-forest-950'
+                        : 'bg-white/10 text-white hover:bg-white/20'
+                    }`}
+                  >
+                    Toutes
+                  </button>
+                  {allSizes.map((sz) => (
+                    <button
+                      key={sz}
+                      type="button"
+                      onClick={() => setSizeFilter((prev) => (prev === sz ? '' : sz))}
+                      className={`rounded-lg px-2 py-0.5 text-[11px] font-bold ${
+                        sizeFilter === sz
+                          ? 'bg-limeglow-400 text-forest-950'
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                      }`}
+                    >
+                      {sz}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {profile.enableColors && allColors.length > 0 ? (
+                <div className="flex items-center gap-1 overflow-x-auto">
+                  <span className="shrink-0 text-[11px] font-bold text-emerald-200/80">
+                    Couleur :
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setColorFilter('')}
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                      colorFilter === ''
+                        ? 'bg-limeglow-400 text-forest-950'
+                        : 'bg-white/10 text-white hover:bg-white/20'
+                    }`}
+                  >
+                    Toutes
+                  </button>
+                  {allColors.map((col) => (
+                    <button
+                      key={col}
+                      type="button"
+                      onClick={() => setColorFilter((prev) => (prev === col ? '' : col))}
+                      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                        colorFilter === col
+                          ? 'bg-limeglow-400 text-forest-950'
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                      }`}
+                    >
+                      <span
+                        className="h-2.5 w-2.5 rounded-full border border-white/40"
+                        style={{ backgroundColor: swatchHex(col) }}
+                      />
+                      {col}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </section>
 
-      {/* Grille Produits Responsive avec photos calibrées & bouton Voir plus */}
+      {/* Catalogue Adaptatif selon le type de boutique : QUICK_LIST / TECH_SPEC / GALLERY (Lot 11) */}
       <main className="mx-auto max-w-6xl px-3 py-5 sm:px-6">
         {filteredProducts.length === 0 ? (
           <div className="sc-card p-10 text-center">
@@ -651,6 +820,264 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
             <p className="mt-1 text-xs text-slate-500">
               Essayez un autre mot-clé ou écrivez directement à la boutique.
             </p>
+          </div>
+        ) : layout === 'QUICK_LIST' ? (
+          /* Mode ÉPICERIE EXPRESS (Boutique de quartier — Liste rapide avec boutons - / + et Unité / Carton) */
+          <div className="space-y-2.5">
+            {filteredProducts.map((p) => {
+              const photo = p.imageUrls?.[0];
+              const hasBulk = Boolean(p.unitsPerBulk && p.unitsPerBulk >= 2);
+              const bulkPrice =
+                p.bulkSalePriceXof ?? p.salePriceXof * (p.unitsPerBulk || 1);
+              const canOrderBulk = hasBulk && getMaxOrderableQty(p, true) > 0;
+              const unitCartItem = cart.find(
+                (i) => i.product.id === p.id && !i.soldInBulk,
+              );
+              const bulkCartItem = cart.find(
+                (i) => i.product.id === p.id && i.soldInBulk,
+              );
+
+              return (
+                <article
+                  key={p.id}
+                  className="sc-card flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => openProductDetail(p)}
+                      className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-porcelain-50"
+                    >
+                      {photo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={photo} alt={p.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-slate-400">
+                          <Package className="h-6 w-6" />
+                        </span>
+                      )}
+                    </button>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {p.categoryName ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-brand-700">
+                            {p.categoryName}
+                          </span>
+                        ) : null}
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            p.inStock
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-rose-50 text-rose-700'
+                          }`}
+                        >
+                          {p.inStock
+                            ? `${p.stockAvailableDecimal ?? p.stockAvailable} ${p.unit} dispo`
+                            : 'Rupture'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openProductDetail(p)}
+                        className="mt-0.5 block truncate text-left text-sm font-extrabold text-slate-900 hover:text-brand-700"
+                      >
+                        {p.name}
+                      </button>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs">
+                        <span className="font-black text-forest-950 tabular">
+                          {formatXof(p.salePriceXof)}{' '}
+                          <span className="font-normal text-slate-500">/ {p.unit}</span>
+                        </span>
+                        {hasBulk ? (
+                          <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800 tabular">
+                            {p.bulkUnitLabel || 'carton'} (×{p.unitsPerBulk}) :{' '}
+                            {formatXof(bulkPrice)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contrôles directs - / + Détail et Carton sans ouvrir de modale */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {unitCartItem ? (
+                      <div className="inline-flex items-center gap-1.5 rounded-xl border border-forest-900 bg-forest-900 px-2 py-1 text-white">
+                        <button
+                          type="button"
+                          onClick={() => updateCartItemQty(unitCartItem.key, -1)}
+                          className="rounded-lg bg-white/15 p-1 hover:bg-white/25"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="min-w-[36px] text-center text-xs font-extrabold tabular">
+                          {unitCartItem.qty} {p.unit}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateCartItemQty(unitCartItem.key, 1)}
+                          className="rounded-lg bg-white/15 p-1 hover:bg-white/25"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={!p.inStock}
+                        onClick={() => addItemToCart(p, '', '', 1, false)}
+                        className="inline-flex items-center gap-1 rounded-xl bg-forest-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-forest-800 disabled:bg-slate-200 disabled:text-slate-400"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        {p.unit}
+                      </button>
+                    )}
+
+                    {hasBulk ? (
+                      bulkCartItem ? (
+                        <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-700 bg-emerald-50 px-2 py-1 text-emerald-950">
+                          <button
+                            type="button"
+                            onClick={() => updateCartItemQty(bulkCartItem.key, -1)}
+                            className="rounded-lg bg-white p-1 shadow-2xs"
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="min-w-[44px] text-center text-xs font-extrabold tabular">
+                            {bulkCartItem.qty} {p.bulkUnitLabel || 'carton'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => updateCartItemQty(bulkCartItem.key, 1)}
+                            className="rounded-lg bg-white p-1 shadow-2xs"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!canOrderBulk}
+                          onClick={() => addItemToCart(p, '', '', 1, true)}
+                          className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-extrabold text-emerald-900 transition hover:bg-emerald-100 disabled:opacity-40"
+                        >
+                          <Boxes className="h-3.5 w-3.5" />+ {p.bulkUnitLabel || 'carton'}
+                        </button>
+                      )
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : layout === 'TECH_SPEC' ? (
+          /* Mode CATALOGUE TECHNIQUE (Électronique & Quincaillerie — Marque, Modèle, Garantie & Question rapide) */
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredProducts.map((p) => {
+              const photo = p.imageUrls?.[0];
+              return (
+                <article
+                  key={p.id}
+                  className="sc-card-hover flex flex-col justify-between overflow-hidden rounded-2xl p-4"
+                >
+                  <div>
+                    <div className="flex items-start gap-3.5">
+                      <button
+                        type="button"
+                        onClick={() => openProductDetail(p)}
+                        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-porcelain-50"
+                      >
+                        {photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={photo} alt={p.name} className="h-full w-full object-contain p-1" />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-slate-300">
+                            <Package className="h-8 w-8" />
+                          </span>
+                        )}
+                      </button>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {p.brand ? (
+                            <span className="rounded-md bg-forest-900 px-2 py-0.5 text-[10px] font-extrabold text-limeglow-400">
+                              {p.brand}
+                            </span>
+                          ) : null}
+                          {p.warrantyMonths ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-800">
+                              <ShieldCheck className="h-3 w-3" />
+                              Garantie {p.warrantyMonths} mois
+                            </span>
+                          ) : null}
+                        </div>
+                        <h2 className="mt-1 line-clamp-2 text-sm font-extrabold text-slate-900">
+                          {p.name}
+                        </h2>
+                        <p className="mt-0.5 font-mono text-[11px] text-slate-500">
+                          {p.modelName ? `Modèle : ${p.modelName} · ` : ''}Réf : {p.sku}
+                        </p>
+                      </div>
+                    </div>
+
+                    {p.description ? (
+                      <p className="mt-3 line-clamp-2 rounded-xl bg-porcelain-50 p-2.5 text-xs text-slate-600">
+                        {p.description}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-4 space-y-2.5 border-t border-slate-100 pt-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-base font-black text-forest-950 tabular">
+                        {formatXof(p.salePriceXof)}
+                      </p>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                          p.inStock
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-rose-50 text-rose-700'
+                        }`}
+                      >
+                        {p.inStock ? `${p.stockAvailable} en stock` : 'Rupture'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => openProductDetail(p)}
+                        className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-porcelain-50 py-2 text-[11px] font-bold text-slate-700 hover:bg-slate-100"
+                      >
+                        <Eye className="h-3 w-3" />
+                        Fiche
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatText(
+                            `Bonjour, est-ce que ${p.name} (${p.sku}) est disponible ?`,
+                          );
+                          setChatOpen(true);
+                        }}
+                        className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white py-2 text-[11px] font-bold text-brand-700 hover:bg-brand-50"
+                      >
+                        <MessageCircle className="h-3 w-3" />
+                        Question
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!p.inStock}
+                        onClick={() => addItemToCart(p)}
+                        className="rounded-xl bg-forest-900 py-2 text-[11px] font-bold text-white hover:bg-forest-800 disabled:bg-slate-200 disabled:text-slate-400"
+                      >
+                        + Panier
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 sm:gap-4">
@@ -872,22 +1299,72 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                 );
               })()}
 
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-2xl font-black text-forest-950 tabular">
-                  {formatXof(detailProduct.salePriceXof)}
+                  {formatXof(resolveProductUnitPrice(detailProduct, detailSoldInBulk))}
+                  <span className="ml-1 text-xs font-semibold text-slate-500">
+                    /{' '}
+                    {detailSoldInBulk
+                      ? `${detailProduct.bulkUnitLabel || 'carton'} (×${detailProduct.unitsPerBulk})`
+                      : detailProduct.unit}
+                  </span>
                 </p>
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-bold ${
-                    detailProduct.inStock
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-rose-50 text-rose-700'
-                  }`}
-                >
-                  {detailProduct.inStock
-                    ? `${detailProduct.stockAvailable} ${detailProduct.unit} en stock`
-                    : 'Rupture de stock'}
-                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {detailProduct.warrantyMonths ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      Garantie {detailProduct.warrantyMonths} mois
+                    </span>
+                  ) : null}
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-bold ${
+                      detailProduct.inStock
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-rose-50 text-rose-700'
+                    }`}
+                  >
+                    {detailProduct.inStock
+                      ? `${detailProduct.stockAvailableDecimal ?? detailProduct.stockAvailable} ${detailProduct.unit} en stock`
+                      : 'Rupture de stock'}
+                  </span>
+                </div>
               </div>
+
+              {/* Choix Détail (Unité) vs Gros (Carton/Sac) si configuré */}
+              {detailProduct.unitsPerBulk && detailProduct.unitsPerBulk >= 2 ? (
+                <div className="grid grid-cols-2 gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-2 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDetailSoldInBulk(false);
+                      setDetailQty(1);
+                    }}
+                    className={`rounded-xl py-2 transition ${
+                      !detailSoldInBulk
+                        ? 'bg-forest-900 text-white shadow-xs'
+                        : 'bg-white text-slate-700'
+                    }`}
+                  >
+                    Au détail ({detailProduct.unit}) · {formatXof(detailProduct.salePriceXof)}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={getMaxOrderableQty(detailProduct, true) <= 0}
+                    onClick={() => {
+                      setDetailSoldInBulk(true);
+                      setDetailQty(1);
+                    }}
+                    className={`rounded-xl py-2 transition disabled:opacity-40 ${
+                      detailSoldInBulk
+                        ? 'bg-forest-900 text-limeglow-400 shadow-xs'
+                        : 'bg-white text-emerald-900'
+                    }`}
+                  >
+                    En gros ({detailProduct.bulkUnitLabel || 'carton'} ×{detailProduct.unitsPerBulk}) ·{' '}
+                    {formatXof(resolveProductUnitPrice(detailProduct, true))}
+                  </button>
+                </div>
+              ) : null}
 
               {/* Description */}
               <div className="rounded-2xl bg-porcelain-50 p-3.5 text-xs leading-relaxed text-slate-700">
@@ -972,7 +1449,12 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                   <button
                     type="button"
                     onClick={() =>
-                      setDetailQty((q) => Math.min(detailProduct.stockAvailable, q + 1))
+                      setDetailQty((q) =>
+                        Math.min(
+                          Math.max(1, getMaxOrderableQty(detailProduct, detailSoldInBulk)),
+                          q + 1,
+                        ),
+                      )
                     }
                     className="rounded-lg bg-white p-2 text-slate-700 shadow-xs"
                   >
@@ -984,14 +1466,23 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                   type="button"
                   disabled={!detailProduct.inStock}
                   onClick={() => {
-                    addItemToCart(detailProduct, detailSize, detailColor, detailQty);
+                    addItemToCart(
+                      detailProduct,
+                      detailSize,
+                      detailColor,
+                      detailQty,
+                      detailSoldInBulk,
+                    );
                     setDetailProduct(null);
                     setCartOpen(true);
                   }}
                   className="sc-btn-lime flex-1 py-3 text-sm"
                 >
                   <ShoppingBag className="h-4 w-4" />
-                  Ajouter · {formatXof(detailProduct.salePriceXof * detailQty)}
+                  Ajouter ·{' '}
+                  {formatXof(
+                    resolveProductUnitPrice(detailProduct, detailSoldInBulk) * detailQty,
+                  )}
                 </button>
               </div>
             </div>
@@ -1111,11 +1602,19 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                                 />
                               ) : null}
                               <div className="min-w-0">
-                                <p className="truncate font-bold text-slate-900">{c.product.name}</p>
+                                <p className="truncate font-bold text-slate-900">
+                                  {c.product.name}
+                                  {c.soldInBulk
+                                    ? ` [${c.product.bulkUnitLabel || 'carton'} ×${c.product.unitsPerBulk}]`
+                                    : ''}
+                                </p>
                                 <p className="text-slate-500 tabular">
-                                  {formatXof(c.product.salePriceXof)} × {c.qty} ={' '}
+                                  {formatXof(resolveProductUnitPrice(c.product, c.soldInBulk))} ×{' '}
+                                  {c.qty} ={' '}
                                   <strong className="text-slate-900">
-                                    {formatXof(c.product.salePriceXof * c.qty)}
+                                    {formatXof(
+                                      resolveProductUnitPrice(c.product, c.soldInBulk) * c.qty,
+                                    )}
                                   </strong>
                                 </p>
                               </div>
@@ -1146,6 +1645,36 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                               </button>
                             </div>
                           </div>
+
+                          {/* Sélecteur Détail ↔ Gros dans le panier */}
+                          {c.product.unitsPerBulk &&
+                          c.product.unitsPerBulk >= 2 &&
+                          getMaxOrderableQty(c.product, true) > 0 ? (
+                            <div className="grid grid-cols-2 gap-1 rounded-lg bg-white p-1 text-[10px] font-bold">
+                              <button
+                                type="button"
+                                onClick={() => toggleCartItemBulk(c.key, false)}
+                                className={`rounded py-1 ${
+                                  !c.soldInBulk
+                                    ? 'bg-forest-900 text-white'
+                                    : 'text-slate-600'
+                                }`}
+                              >
+                                Détail ({c.product.unit})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => toggleCartItemBulk(c.key, true)}
+                                className={`rounded py-1 ${
+                                  c.soldInBulk
+                                    ? 'bg-forest-900 text-limeglow-400'
+                                    : 'text-slate-600'
+                                }`}
+                              >
+                                {c.product.bulkUnitLabel || 'Carton'} (×{c.product.unitsPerBulk})
+                              </button>
+                            </div>
+                          ) : null}
 
                           {/* Sélecteurs Taille & Couleur directement dans le panier */}
                           {(sizes.length > 0 || colors.length > 0) && (
@@ -1583,14 +2112,43 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                             <span className="font-extrabold text-slate-900 tabular">
                               {formatXof(ord.totalXof)}
                             </span>
-                            <Link
-                              href={ord.trackingPath}
-                              onClick={() => setAccountOpen(false)}
-                              className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline"
-                            >
-                              Suivre
-                              <ExternalLink className="h-3 w-3" />
-                            </Link>
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  for (const l of ord.lines) {
+                                    const baseName = l.productName.split(' [')[0].trim().toLowerCase();
+                                    const matched = products.find(
+                                      (p) => p.name.trim().toLowerCase() === baseName && p.inStock,
+                                    );
+                                    if (matched) {
+                                      const isBulk = l.productName.includes(' [') && Boolean(matched.unitsPerBulk && matched.unitsPerBulk >= 2);
+                                      addItemToCart(
+                                        matched,
+                                        l.selectedSize || '',
+                                        l.selectedColor || '',
+                                        l.orderedQty,
+                                        isBulk,
+                                      );
+                                    }
+                                  }
+                                  setAccountOpen(false);
+                                  setCartOpen(true);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg bg-forest-900 px-2.5 py-1 text-[11px] font-bold text-limeglow-400 hover:bg-forest-800"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                                Recommander
+                              </button>
+                              <Link
+                                href={ord.trackingPath}
+                                onClick={() => setAccountOpen(false)}
+                                className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline"
+                              >
+                                Suivre
+                                <ExternalLink className="h-3 w-3" />
+                              </Link>
+                            </div>
                           </div>
                         </div>
                       ))

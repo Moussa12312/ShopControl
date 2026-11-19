@@ -7,6 +7,12 @@ import {
   DEFAULT_CURRENCY,
   DEFAULT_DAILY_REPORT_TIME,
   DEFAULT_TIMEZONE,
+  normalizeShopType,
+  SHOP_TYPE_DESCRIPTIONS,
+  SHOP_TYPE_LABELS,
+  SHOP_TYPE_SHORT_LABELS,
+  SHOP_TYPES,
+  ShopType,
   TaxMode,
   TAX_MODES,
 } from '@shopcontrol/shared';
@@ -26,6 +32,7 @@ interface ShopRow {
   id: string;
   name: string;
   slug: string;
+  shopType?: ShopType;
   logoUrl?: string | null;
   status: string;
   dbName: string;
@@ -58,6 +65,7 @@ export default function OwnerShopsPage() {
   const [form, setForm] = useState({
     name: '',
     slug: '',
+    shopType: 'GENERAL' as ShopType,
     logoUrl: null as string | null,
     phone: '',
     address: '',
@@ -92,6 +100,7 @@ export default function OwnerShopsPage() {
     setForm({
       name: '',
       slug: '',
+      shopType: 'GENERAL',
       logoUrl: null,
       phone: '',
       address: '',
@@ -111,6 +120,7 @@ export default function OwnerShopsPage() {
     setForm({
       name: shop.name,
       slug: shop.slug,
+      shopType: normalizeShopType(shop.shopType),
       logoUrl: shop.logoUrl || null,
       phone: shop.phone || '',
       address: shop.address || '',
@@ -132,6 +142,7 @@ export default function OwnerShopsPage() {
       const payload = {
         name: form.name,
         ...(form.slug.trim() ? { slug: form.slug.trim() } : {}),
+        shopType: form.shopType,
         logoUrl: form.logoUrl,
         phone: form.phone.trim() || undefined,
         address: form.address.trim() || undefined,
@@ -218,7 +229,12 @@ export default function OwnerShopsPage() {
                         </span>
                       )}
                       <div className="min-w-0">
-                        <h2 className="truncate text-lg font-extrabold text-slate-900">{shop.name}</h2>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="truncate text-lg font-extrabold text-slate-900">{shop.name}</h2>
+                          <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[11px] font-bold text-brand-800">
+                            {SHOP_TYPE_SHORT_LABELS[normalizeShopType(shop.shopType)]}
+                          </span>
+                        </div>
                         <Link
                           href={`/s/${shop.slug}`}
                           target="_blank"
@@ -321,6 +337,41 @@ export default function OwnerShopsPage() {
                   value={form.logoUrl}
                   onChange={(url) => setForm((f) => ({ ...f, logoUrl: url }))}
                 />
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800">
+                    Type de boutique / Secteur d’activité *
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Adapte automatiquement le formulaire produit, le comptoir POS et l’affichage de la vitrine QR.
+                  </p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {SHOP_TYPES.map((t) => {
+                      const active = form.shopType === t;
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setForm({ ...form, shopType: t })}
+                          className={`rounded-xl border p-2.5 text-left transition ${
+                            active
+                              ? 'border-forest-900 bg-forest-900 text-white shadow-xs'
+                              : 'border-slate-200 bg-slate-50 text-slate-800 hover:border-brand-400'
+                          }`}
+                        >
+                          <p className="text-xs font-extrabold">{SHOP_TYPE_LABELS[t]}</p>
+                          <p
+                            className={`mt-0.5 line-clamp-2 text-[10px] leading-snug ${
+                              active ? 'text-emerald-100/85' : 'text-slate-500'
+                            }`}
+                          >
+                            {SHOP_TYPE_DESCRIPTIONS[t]}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-medium text-slate-700">

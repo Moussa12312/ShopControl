@@ -16,9 +16,11 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  createProductBatchSchema,
   physicalInventorySchema,
   stockAdjustmentSchema,
   StockMovementType,
+  writeOffBatchSchema,
 } from '@shopcontrol/shared';
 import { Prisma as ShopPrisma } from '../../generated/prisma-shop';
 import {
@@ -47,6 +49,8 @@ export interface ApplyStockMovementInput {
   variantId?: string | null;
   movementType: StockMovementType;
   quantityDelta: number;
+  /** Optionnel : variation exacte en millièmes d'unité (ex: -250 pour 0,25 kg). Prioritaire sur quantityDelta si défini. */
+  quantityDeltaMilli?: number;
   unitCostXof?: number | null;
   referenceType?: string | null;
   referenceId?: string | null;
@@ -61,7 +65,10 @@ export interface ApplyStockMovementResult {
   movementId: string;
   qtyBefore: number;
   qtyAfter: number;
+  remainderMilliAfter: number;
+  qtyAfterDecimal: number;
   availableAfter: number;
+  availableAfterDecimal: number;
   becameNegative: boolean;
   isLowStock: boolean;
   productName: string;
@@ -116,15 +123,20 @@ export class InventoryService {
 
     // Garantit l'existence de la ligne avant verrouillage FOR UPDATE
     await tx.$executeRaw`
-      INSERT INTO "stock_balances" ("id", "product_id", "variant_id", "variant_key", "physical_qty", "reserved_qty", "updated_at")
-      VALUES (${balanceId}::uuid, ${input.productId}::uuid, ${input.variantId ?? null}::uuid, ${variantKey}, 0, 0, NOW())
+      INSERT INTO "stock_balances" ("id", "product_id", "variant_id", "variant_key", "physical_qty", "fractional_remainder_milli", "reserved_qty", "updated_at")
+      VALUES (${balanceId}::uuid, ${input.productId}::uuid, ${input.variantId ?? null}::uuid, ${variantKey}, 0, 0, 0, NOW())
       ON CONFLICT ("product_id", "variant_key") DO NOTHING
     `;
 
     const lockedRows = await tx.$queryRaw<
-      Array<{ id: string; physical_qty: number; reserved_qty: number }>
+      Array<{
+        id: string;
+        physical_qty: number;
+        fractional_remainder_milli: number;
+        reserved_qty: number;
+      }>
     >`
-      SELECT "id", "physical_qty", "reserved_qty"
+      SELECT "id", "physical_qty", "fractional_remainder_milli", "reserved_qty"
       FROM "stock_balances"
       WHERE "product_id" = ${input.productId}::uuid AND "variant_key" = ${variantKey}
       FOR UPDATE
@@ -132,21 +144,42 @@ export class InventoryService {
 
     const balance = lockedRows[0];
     const qtyBefore = balance.physical_qty;
-    const availableBefore = balance.physical_qty - balance.reserved_qty;
-    const qtyAfter = qtyBefore + input.quantityDelta;
-    const availableAfter = availableBefore + input.quantityDelta;
+    const remainderBefore = balance.fractional_remainder_milli ?? 0;
+    const totalPhysicalMilliBefore = qtyBefore * 1000 + remainderBefore;
+    const availableMilliBefore = totalPhysicalMilliBefore - balance.reserved_qty * 1000;
 
-    if (input.quantityDelta < 0 && !input.allowNegativeStock && availableAfter < 0) {
+    const deltaMilli =
+      input.quantityDeltaMilli !== undefined
+        ? Math.trunc(input.quantityDeltaMilli)
+        : Math.trunc(input.quantityDelta) * 1000;
+
+    const totalPhysicalMilliAfter = totalPhysicalMilliBefore + deltaMilli;
+    const availableMilliAfter = availableMilliBefore + deltaMilli;
+
+    if (deltaMilli < 0 && !input.allowNegativeStock && availableMilliAfter < 0) {
+      const availDisplay = Number((availableMilliBefore / 1000).toFixed(3));
+      const reqDisplay = Number((Math.abs(deltaMilli) / 1000).toFixed(3));
       throw new ConflictException({
         code: 'INSUFFICIENT_STOCK',
-        message: `Stock insuffisant pour « ${product.name} » (disponible : ${availableBefore}, demandé : ${Math.abs(input.quantityDelta)}).`,
-        errors: [{ path: 'quantity', message: `Stock restant : ${availableBefore}` }],
+        message: `Stock insuffisant pour « ${product.name} » (disponible : ${availDisplay}, demandé : ${reqDisplay}).`,
+        errors: [{ path: 'quantity', message: `Stock restant : ${availDisplay}` }],
       });
     }
 
+    const qtyAfter = Math.floor(totalPhysicalMilliAfter / 1000);
+    const remainderMilliAfter = totalPhysicalMilliAfter - qtyAfter * 1000;
+    const availableAfter = Math.floor(availableMilliAfter / 1000);
+    const qtyAfterDecimal = Number((totalPhysicalMilliAfter / 1000).toFixed(3));
+    const availableAfterDecimal = Number((availableMilliAfter / 1000).toFixed(3));
+    const loggedDelta =
+      input.quantityDeltaMilli !== undefined ? qtyAfter - qtyBefore : input.quantityDelta;
+
     await tx.stockBalance.update({
       where: { id: balance.id },
-      data: { physicalQty: qtyAfter },
+      data: {
+        physicalQty: qtyAfter,
+        fractionalRemainderMilli: remainderMilliAfter,
+      },
     });
 
     const movement = await tx.stockMovement.create({
@@ -154,7 +187,7 @@ export class InventoryService {
         productId: input.productId,
         variantId: input.variantId ?? null,
         movementType: input.movementType,
-        quantityDelta: input.quantityDelta,
+        quantityDelta: loggedDelta,
         qtyBefore,
         qtyAfter,
         unitCostXof: input.unitCostXof ?? null,
@@ -171,11 +204,398 @@ export class InventoryService {
       movementId: movement.id,
       qtyBefore,
       qtyAfter,
+      remainderMilliAfter,
+      qtyAfterDecimal,
       availableAfter,
-      becameNegative: qtyAfter < 0,
-      isLowStock: availableAfter <= alertThreshold,
+      availableAfterDecimal,
+      becameNegative: totalPhysicalMilliAfter < 0,
+      isLowStock: availableAfterDecimal <= alertThreshold,
       productName: product.name,
       alertThreshold,
+    };
+  }
+
+  /**
+   * Synchronise `product.expiryDate` sur la date de péremption la plus proche parmi ses lots actifs.
+   */
+  async syncProductEarliestExpiryInTx(
+    tx: ShopPrisma.TransactionClient,
+    productId: string,
+  ): Promise<void> {
+    const earliest = await tx.productBatch.findFirst({
+      where: { productId, status: 'ACTIVE', remainingQty: { gt: 0 } },
+      orderBy: [{ expiryDate: 'asc' }, { createdAt: 'asc' }],
+      select: { expiryDate: true },
+    });
+    if (earliest) {
+      await tx.product.update({
+        where: { id: productId },
+        data: { expiryDate: earliest.expiryDate },
+      });
+    }
+  }
+
+  /**
+   * Déduction FEFO (First Expired, First Out — Lot 10) :
+   * Consomme automatiquement les lots actifs dont la DLC est la plus proche lors d'une vente.
+   */
+  async deductBatchesFefoInTx(
+    tx: ShopPrisma.TransactionClient,
+    productId: string,
+    unitsToDeduct: number,
+  ): Promise<void> {
+    if (unitsToDeduct <= 0) return;
+    const batches = await tx.productBatch.findMany({
+      where: { productId, status: 'ACTIVE', remainingQty: { gt: 0 } },
+      orderBy: [{ expiryDate: 'asc' }, { createdAt: 'asc' }],
+    });
+    if (batches.length === 0) return;
+
+    let remaining = unitsToDeduct;
+    for (const batch of batches) {
+      if (remaining <= 0) break;
+      const take = Math.min(batch.remainingQty, remaining);
+      const nextRemaining = batch.remainingQty - take;
+      await tx.productBatch.update({
+        where: { id: batch.id },
+        data: {
+          remainingQty: nextRemaining,
+          status: nextRemaining === 0 ? 'DEPLETED' : 'ACTIVE',
+        },
+      });
+      remaining -= take;
+    }
+
+    await this.syncProductEarliestExpiryInTx(tx, productId);
+  }
+
+  /**
+   * Réintégration inverse de lots lors d'une annulation de vente.
+   */
+  async restoreBatchesInTx(
+    tx: ShopPrisma.TransactionClient,
+    productId: string,
+    unitsToRestore: number,
+  ): Promise<void> {
+    if (unitsToRestore <= 0) return;
+    const batches = await tx.productBatch.findMany({
+      where: { productId, status: { in: ['ACTIVE', 'DEPLETED'] } },
+      orderBy: [{ expiryDate: 'desc' }, { createdAt: 'desc' }],
+    });
+    if (batches.length === 0) return;
+
+    let remaining = unitsToRestore;
+    for (const batch of batches) {
+      if (remaining <= 0) break;
+      const capacity = Math.max(0, batch.initialQty - batch.remainingQty);
+      if (capacity <= 0) continue;
+      const putBack = Math.min(capacity, remaining);
+      await tx.productBatch.update({
+        where: { id: batch.id },
+        data: {
+          remainingQty: batch.remainingQty + putBack,
+          status: 'ACTIVE',
+        },
+      });
+      remaining -= putBack;
+    }
+
+    await this.syncProductEarliestExpiryInTx(tx, productId);
+  }
+
+  /**
+   * Alertes DLC / Péremptions (Lot 10) :
+   * Classe les lots actifs (et produits avec DLC simple) en : EXPIRED, EXPIRING_7D, EXPIRING_30D, OK.
+   */
+  async getExpiryAlerts(shopId: string) {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+    const now = Date.now();
+    const dayMs = 86_400_000;
+
+    const [batches, productsWithExpiry] = await Promise.all([
+      client.productBatch.findMany({
+        where: { status: 'ACTIVE', remainingQty: { gt: 0 } },
+        orderBy: [{ expiryDate: 'asc' }, { createdAt: 'asc' }],
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              unit: true,
+              costPriceXof: true,
+              salePriceXof: true,
+              status: true,
+            },
+          },
+        },
+      }),
+      client.product.findMany({
+        where: { status: { not: 'ARCHIVED' }, expiryDate: { not: null } },
+        include: {
+          stockBalances: { where: { variantKey: 'BASE' } },
+          batches: { where: { status: 'ACTIVE', remainingQty: { gt: 0 } }, select: { id: true } },
+        },
+      }),
+    ]);
+
+    type ExpirySeverity = 'EXPIRED' | 'EXPIRING_7D' | 'EXPIRING_30D' | 'OK';
+    const classify = (expiryDate: Date): { daysRemaining: number; severity: ExpirySeverity } => {
+      const daysRemaining = Math.ceil((expiryDate.getTime() - now) / dayMs);
+      if (daysRemaining <= 0) return { daysRemaining, severity: 'EXPIRED' };
+      if (daysRemaining <= 7) return { daysRemaining, severity: 'EXPIRING_7D' };
+      if (daysRemaining <= 30) return { daysRemaining, severity: 'EXPIRING_30D' };
+      return { daysRemaining, severity: 'OK' };
+    };
+
+    const items: Array<{
+      batchId: string | null;
+      productId: string;
+      productName: string;
+      sku: string;
+      unit: string;
+      batchNumber: string | null;
+      expiryDate: string;
+      remainingQty: number;
+      initialQty: number;
+      daysRemaining: number;
+      severity: ExpirySeverity;
+      estimatedLossCostXof: number;
+      notes: string | null;
+    }> = [];
+
+    for (const b of batches) {
+      if (b.product.status === 'ARCHIVED') continue;
+      const { daysRemaining, severity } = classify(b.expiryDate);
+      items.push({
+        batchId: b.id,
+        productId: b.product.id,
+        productName: b.product.name,
+        sku: b.product.sku,
+        unit: b.product.unit,
+        batchNumber: b.batchNumber,
+        expiryDate: b.expiryDate.toISOString(),
+        remainingQty: b.remainingQty,
+        initialQty: b.initialQty,
+        daysRemaining,
+        severity,
+        estimatedLossCostXof: (b.product.costPriceXof ?? 0) * b.remainingQty,
+        notes: b.notes,
+      });
+    }
+
+    // Produits ayant une DLC directe sans lot actif détaillé
+    for (const p of productsWithExpiry) {
+      if (p.batches.length > 0 || !p.expiryDate) continue;
+      const bal = p.stockBalances[0];
+      const qty = Math.max(0, bal?.physicalQty ?? 0);
+      if (qty <= 0) continue;
+      const { daysRemaining, severity } = classify(p.expiryDate);
+      items.push({
+        batchId: null,
+        productId: p.id,
+        productName: p.name,
+        sku: p.sku,
+        unit: p.unit,
+        batchNumber: null,
+        expiryDate: p.expiryDate.toISOString(),
+        remainingQty: qty,
+        initialQty: qty,
+        daysRemaining,
+        severity,
+        estimatedLossCostXof: (p.costPriceXof ?? 0) * qty,
+        notes: null,
+      });
+    }
+
+    items.sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
+
+    return {
+      summary: {
+        expiredCount: items.filter((i) => i.severity === 'EXPIRED').length,
+        expiring7dCount: items.filter((i) => i.severity === 'EXPIRING_7D').length,
+        expiring30dCount: items.filter((i) => i.severity === 'EXPIRING_30D').length,
+        totalTrackedBatches: items.length,
+        expiredEstimatedCostXof: items
+          .filter((i) => i.severity === 'EXPIRED')
+          .reduce((acc, i) => acc + i.estimatedLossCostXof, 0),
+      },
+      items,
+    };
+  }
+
+  async createBatch(
+    shopId: string,
+    input: {
+      productId: string;
+      batchNumber?: string;
+      expiryDate: string;
+      quantity: number;
+      notes?: string;
+    },
+    actor: AuthenticatedUser,
+    operator: DeclaredOperatorContext | undefined,
+    meta: RequestMeta,
+  ) {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+    const expiryDate = new Date(input.expiryDate);
+
+    const created = await client.$transaction(async (tx) => {
+      const product = await tx.product.findUnique({ where: { id: input.productId } });
+      if (!product) {
+        throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND', message: 'Produit introuvable.' });
+      }
+
+      const batch = await tx.productBatch.create({
+        data: {
+          productId: product.id,
+          batchNumber: input.batchNumber?.trim() || null,
+          expiryDate,
+          initialQty: input.quantity,
+          remainingQty: input.quantity,
+          status: 'ACTIVE',
+          notes: input.notes?.trim() || null,
+        },
+      });
+
+      await this.applyMovementInTx(tx, {
+        productId: product.id,
+        movementType: 'MANUAL_IN',
+        quantityDelta: input.quantity,
+        unitCostXof: product.costPriceXof,
+        referenceType: 'PRODUCT_BATCH',
+        referenceId: batch.id,
+        reason: `Entrée lot${batch.batchNumber ? ` ${batch.batchNumber}` : ''} (DLC ${expiryDate.toISOString().slice(0, 10)})`,
+        actorUserId: actor.userId,
+        declaredOperatorId: operator?.id ?? null,
+        declaredOperatorName: operator?.firstName ?? null,
+      });
+
+      await this.syncProductEarliestExpiryInTx(tx, product.id);
+      return batch;
+    });
+
+    await this.auditService.recordShop({
+      shopId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      declaredOperatorId: operator?.id ?? null,
+      declaredOperatorName: operator?.firstName ?? null,
+      action: 'PRODUCT_BATCH_CREATED',
+      entityType: 'ProductBatch',
+      entityId: created.id,
+      afterData: {
+        productId: created.productId,
+        batchNumber: created.batchNumber,
+        expiryDate: created.expiryDate.toISOString(),
+        quantity: created.initialQty,
+      },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+
+    return {
+      ...created,
+      expiryDate: created.expiryDate.toISOString(),
+      createdAt: created.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * Mise au rebut atomique d'un lot périmé/endommagé (Lot 10) :
+   * Décrémente le stock en `RETURN_DAMAGED_LOSS` et marque le lot `WRITTEN_OFF`.
+   */
+  async writeOffBatch(
+    shopId: string,
+    batchId: string,
+    input: { reason: string },
+    actor: AuthenticatedUser,
+    operator: DeclaredOperatorContext | undefined,
+    meta: RequestMeta,
+  ) {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+
+    const result = await client.$transaction(async (tx) => {
+      const batch = await tx.productBatch.findUnique({
+        where: { id: batchId },
+        include: { product: { select: { id: true, name: true, costPriceXof: true } } },
+      });
+      if (!batch) {
+        throw new NotFoundException({ code: 'BATCH_NOT_FOUND', message: 'Lot introuvable.' });
+      }
+      if (batch.status !== 'ACTIVE' || batch.remainingQty <= 0) {
+        throw new ConflictException({
+          code: 'BATCH_ALREADY_CLOSED',
+          message: 'Ce lot est déjà épuisé ou mis au rebut.',
+        });
+      }
+
+      const bal = await tx.stockBalance.findUnique({
+        where: { productId_variantKey: { productId: batch.productId, variantKey: 'BASE' } },
+      });
+      const available = Math.max(0, (bal?.physicalQty ?? 0) - (bal?.reservedQty ?? 0));
+      const qtyToDeduct = Math.min(batch.remainingQty, available);
+
+      if (qtyToDeduct > 0) {
+        await this.applyMovementInTx(tx, {
+          productId: batch.productId,
+          movementType: 'RETURN_DAMAGED_LOSS',
+          quantityDelta: -qtyToDeduct,
+          unitCostXof: batch.product.costPriceXof,
+          referenceType: 'BATCH_WRITE_OFF',
+          referenceId: batch.id,
+          reason: `Mise au rebut lot${batch.batchNumber ? ` ${batch.batchNumber}` : ''} (DLC ${batch.expiryDate.toISOString().slice(0, 10)}) : ${input.reason}`,
+          actorUserId: actor.userId,
+          declaredOperatorId: operator?.id ?? null,
+          declaredOperatorName: operator?.firstName ?? null,
+          allowNegativeStock: false,
+        });
+      }
+
+      const writtenOff = await tx.productBatch.update({
+        where: { id: batch.id },
+        data: {
+          remainingQty: 0,
+          status: 'WRITTEN_OFF',
+          notes: input.reason,
+        },
+      });
+
+      await this.syncProductEarliestExpiryInTx(tx, batch.productId);
+      return {
+        batch: writtenOff,
+        productName: batch.product.name,
+        writtenOffQty: batch.remainingQty,
+        stockDeductedQty: qtyToDeduct,
+      };
+    });
+
+    await this.auditService.recordShop({
+      shopId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      declaredOperatorId: operator?.id ?? null,
+      declaredOperatorName: operator?.firstName ?? null,
+      action: 'BATCH_WRITTEN_OFF',
+      entityType: 'ProductBatch',
+      entityId: batchId,
+      afterData: {
+        productName: result.productName,
+        writtenOffQty: result.writtenOffQty,
+        stockDeductedQty: result.stockDeductedQty,
+      },
+      reason: input.reason,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+
+    return {
+      id: result.batch.id,
+      status: result.batch.status,
+      writtenOffQty: result.writtenOffQty,
+      stockDeductedQty: result.stockDeductedQty,
     };
   }
 
@@ -515,6 +935,53 @@ export class InventoryController {
     @Req() req: RequestWithAuth,
   ) {
     return this.inventoryService.submitPhysicalInventory(shopId, body, user, operator, {
+      ipAddress: req.ip || null,
+      userAgent: req.header('user-agent') || null,
+      correlationId: req.correlationId || null,
+    });
+  }
+
+  @Get('expiry-alerts')
+  @Roles('OWNER', 'AGENT')
+  @RequirePermissions('stock:read')
+  @ApiOperation({ summary: 'Consulter les alertes de dates de péremption (DLC) et lots actifs' })
+  expiryAlerts(@Param('shopId') shopId: string) {
+    return this.inventoryService.getExpiryAlerts(shopId);
+  }
+
+  @Post('batches')
+  @Roles('OWNER', 'AGENT')
+  @RequirePermissions('stock:adjust')
+  @RequireOperator()
+  @ApiOperation({ summary: 'Enregistrer un nouveau lot avec date de péremption (DLC) et créditer le stock' })
+  createBatch(
+    @Param('shopId') shopId: string,
+    @Body(new ZodValidationPipe(createProductBatchSchema)) body: any,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOperator() operator: DeclaredOperatorContext | undefined,
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.inventoryService.createBatch(shopId, body, user, operator, {
+      ipAddress: req.ip || null,
+      userAgent: req.header('user-agent') || null,
+      correlationId: req.correlationId || null,
+    });
+  }
+
+  @Post('batches/:batchId/write-off')
+  @Roles('OWNER', 'AGENT')
+  @RequirePermissions('stock:adjust')
+  @RequireOperator(true)
+  @ApiOperation({ summary: 'Mettre au rebut un lot périmé/endommagé (sortie en perte tracée)' })
+  writeOffBatch(
+    @Param('shopId') shopId: string,
+    @Param('batchId') batchId: string,
+    @Body(new ZodValidationPipe(writeOffBatchSchema)) body: any,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOperator() operator: DeclaredOperatorContext | undefined,
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.inventoryService.writeOffBatch(shopId, batchId, body, user, operator, {
       ipAddress: req.ip || null,
       userAgent: req.header('user-agent') || null,
       correlationId: req.correlationId || null,

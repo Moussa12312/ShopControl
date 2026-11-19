@@ -240,6 +240,17 @@ export function ReceiptModal({
                           {formatXof(l.lineTotalXof)}
                         </span>
                       </div>
+                      {(l.serialNumber || l.warrantyEndsAt) && (
+                        <div className="rounded bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-700">
+                          {l.serialNumber ? <p>N° Série / IMEI : <strong>{l.serialNumber}</strong></p> : null}
+                          {l.warrantyEndsAt ? (
+                            <p>
+                              Garantie{l.warrantyMonths ? ` (${l.warrantyMonths}m)` : ''} jusqu’au{' '}
+                              <strong>{new Date(l.warrantyEndsAt).toLocaleDateString('fr-FR')}</strong>
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

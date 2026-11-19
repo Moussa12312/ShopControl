@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  BusinessProfileConfig,
   DEFAULT_CURRENCY,
   DEFAULT_DAILY_REPORT_TIME,
   DEFAULT_DELIVERY_CONFIG,
@@ -13,6 +14,9 @@ import {
   DEFAULT_PAYMENT_METHODS,
   DEFAULT_RECEIPT_SETTINGS,
   DEFAULT_TIMEZONE,
+  normalizeBusinessProfile,
+  normalizeShopType,
+  ShopType,
   slugifyShopName,
   TaxMode,
   TenantStatus,
@@ -26,6 +30,8 @@ import { RequestMeta } from '../auth/auth.service';
 export interface CreateShopPayload {
   name: string;
   slug?: string;
+  shopType?: ShopType;
+  businessProfile?: Partial<BusinessProfileConfig>;
   logoUrl?: string | null;
   phone?: string;
   email?: string;
@@ -116,6 +122,8 @@ export class ShopsService {
 
     const shopId = crypto.randomUUID();
     const dbName = this.shopDbManager.buildShopDatabaseName(shopId);
+    const shopType = normalizeShopType(input.shopType);
+    const businessProfile = normalizeBusinessProfile(shopType, input.businessProfile);
     const currency = input.currency || merchant.currency || DEFAULT_CURRENCY;
     const timezone = input.timezone || merchant.defaultTimezone || DEFAULT_TIMEZONE;
     const dailyReportTime = input.dailyReportTime || DEFAULT_DAILY_REPORT_TIME;
@@ -128,6 +136,8 @@ export class ShopsService {
         merchantId,
         name: input.name,
         slug,
+        shopType,
+        businessProfile: businessProfile as object,
         status: 'ACTIVE',
         dbName,
         dbStatus: 'PROVISIONING',
@@ -155,6 +165,8 @@ export class ShopsService {
         name: shop.name,
         slug: shop.slug,
         dbName: shop.dbName,
+        shopType,
+        businessProfile,
         currency: shop.currency,
         timezone: shop.timezone,
         dailyReportTime: shop.dailyReportTime,
@@ -265,11 +277,14 @@ export class ShopsService {
           terminalsCount = terms;
         }
 
+        const shopType = normalizeShopType(shop.shopType);
         return {
           id: shop.id,
           merchantId: shop.merchantId,
           name: shop.name,
           slug: shop.slug,
+          shopType,
+          businessProfile: normalizeBusinessProfile(shopType, shop.businessProfile),
           status: shop.status,
           statusReason: shop.statusReason,
           dbName: shop.dbName,
@@ -308,8 +323,11 @@ export class ShopsService {
     if (!shop) {
       throw new NotFoundException({ code: 'SHOP_NOT_FOUND', message: 'Boutique introuvable.' });
     }
+    const shopType = normalizeShopType(shop.shopType);
     return {
       ...shop,
+      shopType,
+      businessProfile: normalizeBusinessProfile(shopType, shop.businessProfile),
       deliveryConfig: { ...DEFAULT_DELIVERY_CONFIG, ...((shop.deliveryConfig as object) || {}) },
       receiptSettings: { ...DEFAULT_RECEIPT_SETTINGS, ...((shop.receiptSettings as object) || {}) },
     };
@@ -350,6 +368,26 @@ export class ShopsService {
       nextSlug = candidate;
     }
 
+    const nextShopType =
+      input.shopType !== undefined
+        ? normalizeShopType(input.shopType)
+        : normalizeShopType(existing.shopType);
+    const shopTypeChanged = input.shopType !== undefined && nextShopType !== normalizeShopType(existing.shopType);
+
+    let nextBusinessProfile: BusinessProfileConfig | undefined;
+    if (input.businessProfile !== undefined) {
+      const base = shopTypeChanged
+        ? normalizeBusinessProfile(nextShopType)
+        : normalizeBusinessProfile(nextShopType, existing.businessProfile);
+      nextBusinessProfile = normalizeBusinessProfile(nextShopType, {
+        ...base,
+        ...input.businessProfile,
+      });
+    } else if (shopTypeChanged) {
+      // Changer de secteur applique proprement le preset du nouveau secteur
+      nextBusinessProfile = normalizeBusinessProfile(nextShopType);
+    }
+
     const updated = await this.controlPrisma.$transaction(async (tx) => {
       if (slugChanged) {
         // Supprime une éventuelle ancienne redirection si la boutique reprend un ancien slug qui lui appartenait
@@ -369,6 +407,10 @@ export class ShopsService {
         data: {
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(slugChanged ? { slug: nextSlug } : {}),
+          ...(input.shopType !== undefined ? { shopType: nextShopType } : {}),
+          ...(nextBusinessProfile !== undefined
+            ? { businessProfile: nextBusinessProfile as object }
+            : {}),
           ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl || null } : {}),
           ...(input.phone !== undefined ? { phone: input.phone || null } : {}),
           ...(input.email !== undefined ? { email: input.email || null } : {}),
@@ -407,6 +449,11 @@ export class ShopsService {
       });
     });
 
+    const normalizedUpdatedProfile = normalizeBusinessProfile(
+      updated.shopType,
+      updated.businessProfile,
+    );
+
     if (updated.dbStatus === 'READY') {
       await this.shopDbManager.syncShopLocalConfig({
         id: updated.id,
@@ -414,6 +461,8 @@ export class ShopsService {
         name: updated.name,
         slug: updated.slug,
         dbName: updated.dbName,
+        shopType: updated.shopType,
+        businessProfile: normalizedUpdatedProfile,
         currency: updated.currency,
         timezone: updated.timezone,
         dailyReportTime: updated.dailyReportTime,
@@ -450,7 +499,11 @@ export class ShopsService {
       correlationId: meta.correlationId,
     });
 
-    return updated;
+    return {
+      ...updated,
+      shopType: normalizeShopType(updated.shopType),
+      businessProfile: normalizedUpdatedProfile,
+    };
   }
 
   /**
@@ -600,6 +653,8 @@ export class ShopsService {
         id: shop.id,
         name: shop.name,
         slug: shop.slug,
+        shopType: normalizeShopType(shop.shopType),
+        businessProfile: normalizeBusinessProfile(shop.shopType, shop.businessProfile),
         logoUrl: shop.logoUrl,
         phone: shop.phone,
         email: shop.email,

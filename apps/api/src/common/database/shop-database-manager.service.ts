@@ -25,6 +25,8 @@ export interface ShopProvisionInput {
   name: string;
   slug: string;
   dbName: string;
+  shopType?: string;
+  businessProfile?: unknown;
   currency: string;
   timezone: string;
   dailyReportTime: string;
@@ -106,6 +108,8 @@ export class ShopDatabaseManagerService implements OnModuleDestroy {
         merchantId: input.merchantId,
         shopName: input.name,
         slug: input.slug,
+        shopType: input.shopType || 'GENERAL',
+        businessProfile: (input.businessProfile ?? {}) as object,
         currency: input.currency,
         timezone: input.timezone,
         dailyReportTime: input.dailyReportTime,
@@ -118,6 +122,10 @@ export class ShopDatabaseManagerService implements OnModuleDestroy {
       update: {
         shopName: input.name,
         slug: input.slug,
+        ...(input.shopType ? { shopType: input.shopType } : {}),
+        ...(input.businessProfile !== undefined
+          ? { businessProfile: (input.businessProfile ?? {}) as object }
+          : {}),
         currency: input.currency,
         timezone: input.timezone,
         dailyReportTime: input.dailyReportTime,
@@ -185,6 +193,8 @@ export class ShopDatabaseManagerService implements OnModuleDestroy {
         merchantId: input.merchantId,
         shopName: input.name,
         slug: input.slug,
+        shopType: input.shopType || 'GENERAL',
+        businessProfile: (input.businessProfile ?? {}) as object,
         currency: input.currency,
         timezone: input.timezone,
         dailyReportTime: input.dailyReportTime,
@@ -197,6 +207,10 @@ export class ShopDatabaseManagerService implements OnModuleDestroy {
       update: {
         shopName: input.name,
         slug: input.slug,
+        ...(input.shopType ? { shopType: input.shopType } : {}),
+        ...(input.businessProfile !== undefined
+          ? { businessProfile: (input.businessProfile ?? {}) as object }
+          : {}),
         currency: input.currency,
         timezone: input.timezone,
         dailyReportTime: input.dailyReportTime,

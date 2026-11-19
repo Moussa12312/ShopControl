@@ -9,7 +9,9 @@ import { Reflector } from '@nestjs/core';
 import * as jwt from 'jsonwebtoken';
 import {
   createAllPermissions,
+  normalizeBusinessProfile,
   normalizePermissionMap,
+  normalizeShopType,
   TenantStatus,
   UserRole,
 } from '@shopcontrol/shared';
@@ -146,6 +148,8 @@ export class JwtAuthGuard implements CanActivate {
         shopName: s.name,
         slug: s.slug,
         logoUrl: s.logoUrl ?? null,
+        shopType: normalizeShopType(s.shopType),
+        businessProfile: normalizeBusinessProfile(s.shopType, s.businessProfile),
         status: s.status as TenantStatus,
         dbStatus: s.dbStatus,
         permissions: allPerms,
@@ -158,6 +162,8 @@ export class JwtAuthGuard implements CanActivate {
         shopName: access.shop.name,
         slug: access.shop.slug,
         logoUrl: access.shop.logoUrl ?? null,
+        shopType: normalizeShopType(access.shop.shopType),
+        businessProfile: normalizeBusinessProfile(access.shop.shopType, access.shop.businessProfile),
         status: access.shop.status as TenantStatus,
         dbStatus: access.shop.dbStatus,
         permissions: normalizePermissionMap(access.permissions),
@@ -202,6 +208,8 @@ export class JwtAuthGuard implements CanActivate {
           shopName: s.name,
           slug: s.slug,
           logoUrl: s.logoUrl ?? null,
+          shopType: normalizeShopType(s.shopType),
+          businessProfile: normalizeBusinessProfile(s.shopType, s.businessProfile),
           status: s.status as TenantStatus,
           dbStatus: s.dbStatus,
           permissions: allPerms,

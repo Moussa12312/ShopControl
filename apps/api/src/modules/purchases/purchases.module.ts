@@ -248,7 +248,14 @@ export class PurchasesService {
     poId: string,
     input: {
       notes?: string;
-      items: Array<{ purchaseOrderItemId: string; receivedQty: number; unitCostXof?: number }>;
+      items: Array<{
+        purchaseOrderItemId: string;
+        receivedQty: number;
+        unitCostXof?: number;
+        receivedInBulk?: boolean;
+        expiryDate?: string | null;
+        batchNumber?: string | null;
+      }>;
     },
     actor: AuthenticatedUser,
     operator: DeclaredOperatorContext | undefined,
@@ -299,32 +306,48 @@ export class PurchasesService {
           });
         }
 
+        const product = await tx.product.findUniqueOrThrow({ where: { id: poItem.productId } });
         const unitCost = reqLine.unitCostXof ?? poItem.unitCostXof;
         receiptTotalCostXof += reqLine.receivedQty * unitCost;
 
-        // Crédite le stock de la quantité réellement reçue via mouvement tracé
+        let unitsToCredit = reqLine.receivedQty;
+        let retailUnitCost = unitCost;
+        let bulkReasonSuffix = '';
+
+        if (reqLine.receivedInBulk) {
+          if (!product.unitsPerBulk || product.unitsPerBulk < 2) {
+            throw new BadRequestException({
+              code: 'BULK_NOT_CONFIGURED',
+              message: `Le conditionnement de gros (unités par carton/sac) n’est pas configuré sur « ${product.name} ».`,
+            });
+          }
+          unitsToCredit = reqLine.receivedQty * product.unitsPerBulk;
+          retailUnitCost = Math.round(unitCost / product.unitsPerBulk);
+          bulkReasonSuffix = ` (${reqLine.receivedQty} ${product.bulkUnitLabel || 'gros'} × ${product.unitsPerBulk} ${product.unit})`;
+        }
+
+        // Crédite le stock en unités de base (détail) via mouvement tracé
         const moveResult = await this.inventoryService.applyMovementInTx(tx, {
           productId: poItem.productId,
           variantId: poItem.variantId,
           movementType: 'PURCHASE_RECEIPT',
-          quantityDelta: reqLine.receivedQty,
-          unitCostXof: unitCost,
+          quantityDelta: unitsToCredit,
+          unitCostXof: retailUnitCost,
           referenceType: 'PURCHASE_RECEIPT',
           referenceId: receiptNumber,
-          reason: `Réception ${po.poNumber}`,
+          reason: `Réception ${po.poNumber}${bulkReasonSuffix}`,
           actorUserId: actor.userId,
           declaredOperatorId: operator?.id ?? null,
           declaredOperatorName: operator?.firstName ?? null,
         });
 
-        // Recalcul du Coût Moyen Pondéré (CMP — Arbitrage #5)
-        const product = await tx.product.findUniqueOrThrow({ where: { id: poItem.productId } });
+        // Recalcul du Coût Moyen Pondéré par unité de détail (CMP — Arbitrage #5)
         const previousCost = product.costPriceXof;
         const newCmp = calculateWeightedAverageCost(
           moveResult.qtyBefore,
           previousCost,
-          reqLine.receivedQty,
-          unitCost,
+          unitsToCredit,
+          retailUnitCost,
         );
 
         await tx.product.update({
@@ -338,12 +361,29 @@ export class PurchasesService {
             variantId: poItem.variantId,
             previousCostXof: previousCost,
             newCostXof: newCmp,
-            receivedQty: reqLine.receivedQty,
-            receivedUnitCostXof: unitCost,
+            receivedQty: unitsToCredit,
+            receivedUnitCostXof: retailUnitCost,
             sourceType: 'PURCHASE_RECEIPT',
             sourceId: receiptNumber,
           },
         });
+
+        // Création automatique du lot DLC si date de péremption fournie à la réception (Lot 10)
+        if (reqLine.expiryDate) {
+          const parsedExpiry = new Date(reqLine.expiryDate);
+          await tx.productBatch.create({
+            data: {
+              productId: poItem.productId,
+              batchNumber: reqLine.batchNumber?.trim() || receiptNumber,
+              expiryDate: parsedExpiry,
+              initialQty: unitsToCredit,
+              remainingQty: unitsToCredit,
+              status: 'ACTIVE',
+              notes: `Réception fournisseur ${po.poNumber} (${receiptNumber})`,
+            },
+          });
+          await this.inventoryService.syncProductEarliestExpiryInTx(tx, poItem.productId);
+        }
 
         await tx.purchaseOrderItem.update({
           where: { id: poItem.id },

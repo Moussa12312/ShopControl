@@ -1,4 +1,10 @@
-import { PermissionMap, TenantStatus, UserRole } from '@shopcontrol/shared';
+import {
+  BusinessProfileConfig,
+  PermissionMap,
+  ShopType,
+  TenantStatus,
+  UserRole,
+} from '@shopcontrol/shared';
 import { RequestWithCorrelation } from '../middleware/correlation-id.middleware';
 
 export interface ShopAccessSummary {
@@ -6,6 +12,8 @@ export interface ShopAccessSummary {
   shopName: string;
   slug: string;
   logoUrl?: string | null;
+  shopType?: ShopType;
+  businessProfile?: BusinessProfileConfig;
   status: TenantStatus;
   dbStatus: string;
   permissions: PermissionMap;

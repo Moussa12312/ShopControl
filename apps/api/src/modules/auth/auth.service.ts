@@ -10,7 +10,9 @@ import * as jwt from 'jsonwebtoken';
 import * as QRCode from 'qrcode';
 import {
   createAllPermissions,
+  normalizeBusinessProfile,
   normalizePermissionMap,
+  normalizeShopType,
   TenantStatus,
   UserRole,
 } from '@shopcontrol/shared';
@@ -640,6 +642,8 @@ export class AuthService {
             shopName: s.name,
             slug: s.slug,
             logoUrl: s.logoUrl ?? null,
+            shopType: normalizeShopType(s.shopType),
+            businessProfile: normalizeBusinessProfile(s.shopType, s.businessProfile),
             status: s.status as TenantStatus,
             dbStatus: s.dbStatus,
             permissions: createAllPermissions(),
@@ -652,6 +656,8 @@ export class AuthService {
               shopName: a.shop.name,
               slug: a.shop.slug,
               logoUrl: a.shop.logoUrl ?? null,
+              shopType: normalizeShopType(a.shop.shopType),
+              businessProfile: normalizeBusinessProfile(a.shop.shopType, a.shop.businessProfile),
               status: a.shop.status as TenantStatus,
               dbStatus: a.shop.dbStatus,
               permissions: normalizePermissionMap(a.permissions),
