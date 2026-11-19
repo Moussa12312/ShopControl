@@ -18,9 +18,10 @@ export class RedisService implements OnModuleDestroy {
     const env = getEnv();
     this.client = new Redis(env.REDIS_URL, {
       maxRetriesPerRequest: 1,
-      connectTimeout: 2000,
+      connectTimeout: 1500,
+      enableOfflineQueue: false,
       enableReadyCheck: true,
-      retryStrategy: (times) => Math.min(times * 1000, 10_000),
+      retryStrategy: (times) => Math.min(times * 2000, 15_000),
     });
 
     this.client.on('ready', () => {
@@ -123,6 +124,9 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async ping(): Promise<string> {
+    if (!this.connected) {
+      return this.canFallbackToMemory() ? 'FALLBACK_MEMORY' : 'DOWN';
+    }
     return this.client.ping();
   }
 

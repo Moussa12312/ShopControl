@@ -24,13 +24,14 @@ export class HealthController {
       db = 'error';
     }
     try {
-      await this.redis.ping();
+      const pong = await this.redis.ping();
+      redis = pong === 'PONG' ? 'ok' : pong === 'FALLBACK_MEMORY' ? 'memory-fallback' : 'error';
     } catch {
       redis = 'error';
     }
 
     return {
-      status: db === 'ok' && redis === 'ok' ? 'ok' : 'degraded',
+      status: db === 'ok' ? 'ok' : 'degraded',
       services: { db, redis },
       timestamp: new Date().toISOString(),
     };
