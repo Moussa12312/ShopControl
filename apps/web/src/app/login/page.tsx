@@ -1,8 +1,20 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Database, KeyRound, Lock, ShieldCheck, Sparkles, Store } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Lock,
+  QrCode,
+  Receipt,
+  ShieldCheck,
+  Store,
+} from 'lucide-react';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { useAuth } from '@/components/providers/AuthProvider';
 
@@ -12,6 +24,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [totpCode, setTotpCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +97,7 @@ export default function LoginPage() {
 
   return (
     <div className="grid min-h-screen w-full bg-white lg:grid-cols-12">
-      {/* Panneau gauche Obsidian Emerald plein écran */}
+      {/* Panneau gauche Obsidian Emerald */}
       <div className="obsidian-hero flex flex-col justify-between px-6 py-8 text-white sm:px-10 lg:col-span-5 lg:min-h-screen lg:px-12 lg:py-12">
         <div>
           <div className="flex items-center gap-3">
@@ -93,47 +106,47 @@ export default function LoginPage() {
             </span>
             <div>
               <p className="text-lg font-extrabold tracking-tight">ShopControl</p>
-              <p className="text-xs text-emerald-200/75">SaaS Commercial & E-commerce QR</p>
+              <p className="text-xs text-emerald-200/75">Gestion de Boutique & Vitrine QR</p>
             </div>
           </div>
 
           <h1 className="mt-6 text-2xl font-extrabold leading-snug text-white sm:text-3xl lg:mt-14">
-            Pilotez toutes vos boutiques et vos vitrines QR en temps réel.
+            Gérez vos ventes, votre stock et votre vitrine en ligne en toute simplicité.
           </h1>
           <p className="mt-3 max-w-md text-xs leading-relaxed text-[#9bb5b0] sm:text-sm">
-            Comptoir POS hors-ligne, tickets 58/80 mm & PDF, caisse, stocks, transferts
-            multi-boutiques, vitrine QR sans compte et bilans consolidés.
+            Adapté à tous les commerces : alimentation, cosmétique, mode & vêtements,
+            quincaillerie, électronique et pièces auto.
           </p>
         </div>
 
-        <div className="lime-glow-card mt-6 hidden space-y-2.5 rounded-2xl border border-limeglow-400/25 p-5 text-xs lg:block">
-          <div className="flex items-center gap-2 font-bold text-limeglow-400">
-            <Sparkles className="h-4 w-4" />
-            <span>Plateforme complète Lots 1 à 7</span>
-          </div>
-          <p className="flex items-center gap-2 text-emerald-100/90">
-            <Database className="h-3.5 w-3.5 shrink-0 text-limeglow-300" />
-            1 base PostgreSQL dédiée & isolée par boutique
+        <div className="lime-glow-card mt-6 hidden space-y-3 rounded-2xl border border-limeglow-400/25 p-5 text-xs lg:block">
+          <p className="flex items-center gap-2.5 text-emerald-100/95">
+            <Store className="h-4 w-4 shrink-0 text-limeglow-400" />
+            <span>Catalogue & catégories adaptés à votre type de commerce</span>
           </p>
-          <p className="flex items-center gap-2 text-emerald-100/90">
-            <Store className="h-3.5 w-3.5 shrink-0 text-limeglow-300" />
-            Vitrine QR temps réel · Comptoir PWA · Entiers XOF
+          <p className="flex items-center gap-2.5 text-emerald-100/95">
+            <Receipt className="h-4 w-4 shrink-0 text-limeglow-400" />
+            <span>Caisse POS rapide, tickets thermiques 58/80 mm & factures PDF</span>
+          </p>
+          <p className="flex items-center gap-2.5 text-emerald-100/95">
+            <QrCode className="h-4 w-4 shrink-0 text-limeglow-400" />
+            <span>Vitrine QR publique avec votre logo pour recevoir les commandes clients</span>
           </p>
         </div>
       </div>
 
-      {/* Panneau droit Formulaire plein écran responsive */}
+      {/* Panneau droit Formulaire de connexion épuré */}
       <div className="flex flex-1 flex-col justify-center bg-[#f4f8f7] px-5 py-8 sm:px-10 lg:col-span-7 lg:bg-white">
         <div className="mx-auto w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-6 shadow-card sm:p-8 lg:border-0 lg:p-0 lg:shadow-none">
-          <h2 className="text-2xl font-bold text-slate-900">Connexion à votre espace</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900">Connexion</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Super Admin, Propriétaire ou compte Agent boutique.
+            Accédez au tableau de bord de votre boutique.
           </p>
 
           {error ? (
             <div
               role="alert"
-              className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-800"
+              className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800"
             >
               {error}
             </div>
@@ -152,8 +165,8 @@ export default function LoginPage() {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ex. admin@shopcontrol.local"
-                  className="mt-1.5 block w-full rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-xs focus:border-forest-900"
+                  placeholder="ex. contact@maboutique.com"
+                  className="mt-1.5 block w-full rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-xs focus:border-forest-900 focus:outline-none"
                 />
               </div>
 
@@ -161,15 +174,26 @@ export default function LoginPage() {
                 <label htmlFor="password" className="block text-xs font-semibold text-slate-700">
                   Mot de passe
                 </label>
-                <input
-                  id="password"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1.5 block w-full rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-xs focus:border-forest-900"
-                />
+                <div className="relative mt-1.5">
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="block w-full rounded-xl border border-slate-300 py-3 pl-4 pr-11 text-sm shadow-xs focus:border-forest-900 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-700"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
 
               <button
@@ -235,7 +259,25 @@ export default function LoginPage() {
             </form>
           )}
 
-          <p className="mt-8 text-center text-[11px] text-slate-400">
+          {/* Appel à l'action vers la page d'inscription boutiquier */}
+          <div className="mt-6 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-center">
+            <p className="text-xs font-bold text-slate-800">
+              Vous êtes boutiquier et n’avez pas encore de compte ?
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-600">
+              Créez votre boutique en 1 minute avec votre logo, votre type de commerce et vos modes de paiement.
+            </p>
+            <Link
+              href="/register"
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-forest-900 bg-white px-4 py-2.5 text-xs font-extrabold text-forest-900 shadow-2xs transition hover:bg-forest-900 hover:text-white"
+            >
+              <CheckCircle2 className="h-4 w-4 text-brand-700" />
+              <span>Créer ma boutique (Inscription)</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <p className="mt-7 text-center text-[11px] text-slate-400">
             Propulsé par{' '}
             <sub className="bottom-[-0.18em] text-[10px] font-semibold tracking-wide text-slate-500">
               Chakir’s Entreprise

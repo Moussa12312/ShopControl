@@ -17,6 +17,8 @@ import {
   changePasswordSchema,
   confirmTwoFactorSchema,
   loginSchema,
+  RegisterMerchantInput,
+  registerMerchantSchema,
   verifyTwoFactorLoginSchema,
 } from '@shopcontrol/shared';
 import { getEnv } from '../../common/config/env.config';
@@ -33,6 +35,30 @@ import { AuthService } from './auth.service';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('register-merchant')
+  @Public()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary:
+      'Inscription autonome d’un boutiquier (compte propriétaire, boutique dédiée, type de boutique, logo, modes de paiement & formule)',
+  })
+  async registerMerchant(
+    @Body(new ZodValidationPipe(registerMerchantSchema))
+    body: RegisterMerchantInput,
+    @Req() req: RequestWithAuth,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.registerMerchant(body, this.extractMeta(req));
+    this.setAuthCookies(res, result.accessToken, result.refreshToken, result.refreshTtlMs);
+    return {
+      requiresTwoFactor: false,
+      accessToken: result.accessToken,
+      user: result.user,
+      merchant: result.merchant,
+      shops: result.shops,
+    };
+  }
 
   @Post('login')
   @Public()

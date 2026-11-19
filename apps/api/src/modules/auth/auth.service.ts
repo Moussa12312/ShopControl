@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   UnauthorizedException,
@@ -10,9 +11,19 @@ import * as jwt from 'jsonwebtoken';
 import * as QRCode from 'qrcode';
 import {
   createAllPermissions,
+  DEFAULT_DELIVERY_CONFIG,
+  DEFAULT_RECEIPT_SETTINGS,
   normalizeBusinessProfile,
   normalizePermissionMap,
   normalizeShopType,
+  PaymentMethodConfig,
+  PLATFORM_MODULES,
+  RegisterMerchantInput,
+  SHOP_TYPE_SHORT_LABELS,
+  ShopType,
+  SUBSCRIPTION_PAYMENT_METHOD_LABELS,
+  SUBSCRIPTION_PLAN_LABELS,
+  SubscriptionPlan,
   TenantStatus,
   UserRole,
 } from '@shopcontrol/shared';
@@ -28,6 +39,8 @@ import {
   verifyTotpCode,
 } from '../../common/crypto/security.util';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.module';
+import { ShopsService } from '../shops/shops.service';
 import { AuthenticatedUser } from '../../common/auth/request-context.types';
 
 const MAX_FAILED_LOGINS = 5;
@@ -39,13 +52,187 @@ export interface RequestMeta {
   correlationId?: string | null;
 }
 
+const PLAN_PRICING: Record<
+  SubscriptionPlan,
+  { monthlyPriceXof: number; maxShops: number; maxAgentsPerShop: number }
+> = {
+  STARTER: { monthlyPriceXof: 15000, maxShops: 1, maxAgentsPerShop: 3 },
+  PRO: { monthlyPriceXof: 25000, maxShops: 5, maxAgentsPerShop: 10 },
+  ENTERPRISE: { monthlyPriceXof: 50000, maxShops: 20, maxAgentsPerShop: 50 },
+};
+
+const ALL_SHOP_PAYMENT_METHOD_OPTIONS: PaymentMethodConfig[] = [
+  { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+  { code: 'ORANGE_MONEY', label: 'Orange Money', enabled: true, requireReference: true, affectsCashDrawer: false },
+  { code: 'WAVE', label: 'Wave', enabled: true, requireReference: true, affectsCashDrawer: false },
+  { code: 'MOOV_MONEY', label: 'Moov Money', enabled: true, requireReference: true, affectsCashDrawer: false },
+  { code: 'CARD', label: 'Carte bancaire / Virement', enabled: true, requireReference: true, affectsCashDrawer: false },
+];
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly controlPrisma: ControlPrismaService,
     private readonly redis: RedisService,
     private readonly auditService: AuditService,
+    private readonly shopsService: ShopsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
+
+  async registerMerchant(input: RegisterMerchantInput, meta: RequestMeta) {
+    const ownerEmail = input.ownerEmail.trim().toLowerCase();
+    const dupOwner = await this.controlPrisma.user.findUnique({ where: { email: ownerEmail } });
+    if (dupOwner) {
+      throw new ConflictException({
+        code: 'EMAIL_ALREADY_USED',
+        message: 'Cette adresse e-mail est déjà utilisée par un compte existant.',
+      });
+    }
+
+    const passwordHash = await argon2.hash(input.ownerPassword, { type: argon2.argon2id });
+    const merchantName = (input.merchantName || input.shopName).trim();
+    const planCode: SubscriptionPlan = input.planCode || 'PRO';
+    const planConfig = PLAN_PRICING[planCode] || PLAN_PRICING.PRO;
+    const nextMonth = new Date(Date.now() + 30 * 86_400_000);
+
+    const { merchant, owner } = await this.controlPrisma.$transaction(async (tx) => {
+      const m = await tx.merchant.create({
+        data: {
+          name: merchantName,
+          legalName: input.legalName?.trim() || null,
+          phone: input.ownerPhone.trim(),
+          email: ownerEmail,
+          currency: input.currency || 'XOF',
+          defaultTimezone: input.defaultTimezone || 'Africa/Bamako',
+          status: 'ACTIVE',
+        },
+      });
+
+      const u = await tx.user.create({
+        data: {
+          merchantId: m.id,
+          role: 'OWNER',
+          email: ownerEmail,
+          phone: input.ownerPhone.trim(),
+          fullName: input.ownerFullName.trim(),
+          passwordHash,
+          isActive: true,
+        },
+      });
+
+      await tx.merchantSubscription.create({
+        data: {
+          merchantId: m.id,
+          planCode,
+          monthlyPriceXof: planConfig.monthlyPriceXof,
+          maxShops: planConfig.maxShops,
+          maxAgentsPerShop: planConfig.maxAgentsPerShop,
+          enabledModules: [...PLATFORM_MODULES] as object,
+          currentPeriodEnd: nextMonth,
+          autoSuspendGraceDays: 7,
+        },
+      });
+
+      const now = new Date();
+      const periodLabel = now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+      await tx.platformPayment.create({
+        data: {
+          merchantId: m.id,
+          amountXof: planConfig.monthlyPriceXof,
+          paymentMethodCode: input.subscriptionPaymentMethod || 'ORANGE_MONEY',
+          reference: input.subscriptionPaymentReference?.trim() || null,
+          periodLabel: `Inscription — ${periodLabel}`,
+          notes: `Formule ${SUBSCRIPTION_PLAN_LABELS[planCode]} choisie à l’inscription (${SUBSCRIPTION_PAYMENT_METHOD_LABELS[input.subscriptionPaymentMethod || 'ORANGE_MONEY']})`,
+          recordedByUserId: u.id,
+        },
+      });
+
+      return { merchant: m, owner: u };
+    });
+
+    const primaryType: ShopType = normalizeShopType(input.shopType);
+    const enabledShopTypes: ShopType[] =
+      input.enabledShopTypes && input.enabledShopTypes.length > 0
+        ? Array.from(new Set<ShopType>([primaryType, ...input.enabledShopTypes]))
+        : [primaryType];
+
+    const selectedCodes =
+      input.shopPaymentMethodCodes && input.shopPaymentMethodCodes.length > 0
+        ? input.shopPaymentMethodCodes
+        : ['CASH', 'ORANGE_MONEY', 'WAVE'];
+
+    const paymentMethods: PaymentMethodConfig[] = ALL_SHOP_PAYMENT_METHOD_OPTIONS.map((pm) => ({
+      ...pm,
+      enabled: selectedCodes.includes(pm.code as any),
+    }));
+
+    const shopPhone = (input.shopPhone || input.ownerPhone).trim();
+    await this.shopsService.createShopForMerchant(
+      merchant.id,
+      {
+        name: input.shopName.trim(),
+        slug: input.shopSlug,
+        shopType: primaryType,
+        businessProfile: { enabledShopTypes },
+        logoUrl: input.logoUrl ?? null,
+        phone: shopPhone,
+        email: ownerEmail,
+        address: input.shopAddress?.trim() || undefined,
+        currency: merchant.currency,
+        timezone: merchant.defaultTimezone,
+        paymentMethods,
+        receiptSettings: {
+          ...DEFAULT_RECEIPT_SETTINGS,
+          slogan: input.slogan?.trim() || '',
+          showLogo: true,
+        },
+        deliveryConfig: {
+          ...DEFAULT_DELIVERY_CONFIG,
+          whatsappNumber: shopPhone,
+        },
+      },
+      { userId: owner.id, role: 'OWNER' },
+      meta,
+    );
+
+    await this.auditService.recordControl({
+      merchantId: merchant.id,
+      actorUserId: owner.id,
+      actorRole: 'OWNER',
+      action: 'MERCHANT_SELF_REGISTERED',
+      entityType: 'Merchant',
+      entityId: merchant.id,
+      afterData: {
+        merchantName: merchant.name,
+        shopName: input.shopName.trim(),
+        shopType: primaryType,
+        enabledShopTypes,
+        planCode,
+        subscriptionPaymentMethod: input.subscriptionPaymentMethod,
+      },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+
+    const admins = await this.controlPrisma.user.findMany({
+      where: { role: 'SUPER_ADMIN', isActive: true },
+      select: { id: true },
+    });
+    for (const admin of admins) {
+      await this.notificationsService.create({
+        merchantId: merchant.id,
+        recipientUserId: admin.id,
+        type: 'PLATFORM',
+        priority: 'INFO',
+        title: `Nouveau boutiquier inscrit : ${input.shopName.trim()}`,
+        message: `${owner.fullName} (${owner.email}) a créé la boutique « ${input.shopName.trim()} » (${enabledShopTypes.map((t) => SHOP_TYPE_SHORT_LABELS[t]).join(' + ')}) — Formule ${SUBSCRIPTION_PLAN_LABELS[planCode]} (${SUBSCRIPTION_PAYMENT_METHOD_LABELS[input.subscriptionPaymentMethod || 'ORANGE_MONEY']}).`,
+        targetPath: '/admin/shops',
+      });
+    }
+
+    return this.issueSessionForUser(owner.id, input.deviceName, meta);
+  }
 
   async login(
     input: { email: string; password: string; deviceName?: string },

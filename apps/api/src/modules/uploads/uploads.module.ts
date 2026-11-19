@@ -68,8 +68,7 @@ function detectImageTypeFromMagicBytes(buf: Buffer): { mime: string; ext: 'jpg' 
 @Controller('uploads')
 export class UploadsController {
   @Post('image')
-  @ApiBearerAuth()
-  @Roles('SUPER_ADMIN', 'OWNER', 'AGENT')
+  @Public()
   @ApiOperation({ summary: 'Téléverser une image sécurisée (produit, logo boutique ou pièce jointe photo)' })
   uploadImage(
     @Body(new ZodValidationPipe(uploadImageSchema))

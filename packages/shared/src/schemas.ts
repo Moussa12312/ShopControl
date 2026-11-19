@@ -7,6 +7,7 @@ import {
   TENANT_STATUSES,
 } from './enums';
 import { PERMISSION_KEYS } from './permissions';
+import { SUBSCRIPTION_PLANS } from './platform.enums';
 import { deliveryConfigSchema, receiptSettingsSchema } from './platform.schemas';
 import { businessProfileSchema, SHOP_TYPES } from './shop-profiles';
 
@@ -97,6 +98,56 @@ export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Le mot de passe actuel est requis.'),
   newPassword: strongPasswordSchema,
 });
+
+export const SUBSCRIPTION_PAYMENT_METHODS = [
+  'ORANGE_MONEY',
+  'WAVE',
+  'MOOV_MONEY',
+  'CASH',
+  'BANK_TRANSFER',
+] as const;
+export type SubscriptionPaymentMethod = (typeof SUBSCRIPTION_PAYMENT_METHODS)[number];
+
+export const SUBSCRIPTION_PAYMENT_METHOD_LABELS: Record<SubscriptionPaymentMethod, string> = {
+  ORANGE_MONEY: 'Orange Money',
+  WAVE: 'Wave',
+  MOOV_MONEY: 'Moov Money',
+  CASH: 'Espèces (Paiement agent)',
+  BANK_TRANSFER: 'Virement / Dépôt bancaire',
+};
+
+export const registerMerchantSchema = z.object({
+  // Propriétaire
+  ownerFullName: z.string().trim().min(2, 'Votre nom complet est requis.').max(120),
+  ownerEmail: z.string().trim().email('Adresse e-mail invalide.').toLowerCase(),
+  ownerPhone: z.string().trim().min(6, 'Numéro de téléphone invalide.').max(30),
+  ownerPassword: strongPasswordSchema,
+  // Entreprise & Boutique
+  merchantName: z.string().trim().min(2).max(120).optional(),
+  legalName: z.string().trim().max(160).optional(),
+  shopName: z.string().trim().min(2, 'Le nom de votre boutique est requis.').max(120),
+  shopSlug: slugSchema.optional(),
+  shopType: z.enum(SHOP_TYPES).default('GROCERY'),
+  enabledShopTypes: z.array(z.enum(SHOP_TYPES)).min(1).optional(),
+  logoUrl: z.string().trim().max(500).nullable().optional(),
+  slogan: z.string().trim().max(160).optional(),
+  shopAddress: z.string().trim().max(255).optional(),
+  shopPhone: z.string().trim().max(30).optional(),
+  currency: z.string().trim().min(3).max(5).default(DEFAULT_CURRENCY),
+  defaultTimezone: z.string().trim().min(3).max(60).default(DEFAULT_TIMEZONE),
+  // Modes d'encaissement acceptés en boutique (POS & Vitrine)
+  shopPaymentMethodCodes: z
+    .array(z.enum(['CASH', 'ORANGE_MONEY', 'WAVE', 'MOOV_MONEY', 'CARD']))
+    .min(1, 'Sélectionnez au moins un mode d’encaissement en boutique.')
+    .default(['CASH', 'ORANGE_MONEY', 'WAVE']),
+  // Formule & Mode de paiement de l'abonnement
+  planCode: z.enum(SUBSCRIPTION_PLANS).default('PRO'),
+  subscriptionPaymentMethod: z.enum(SUBSCRIPTION_PAYMENT_METHODS).default('ORANGE_MONEY'),
+  subscriptionPaymentReference: z.string().trim().max(120).optional(),
+  deviceName: z.string().trim().max(100).optional(),
+});
+
+export type RegisterMerchantInput = z.infer<typeof registerMerchantSchema>;
 
 export const createMerchantSchema = z.object({
   merchantName: z.string().trim().min(2, 'Le nom du marchand est requis.').max(120),
