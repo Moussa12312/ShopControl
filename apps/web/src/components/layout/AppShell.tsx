@@ -390,11 +390,11 @@ export function AppShell({
   const headerLeftClass = expanded ? 'lg:left-[216px]' : 'lg:left-[64px]';
 
   return (
-    <div className="min-h-screen w-full overflow-x-clip bg-[#edf1f5]">
+    <div className="min-h-screen w-full overflow-x-clip bg-porcelain-100">
       {/* Overlay mobile drawer */}
       {mobileOpen ? (
         <div
-          className="fixed inset-0 z-40 bg-forest-950/60 backdrop-blur-xs lg:hidden"
+          className="fixed inset-0 z-40 bg-forest-950/65 backdrop-blur-xs lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       ) : null}
@@ -535,9 +535,9 @@ export function AppShell({
         </div>
       </aside>
 
-      {/* Header FIXE épuré avec sélecteur Supervision/Gestion & Profil cliquable */}
+      {/* Header FIXE Obsidian Emerald — profil cliquable & sélecteur Supervision/Gestion */}
       <header
-        className={`no-print fixed left-0 right-0 top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-slate-200/80 bg-white/95 px-3 text-slate-900 backdrop-blur-md transition-all duration-200 sm:px-5 ${headerLeftClass}`}
+        className={`no-print fixed left-0 right-0 top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-white/[0.08] bg-forest-950/95 px-3 text-white backdrop-blur-md transition-all duration-200 sm:px-5 ${headerLeftClass}`}
       >
         {/* Gauche : Hamburger mobile + Titre page active */}
         <div className="flex min-w-0 items-center gap-2">
@@ -545,20 +545,20 @@ export function AppShell({
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Ouvrir la navigation"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 lg:hidden"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/15 lg:hidden"
           >
             <Menu className="h-4 w-4" />
           </button>
 
-          <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 sm:flex">
+          <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-limeglow-400 sm:flex">
             <CurrentIcon className="h-4 w-4" />
           </span>
 
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-bold tracking-tight text-slate-900 sm:text-sm">
+            <p className="truncate text-[13px] font-bold tracking-tight text-white sm:text-sm">
               {pageTitle}
             </p>
-            <p className="hidden truncate text-[11px] text-slate-500 md:block">
+            <p className="hidden truncate text-[11px] text-emerald-200/65 md:block">
               {brandTitle}
               {user.role === 'AGENT' && activeOperator ? ` · Op. ${activeOperator.firstName}` : ''}
             </p>
@@ -572,15 +572,15 @@ export function AppShell({
             <div
               role="group"
               aria-label="Mode de travail propriétaire"
-              className="hidden items-center rounded-full border border-slate-200 bg-[#edf1f5] p-0.5 text-[11px] font-semibold md:inline-flex"
+              className="hidden items-center rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-[11px] font-semibold md:inline-flex"
             >
               <button
                 type="button"
                 onClick={() => handleSwitchOwnerMode('supervision')}
                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition ${
                   ownerMode === 'supervision'
-                    ? 'bg-forest-900 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white text-forest-950 font-bold shadow-xs'
+                    : 'text-[#8aa8a2] hover:text-white'
                 }`}
               >
                 <Eye className="h-3 w-3" />
@@ -591,8 +591,8 @@ export function AppShell({
                 onClick={() => handleSwitchOwnerMode('management')}
                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition ${
                   ownerMode === 'management'
-                    ? 'bg-forest-900 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white text-forest-950 font-bold shadow-xs'
+                    : 'text-[#8aa8a2] hover:text-white'
                 }`}
               >
                 <Wrench className="h-3 w-3" />
@@ -611,13 +611,15 @@ export function AppShell({
                 id="shop-selector"
                 value={selectedShopId}
                 onChange={(e) => setSelectedShopId(e.target.value)}
-                className="max-w-[115px] truncate rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:border-brand-400 sm:max-w-[175px] sm:px-3"
+                className="max-w-[115px] truncate rounded-full border border-white/15 bg-forest-800/90 px-2.5 py-1.5 text-xs font-semibold text-white hover:border-limeglow-400/60 sm:max-w-[175px] sm:px-3"
               >
                 {ownerMode === 'supervision' ? (
-                  <option value="ALL">Toutes (Consolidé)</option>
+                  <option value="ALL" className="bg-forest-900 text-white">
+                    Toutes (Consolidé)
+                  </option>
                 ) : null}
                 {shops.map((s) => (
-                  <option key={s.shopId} value={s.shopId}>
+                  <option key={s.shopId} value={s.shopId} className="bg-forest-900 text-white">
                     {s.shopName} {s.status !== 'ACTIVE' ? `(${s.status})` : ''}
                   </option>
                 ))}
@@ -632,8 +634,8 @@ export function AppShell({
             title={isOnline && apiReachable ? 'En ligne' : 'Hors ligne'}
             className={`inline-flex h-8 w-8 items-center justify-center rounded-full sm:w-auto sm:gap-1 sm:px-2.5 sm:text-[11px] sm:font-semibold ${
               isOnline && apiReachable
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-amber-50 text-amber-700'
+                ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/25'
+                : 'bg-amber-400/20 text-amber-200 ring-1 ring-amber-300/30'
             }`}
           >
             {isOnline && apiReachable ? (
@@ -658,11 +660,11 @@ export function AppShell({
                 setProfileOpen(false);
               }}
               aria-label="Centre de notifications"
-              className="relative flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100"
+              className="relative flex h-9 w-9 items-center justify-center rounded-full bg-forest-800 text-emerald-100 ring-1 ring-white/10 transition hover:bg-forest-700"
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 ? (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-forest-950">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               ) : null}
@@ -735,15 +737,15 @@ export function AppShell({
               }}
               aria-label="Menu profil utilisateur"
               aria-expanded={profileOpen}
-              className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 py-1 pl-1 pr-2 text-left transition hover:border-brand-300 hover:bg-white"
+              className="flex items-center gap-1.5 rounded-full bg-forest-800 py-1 pl-1 pr-2 text-left ring-1 ring-white/15 transition hover:bg-forest-700"
             >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-forest-900 text-[11px] font-bold text-limeglow-300">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-forest-950 text-[11px] font-bold text-limeglow-400 ring-1 ring-limeglow-400/50">
                 {initials || 'U'}
               </span>
-              <span className="hidden max-w-[100px] truncate text-xs font-semibold text-slate-800 sm:inline">
+              <span className="hidden max-w-[100px] truncate text-xs font-semibold text-white sm:inline">
                 {user.fullName.split(' ')[0]}
               </span>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+              <ChevronDown className="h-3.5 w-3.5 text-emerald-200/70" />
             </button>
 
             {profileOpen ? (
@@ -938,10 +940,10 @@ export function AppShell({
           </footer>
         </main>
 
-        {/* Dock mobile natif fixé en bas (< lg) */}
+        {/* Dock mobile natif fixé en bas (< lg) — Obsidian Emerald */}
         <nav
           aria-label="Navigation rapide mobile"
-          className="no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-slate-200/90 bg-white/95 px-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 text-[10px] font-semibold text-slate-500 backdrop-blur-md lg:hidden"
+          className="no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950/95 px-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 text-[10px] font-semibold text-[#8aa8a2] backdrop-blur-md lg:hidden"
         >
           {mobileDockItems.map((item) => {
             const Icon = item.icon;
@@ -951,7 +953,7 @@ export function AppShell({
                 key={item.href}
                 href={item.href}
                 className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 transition ${
-                  active ? 'bg-forest-900 text-white' : 'hover:text-slate-900'
+                  active ? 'bg-white text-forest-950 font-bold' : 'hover:text-white'
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -962,7 +964,7 @@ export function AppShell({
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 hover:text-slate-900"
+            className="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 hover:text-white"
           >
             <Menu className="h-4 w-4 shrink-0" />
             <span>Menu</span>

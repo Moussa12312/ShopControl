@@ -5,7 +5,7 @@
 @layer base {
   html,
   body {
-    @apply min-h-screen w-full bg-[#edf1f5] text-slate-800 antialiased;
+    @apply min-h-screen w-full bg-[#ebf2ef] text-slate-900 antialiased;
     overflow-x: clip;
     touch-action: manipulation;
     -webkit-text-size-adjust: 100%;

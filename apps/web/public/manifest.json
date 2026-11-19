@@ -4,8 +4,8 @@
   "description": "Plateforme SaaS de gestion commerciale multi-boutiques avec mode comptoir résilient.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#edf1f5",
-  "theme_color": "#061514",
+  "background_color": "#ebf2ef",
+  "theme_color": "#051413",
   "lang": "fr",
   "icons": [
     {

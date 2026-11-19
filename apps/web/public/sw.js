@@ -1,4 +1,4 @@
-const CACHE_NAME = 'shopcontrol-shell-v5';
+const CACHE_NAME = 'shopcontrol-shell-v6';
 const SHELL_URLS = ['/', '/login', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', (event) => {

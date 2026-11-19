@@ -172,194 +172,199 @@ export default function OwnerDashboardPage() {
         ? 'LOW'
         : 'OK';
 
-  return (
-    <AppShell allowedRoles={['OWNER']}>
-      <div className="space-y-4 sm:space-y-5">
-        {/* Entête allégée et épurée */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-lg font-extrabold tracking-tight text-slate-900 sm:text-xl">
-              Bonjour {firstName}
-            </h1>
-            <p className="text-xs text-slate-500">
-              {selectedShopId === 'ALL'
-                ? `Vue consolidée · ${overview?.totals.totalShops ?? shops.length} boutique(s)`
-                : `${selectedShopMeta?.shopName || ''} · Données temps réel`}
-            </p>
-          </div>
+  const heroSection = (
+    <div className="space-y-3.5">
+      {/* Entête allégée dans la palette Obsidian Emerald */}
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-lg font-extrabold tracking-tight text-white sm:text-xl">
+            Bonjour {firstName} !
+          </h1>
+          <p className="text-[11px] text-emerald-200/70">
+            {selectedShopId === 'ALL'
+              ? `Vue consolidée · ${overview?.totals.totalShops ?? shops.length} boutique(s)`
+              : `${selectedShopMeta?.shopName || ''} · Données temps réel`}
+          </p>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Sélecteur Jour / Semaine / Mois */}
-            <div
-              role="group"
-              aria-label="Période d'analyse"
-              className="grid w-full grid-cols-3 rounded-xl border border-slate-200 bg-white p-0.5 text-xs font-semibold shadow-xs sm:inline-flex sm:w-auto"
-            >
-              {(
-                [
-                  { key: 'daily', label: 'Jour' },
-                  { key: 'weekly', label: 'Semaine' },
-                  { key: 'monthly', label: 'Mois' },
-                ] as const
-              ).map((opt) => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => setPeriod(opt.key)}
-                  className={`rounded-lg px-3 py-1.5 text-center transition ${
-                    period === opt.key
-                      ? 'bg-forest-900 text-white'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
-            {selectedShopMeta ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            role="group"
+            aria-label="Période d'analyse"
+            className="grid w-full grid-cols-3 rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-[11px] font-semibold sm:inline-flex sm:w-auto"
+          >
+            {(
+              [
+                { key: 'daily', label: 'Jour' },
+                { key: 'weekly', label: 'Semaine' },
+                { key: 'monthly', label: 'Mois' },
+              ] as const
+            ).map((opt) => (
               <button
+                key={opt.key}
                 type="button"
-                onClick={() =>
-                  setQrShop({ slug: selectedShopMeta.slug, name: selectedShopMeta.shopName })
-                }
-                className="sc-btn-ghost flex-1 py-1.5 text-xs sm:flex-none"
+                onClick={() => setPeriod(opt.key)}
+                className={`rounded-full px-3 py-1 text-center transition ${
+                  period === opt.key
+                    ? 'bg-white/15 text-white ring-1 ring-white/20'
+                    : 'text-[#8aa8a2] hover:text-white'
+                }`}
               >
-                <QrCode className="h-3.5 w-3.5 text-brand-700" />
-                <span>QR Vitrine</span>
+                {opt.label}
               </button>
-            ) : null}
+            ))}
+          </div>
 
-            <Link
-              href="/owner/reports"
-              className="sc-btn-primary flex-1 py-1.5 text-xs sm:flex-none"
+          {selectedShopMeta ? (
+            <button
+              type="button"
+              onClick={() =>
+                setQrShop({ slug: selectedShopMeta.slug, name: selectedShopMeta.shopName })
+              }
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15 sm:flex-none"
             >
-              <BarChart3 className="h-3.5 w-3.5" />
-              <span>Bilans</span>
+              <QrCode className="h-3.5 w-3.5 text-limeglow-400" />
+              <span>QR Vitrine</span>
+            </button>
+          ) : null}
+
+          {!supportGrantId ? (
+            <Link
+              href={shops.length > 0 ? '/pos' : '/owner/shops'}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-bold text-forest-950 shadow-sm transition hover:bg-emerald-50 sm:flex-none"
+            >
+              <span>{shops.length > 0 ? 'Nouvelle vente' : 'Créer boutique'}</span>
+              <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
             </Link>
+          ) : null}
+        </div>
+      </div>
+
+      {/* 4 cartes KPI Obsidian Glass + Lime Glow sur 1 rangée desktop */}
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="sc-dark-glass min-w-0 p-3.5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500/20 text-limeglow-400 ring-1 ring-brand-400/25">
+              <ShoppingBag className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium text-[#98b3ae]">Chiffre d’affaires net</p>
+              <p className="truncate text-base font-extrabold tracking-tight text-white tabular sm:text-lg">
+                {formatXof(kpis?.currentSalesXof ?? 0)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+            <TrendingUp
+              className={`h-3.5 w-3.5 shrink-0 ${
+                (kpis?.salesDeltaPercent ?? 0) >= 0 ? 'text-limeglow-400' : 'text-rose-400'
+              }`}
+            />
+            <span
+              className={`font-bold ${
+                (kpis?.salesDeltaPercent ?? 0) >= 0 ? 'text-limeglow-400' : 'text-rose-400'
+              }`}
+            >
+              {(kpis?.salesDeltaPercent ?? 0) >= 0 ? '+' : ''}
+              {kpis?.salesDeltaPercent ?? 0}%
+            </span>
+            <span className="text-[#8aa8a2]">· {kpis?.currentSalesCount ?? 0} vente(s)</span>
+            {(kpis?.refundsXof ?? 0) > 0 ? (
+              <span className="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-200">
+                -{formatXof(kpis?.refundsXof ?? 0)} remb.
+              </span>
+            ) : null}
           </div>
         </div>
 
-        {/* 4 cartes KPI légères sur 1 rangée desktop */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="sc-card min-w-0 p-4">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
-                <ShoppingBag className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium text-slate-500">Chiffre d’affaires net</p>
-                <p className="truncate text-base font-extrabold tracking-tight text-slate-900 tabular sm:text-lg">
-                  {formatXof(kpis?.currentSalesXof ?? 0)}
-                </p>
+        <div className="sc-dark-glass min-w-0 p-3.5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-200">
+              <BarChart3 className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-[11px] font-medium text-[#98b3ae]">Résultat net</p>
+                {kpis?.isEstimated ? (
+                  <span className="rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-200">
+                    Estimé
+                  </span>
+                ) : null}
               </div>
-            </div>
-            <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-              <TrendingUp
-                className={`h-3.5 w-3.5 shrink-0 ${
-                  (kpis?.salesDeltaPercent ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'
-                }`}
-              />
-              <span
-                className={`font-bold ${
-                  (kpis?.salesDeltaPercent ?? 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'
+              <p
+                className={`truncate text-base font-extrabold tracking-tight tabular sm:text-lg ${
+                  (kpis?.estimatedNetProfitXof ?? 0) >= 0 ? 'text-white' : 'text-rose-300'
                 }`}
               >
-                {(kpis?.salesDeltaPercent ?? 0) >= 0 ? '+' : ''}
-                {kpis?.salesDeltaPercent ?? 0}%
-              </span>
-              <span className="text-slate-500">· {kpis?.currentSalesCount ?? 0} vente(s)</span>
-              {(kpis?.refundsXof ?? 0) > 0 ? (
-                <span className="rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">
-                  -{formatXof(kpis?.refundsXof ?? 0)} remb.
-                </span>
-              ) : null}
+                {formatXof(kpis?.estimatedNetProfitXof ?? 0)}
+              </p>
             </div>
           </div>
+          <p className="mt-2 truncate text-[11px] text-[#8aa8a2]">
+            Marge : <strong className="text-emerald-200 tabular">{formatXof(kpis?.grossMarginXof ?? 0)}</strong>
+            {' · '}Dép. : <strong className="text-white tabular">{formatXof(kpis?.expensesXof ?? 0)}</strong>
+          </p>
+        </div>
 
-          <div className="sc-card min-w-0 p-4">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-                <BarChart3 className="h-4 w-4" />
+        <div className="sc-dark-glass min-w-0 p-3.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-200">
+                <Receipt className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <p className="text-[11px] font-medium text-slate-500">Résultat net</p>
-                  {kpis?.isEstimated ? (
-                    <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700">
-                      Estimé
-                    </span>
-                  ) : null}
-                </div>
-                <p
-                  className={`truncate text-base font-extrabold tracking-tight tabular sm:text-lg ${
-                    (kpis?.estimatedNetProfitXof ?? 0) >= 0 ? 'text-slate-900' : 'text-rose-600'
-                  }`}
-                >
-                  {formatXof(kpis?.estimatedNetProfitXof ?? 0)}
+                <p className="text-[11px] font-medium text-[#98b3ae]">Dettes clients</p>
+                <p className="truncate text-base font-extrabold tracking-tight text-white tabular sm:text-lg">
+                  {formatXof(kpis?.openReceivablesAmountXof ?? 0)}
                 </p>
               </div>
             </div>
-            <p className="mt-2.5 truncate text-[11px] text-slate-500">
-              Marge : <strong className="text-brand-700 tabular">{formatXof(kpis?.grossMarginXof ?? 0)}</strong>
-              {' · '}Dép. : <strong className="text-slate-800 tabular">{formatXof(kpis?.expensesXof ?? 0)}</strong>
-            </p>
+            <HealthBarPill
+              level={receivableRiskLevel}
+              label={
+                receivableRiskLevel === 'OK'
+                  ? 'Sain'
+                  : receivableRiskLevel === 'LOW'
+                    ? 'Modéré'
+                    : 'Élevé'
+              }
+            />
           </div>
-
-          <div className="sc-card min-w-0 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
-                  <Receipt className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-medium text-slate-500">Dettes clients</p>
-                  <p className="truncate text-base font-extrabold tracking-tight text-slate-900 tabular sm:text-lg">
-                    {formatXof(kpis?.openReceivablesAmountXof ?? 0)}
-                  </p>
-                </div>
-              </div>
-              <HealthBarPill
-                level={receivableRiskLevel}
-                label={
-                  receivableRiskLevel === 'OK'
-                    ? 'Sain'
-                    : receivableRiskLevel === 'LOW'
-                      ? 'Modéré'
-                      : 'Élevé'
-                }
-              />
-            </div>
-            <p className="mt-2.5 truncate text-[11px] text-slate-500">
-              <strong className="text-slate-800">{kpis?.totalProductsCount ?? 0}</strong> produits ·{' '}
-              <span className={(kpis?.lowStockCount ?? 0) > 0 ? 'font-bold text-amber-700' : 'text-emerald-700'}>
-                {kpis?.lowStockCount ?? 0} stock bas
-              </span>
-            </p>
-          </div>
-
-          <div className="sc-card flex min-w-0 items-center justify-between gap-3 border-brand-200/80 bg-gradient-to-br from-brand-50/80 to-white p-4">
-            <div className="min-w-0">
-              <p className="text-base font-extrabold text-slate-900 tabular sm:text-lg">
-                {(kpis?.priorityActionsCount ?? 0) + (kpis?.pendingOrdersCount ?? 0)}{' '}
-                <span className="text-xs font-semibold text-slate-500">Actions</span>
-              </p>
-              <p className="truncate text-xs font-semibold text-slate-700">
-                {(kpis?.pendingOrdersCount ?? 0) > 0
-                  ? `${kpis?.pendingOrdersCount} commande(s) QR`
-                  : `${kpis?.openCashSessionsCount ?? 0} caisse(s) ouverte(s)`}
-              </p>
-            </div>
-            <Link
-              href={(kpis?.pendingOrdersCount ?? 0) > 0 ? '/commerce/orders' : '/owner/reports'}
-              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-forest-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-forest-800"
-            >
-              <span>{(kpis?.pendingOrdersCount ?? 0) > 0 ? 'Commandes' : 'Bilans'}</span>
-              <Sparkles className="h-3.5 w-3.5 text-limeglow-400" />
-            </Link>
-          </div>
+          <p className="mt-2 truncate text-[11px] text-[#8aa8a2]">
+            <strong className="text-white">{kpis?.totalProductsCount ?? 0}</strong> produits ·{' '}
+            <span className={(kpis?.lowStockCount ?? 0) > 0 ? 'font-bold text-amber-300' : 'text-emerald-300'}>
+              {kpis?.lowStockCount ?? 0} stock bas
+            </span>
+          </p>
         </div>
 
+        <div className="lime-glow-card flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-limeglow-400/30 p-3.5">
+          <div className="min-w-0">
+            <p className="text-base font-extrabold text-white tabular sm:text-lg">
+              {(kpis?.priorityActionsCount ?? 0) + (kpis?.pendingOrdersCount ?? 0)}{' '}
+              <span className="text-xs font-semibold text-emerald-100/80">Actions</span>
+            </p>
+            <p className="truncate text-xs font-semibold text-emerald-50">
+              {(kpis?.pendingOrdersCount ?? 0) > 0
+                ? `${kpis?.pendingOrdersCount} commande(s) QR`
+                : `${kpis?.openCashSessionsCount ?? 0} caisse(s) ouverte(s)`}
+            </p>
+          </div>
+          <Link
+            href={(kpis?.pendingOrdersCount ?? 0) > 0 ? '/commerce/orders' : '/owner/reports'}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-limeglow-400 px-3 py-1.5 text-xs font-extrabold text-forest-950 shadow-lime transition hover:bg-limeglow-300"
+          >
+            <span>{(kpis?.pendingOrdersCount ?? 0) > 0 ? 'Commandes' : 'Bilans'}</span>
+            <Sparkles className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <AppShell allowedRoles={['OWNER']} hero={heroSection}>
+      <div>
       {loading ? (
         <LoadingSkeleton rows={6} />
       ) : error ? (

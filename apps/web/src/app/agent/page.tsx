@@ -7,9 +7,9 @@ import {
   CheckCircle2,
   KeyRound,
   Laptop,
-  Package,
   Plus,
   ShoppingBag,
+  Sparkles,
   UserCheck,
 } from 'lucide-react';
 import { formatXof } from '@shopcontrol/shared';
@@ -185,82 +185,85 @@ export default function AgentHomePage() {
     }
   };
 
-  return (
-    <AppShell allowedRoles={['AGENT']}>
-      <div className="space-y-4 sm:space-y-5">
-        {/* Entête allégée et 100 % responsive */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  const heroSection = (
+    <div className="space-y-3.5">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-extrabold tracking-tight text-white sm:text-xl">
+            {overview?.shop.name || shop?.shopName || 'Accueil boutique'}
+          </h1>
+          <p className="text-[11px] text-emerald-200/75">
+            Opérateur actif :{' '}
+            <strong className="text-limeglow-400">
+              {activeOperator ? activeOperator.firstName : 'À sélectionner ci-dessous'}
+            </strong>
+          </p>
+        </div>
+        <Link
+          href="/pos"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-xs font-bold text-forest-950 shadow-sm hover:bg-emerald-50 sm:w-auto"
+        >
+          <span>Ouvrir le comptoir POS</span>
+          <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+        <div className="sc-dark-glass flex min-w-0 items-center gap-3 p-3.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500/20 text-limeglow-400 ring-1 ring-brand-400/25">
+            <ShoppingBag className="h-4 w-4" />
+          </span>
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-extrabold tracking-tight text-slate-900 sm:text-xl">
-              {overview?.shop.name || shop?.shopName || 'Accueil boutique'}
-            </h1>
-            <p className="text-xs text-slate-500">
-              Opérateur actif :{' '}
-              <strong className="text-brand-700">
-                {activeOperator ? activeOperator.firstName : 'À sélectionner ci-dessous'}
-              </strong>
+            <p className="text-[11px] text-[#98b3ae]">Ventes récentes</p>
+            <p className="truncate text-base font-extrabold text-white tabular">
+              {formatXof(analytics?.kpis.currentSalesXof ?? 0)}
             </p>
           </div>
-          <Link href="/pos" className="sc-btn-primary w-full text-xs sm:w-auto">
-            <Plus className="h-4 w-4" />
-            <span>Ouvrir le comptoir POS</span>
-          </Link>
         </div>
 
-        {/* 3 cartes KPI légères */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="sc-card flex min-w-0 items-center gap-3 p-4">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
-              <ShoppingBag className="h-4 w-4" />
+        <div className="sc-dark-glass flex min-w-0 items-center justify-between gap-2 p-3.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-200">
+              <Banknote className="h-4 w-4" />
             </span>
             <div className="min-w-0">
-              <p className="text-[11px] font-medium text-slate-500">Ventes récentes</p>
-              <p className="truncate text-base font-extrabold text-slate-900 tabular">
-                {formatXof(analytics?.kpis.currentSalesXof ?? 0)}
+              <p className="text-[11px] text-[#98b3ae]">Caisse ouverte</p>
+              <p className="text-base font-extrabold text-white tabular">
+                {analytics?.kpis.openCashSessionsCount ?? 0}
               </p>
             </div>
           </div>
-
-          <div className="sc-card flex min-w-0 items-center justify-between gap-3 p-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                <Banknote className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium text-slate-500">Caisse ouverte</p>
-                <p className="text-base font-extrabold text-slate-900 tabular">
-                  {analytics?.kpis.openCashSessionsCount ?? 0}
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/commerce/cash"
-              className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-            >
-              Caisse
-            </Link>
-          </div>
-
-          <div className="sc-card flex min-w-0 items-center justify-between gap-3 p-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
-                <Package className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium text-slate-500">Alertes stock</p>
-                <p className="text-base font-extrabold text-slate-900 tabular">
-                  {analytics?.kpis.lowStockCount ?? 0}
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/commerce/stock"
-              className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-            >
-              Stocks
-            </Link>
-          </div>
+          <Link
+            href="/commerce/cash"
+            className="shrink-0 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/15"
+          >
+            Caisse
+          </Link>
         </div>
+
+        <div className="lime-glow-card flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-limeglow-400/30 p-3.5">
+          <div className="min-w-0">
+            <p className="text-base font-extrabold text-white tabular">
+              {analytics?.kpis.lowStockCount ?? 0}{' '}
+              <span className="text-xs font-normal text-emerald-100">alertes stock</span>
+            </p>
+            <p className="text-[11px] text-emerald-200/80">Suivi temps réel</p>
+          </div>
+          <Link
+            href="/commerce/stock"
+            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-limeglow-400 px-3 py-1.5 text-xs font-extrabold text-forest-950 shadow-lime"
+          >
+            <span>Stocks</span>
+            <Sparkles className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <AppShell allowedRoles={['AGENT']} hero={heroSection}>
+      <div className="space-y-4 sm:space-y-5">
 
         {loading ? (
           <LoadingSkeleton rows={4} />
