@@ -50,8 +50,8 @@ async function bootstrap(): Promise<void> {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(env.API_PORT);
-  Logger.log(`ShopControl API démarrée sur http://localhost:${env.API_PORT}/api/v1`);
+  await app.listen(env.API_PORT, '0.0.0.0');
+  Logger.log(`ShopControl API démarrée sur http://0.0.0.0:${env.API_PORT}/api/v1`);
   Logger.log(`Documentation Swagger : http://localhost:${env.API_PORT}/api/docs`);
 }
 
