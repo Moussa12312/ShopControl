@@ -178,6 +178,8 @@ export class OrdersService {
       unit: string;
       salePriceXof: number;
       imageUrls: string[];
+      availableSizes: string[];
+      availableColors: string[];
       stockAvailable: number;
       inStock: boolean;
     }> = [];
@@ -213,6 +215,8 @@ export class OrdersService {
           unit: p.unit,
           salePriceXof: p.salePriceXof,
           imageUrls: Array.isArray(p.imageUrls) ? (p.imageUrls as string[]) : [],
+          availableSizes: Array.isArray(p.availableSizes) ? (p.availableSizes as string[]) : [],
+          availableColors: Array.isArray(p.availableColors) ? (p.availableColors as string[]) : [],
           stockAvailable: available,
           inStock: available > 0,
         };
@@ -385,6 +389,8 @@ export class OrdersService {
       variantId: string | null;
       productName: string;
       sku: string;
+      selectedSize: string | null;
+      selectedColor: string | null;
       orderedQty: number;
       unitPriceXof: number;
       lineTotalXof: number;
@@ -416,6 +422,8 @@ export class OrdersService {
         variantId: null,
         productName: prod.name,
         sku: prod.sku,
+        selectedSize: item.selectedSize?.trim() || null,
+        selectedColor: item.selectedColor?.trim() || null,
         orderedQty: item.quantity,
         unitPriceXof: prod.salePriceXof,
         lineTotalXof: lineTotal,
@@ -1005,9 +1013,10 @@ export class OrdersService {
 
         if (deliveredQty > 0) {
           const prod = await tx.product.findUnique({ where: { id: line.productId } });
+          const variantTag = [line.selectedSize, line.selectedColor].filter(Boolean).join(' · ');
           saleLinesData.push({
             productId: line.productId,
-            productName: line.productName,
+            productName: variantTag ? `${line.productName} (${variantTag})` : line.productName,
             sku: line.sku,
             quantity: deliveredQty,
             unitPriceXof: line.unitPriceXof,

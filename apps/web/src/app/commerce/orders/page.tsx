@@ -22,6 +22,7 @@ import {
   FulfillmentMode,
   ONLINE_ORDER_STATUS_LABELS,
   OnlineOrderStatus,
+  PaymentMethodConfig,
 } from '@shopcontrol/shared';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -38,7 +39,10 @@ interface OrderLineRow {
   id: string;
   productName: string;
   sku: string;
-  quantity: number;
+  selectedSize?: string | null;
+  selectedColor?: string | null;
+  orderedQty?: number;
+  quantity?: number;
   unitPriceXof: number;
   lineTotalXof: number;
 }
@@ -78,6 +82,7 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [blocked, setBlocked] = useState<BlockedPhoneRow[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodConfig[]>(DEFAULT_PAYMENT_METHODS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -109,12 +114,19 @@ export default function OrdersPage() {
     setError(null);
     try {
       const qs = statusFilter ? `?status=${statusFilter}` : '';
-      const [ordRes, blkRes] = await Promise.all([
+      const [ordRes, blkRes, shopMeta] = await Promise.all([
         apiFetch<OrderRow[]>(`/shops/${shopId}/orders${qs}`, { shopId }),
         apiFetch<BlockedPhoneRow[]>(`/shops/${shopId}/blocked-phones`, { shopId }).catch(() => []),
+        apiFetch<{ paymentMethods?: PaymentMethodConfig[] }>(`/shops/${shopId}`, { shopId }).catch(
+          () => null,
+        ),
       ]);
       setOrders(ordRes);
       setBlocked(blkRes);
+      const enabledMethods = (shopMeta?.paymentMethods || DEFAULT_PAYMENT_METHODS).filter(
+        (m) => m.enabled,
+      );
+      if (enabledMethods.length > 0) setPaymentMethods(enabledMethods);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur de chargement des commandes.');
     } finally {
@@ -464,14 +476,26 @@ export default function OrdersPage() {
                   </div>
                 </div>
 
-                {/* Articles commandés */}
+                {/* Articles commandés (avec Taille & Couleur sélectionnées par le client) */}
                 <div className="mt-3 divide-y divide-slate-100 rounded-2xl bg-porcelain-50 px-3.5 py-2 text-xs">
                   {o.lines.map((l) => (
-                    <div key={l.id} className="flex items-center justify-between py-1.5">
-                      <span className="font-semibold text-slate-800">
-                        {l.quantity} × {l.productName}{' '}
-                        <code className="text-slate-400">({l.sku})</code>
-                      </span>
+                    <div key={l.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold text-slate-800">
+                          {l.orderedQty ?? l.quantity ?? 1} × {l.productName}{' '}
+                          <code className="text-slate-400">({l.sku})</code>
+                        </span>
+                        {l.selectedSize ? (
+                          <span className="rounded-md bg-forest-900 px-1.5 py-0.5 text-[10px] font-bold text-limeglow-400">
+                            Taille {l.selectedSize}
+                          </span>
+                        ) : null}
+                        {l.selectedColor ? (
+                          <span className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
+                            {l.selectedColor}
+                          </span>
+                        ) : null}
+                      </div>
                       <span className="font-bold text-slate-900 tabular">
                         {formatXof(l.lineTotalXof)}
                       </span>
@@ -610,7 +634,7 @@ export default function OrdersPage() {
                     onChange={(e) => setPayMethod(e.target.value)}
                     className="sc-input mt-1"
                   >
-                    {DEFAULT_PAYMENT_METHODS.map((m) => (
+                    {paymentMethods.map((m) => (
                       <option key={m.code} value={m.code}>
                         {m.label}
                       </option>

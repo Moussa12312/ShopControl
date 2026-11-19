@@ -1,27 +1,71 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Check,
   CheckCircle2,
   Clock,
   Copy,
+  Eye,
   MapPin,
   MessageCircle,
   Minus,
   Package,
+  Palette,
   Phone,
   Plus,
+  Ruler,
   Search,
   Send,
   ShoppingBag,
   Store,
+  Trash2,
   Truck,
   X,
 } from 'lucide-react';
-import { formatXof, FulfillmentMode } from '@shopcontrol/shared';
+import { formatDateTimeInTimezone, formatXof, FulfillmentMode } from '@shopcontrol/shared';
 import { apiFetch, ApiError } from '@/lib/api-client';
+
+const COLOR_HEX_MAP: Record<string, string> = {
+  noir: '#111827',
+  blanc: '#ffffff',
+  'bleu marine': '#1e3a8a',
+  'bleu ciel': '#38bdf8',
+  bleu: '#2563eb',
+  rouge: '#dc2626',
+  vert: '#16a34a',
+  beige: '#e5d3b3',
+  marron: '#78350f',
+  gris: '#6b7280',
+  jaune: '#eab308',
+  rose: '#ec4899',
+  doré: '#ca8a04',
+  or: '#ca8a04',
+  kaki: '#4d7c0f',
+  orange: '#ea580c',
+  violet: '#7c3aed',
+};
+
+function swatchHex(name: string): string {
+  return COLOR_HEX_MAP[name.trim().toLowerCase()] || '#0f766e';
+}
+
+interface StorefrontProduct {
+  id: string;
+  name: string;
+  sku: string;
+  description: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  unit: string;
+  salePriceXof: number;
+  imageUrls: string[];
+  availableSizes?: string[];
+  availableColors?: string[];
+  stockAvailable: number;
+  inStock: boolean;
+}
 
 interface StorefrontData {
   available: boolean;
@@ -48,19 +92,15 @@ interface StorefrontData {
     };
   };
   categories: Array<{ id: string; name: string }>;
-  products: Array<{
-    id: string;
-    name: string;
-    sku: string;
-    description: string | null;
-    categoryId: string | null;
-    categoryName: string | null;
-    unit: string;
-    salePriceXof: number;
-    imageUrls: string[];
-    stockAvailable: number;
-    inStock: boolean;
-  }>;
+  products: StorefrontProduct[];
+}
+
+interface CartItem {
+  key: string;
+  product: StorefrontProduct;
+  selectedSize: string;
+  selectedColor: string;
+  qty: number;
 }
 
 interface OrderConfirmation {
@@ -78,8 +118,14 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
 
   const [search, setSearch] = useState('');
   const [catId, setCatId] = useState('');
-  const [cart, setCart] = useState<Array<{ product: StorefrontData['products'][number]; qty: number }>>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
+
+  // Modale Détail / Voir plus produit
+  const [detailProduct, setDetailProduct] = useState<StorefrontProduct | null>(null);
+  const [detailSize, setDetailSize] = useState('');
+  const [detailColor, setDetailColor] = useState('');
+  const [detailQty, setDetailQty] = useState(1);
 
   // Formulaire commande sans compte
   const [clientName, setClientName] = useState('');
@@ -90,13 +136,13 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   const [deliveryDistrict, setDeliveryDistrict] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
-  const [websiteHp, setWebsiteHp] = useState(''); // anti-bot honeypot
+  const [websiteHp, setWebsiteHp] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [orderErr, setOrderErr] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<OrderConfirmation | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Chat public client <-> boutique
+  // Chat public amélioré
   const [chatOpen, setChatOpen] = useState(false);
   const [chatToken, setChatToken] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<
@@ -107,6 +153,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   const [chatText, setChatText] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
   const [chatErr, setChatErr] = useState<string | null>(null);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem(`sc_chat_${shop.slug}`) : null;
@@ -127,6 +174,12 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
     return () => window.clearInterval(t);
   }, [chatOpen, chatToken, shop.slug]);
 
+  useEffect(() => {
+    if (chatOpen) {
+      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages.length, chatOpen]);
+
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products.filter((p) => {
@@ -140,27 +193,70 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
     });
   }, [products, search, catId]);
 
-  const addItem = (product: StorefrontData['products'][number]) => {
+  const openProductDetail = (p: StorefrontProduct) => {
+    setDetailProduct(p);
+    setDetailSize(p.availableSizes?.[0] || '');
+    setDetailColor(p.availableColors?.[0] || '');
+    setDetailQty(1);
+  };
+
+  const addItemToCart = (
+    product: StorefrontProduct,
+    size = '',
+    color = '',
+    qtyToAdd = 1,
+  ) => {
     if (!product.inStock) return;
+    const chosenSize = size || product.availableSizes?.[0] || '';
+    const chosenColor = color || product.availableColors?.[0] || '';
+    const key = `${product.id}__${chosenSize}__${chosenColor}`;
     setCart((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id);
+      const existing = prev.find((i) => i.key === key);
       if (existing) {
-        if (existing.qty >= product.stockAvailable) return prev;
-        return prev.map((i) => (i.product.id === product.id ? { ...i, qty: i.qty + 1 } : i));
+        return prev.map((i) =>
+          i.key === key
+            ? { ...i, qty: Math.min(product.stockAvailable, i.qty + qtyToAdd) }
+            : i,
+        );
       }
-      return [...prev, { product, qty: 1 }];
+      return [
+        ...prev,
+        {
+          key,
+          product,
+          selectedSize: chosenSize,
+          selectedColor: chosenColor,
+          qty: Math.min(product.stockAvailable, qtyToAdd),
+        },
+      ];
     });
   };
 
-  const updateQty = (productId: string, delta: number) => {
+  const updateCartItemQty = (key: string, delta: number) => {
     setCart((prev) =>
       prev
-        .map((i) => {
-          if (i.product.id !== productId) return i;
-          const next = Math.min(i.product.stockAvailable, i.qty + delta);
-          return { ...i, qty: next };
-        })
+        .map((i) =>
+          i.key === key
+            ? { ...i, qty: Math.min(i.product.stockAvailable, i.qty + delta) }
+            : i,
+        )
         .filter((i) => i.qty > 0),
+    );
+  };
+
+  const updateCartItemVariant = (key: string, field: 'selectedSize' | 'selectedColor', val: string) => {
+    setCart((prev) =>
+      prev.map((i) => {
+        if (i.key !== key) return i;
+        const nextSize = field === 'selectedSize' ? val : i.selectedSize;
+        const nextColor = field === 'selectedColor' ? val : i.selectedColor;
+        return {
+          ...i,
+          key: `${i.product.id}__${nextSize}__${nextColor}__${Math.random().toString(36).slice(2, 5)}`,
+          selectedSize: nextSize,
+          selectedColor: nextColor,
+        };
+      }),
     );
   };
 
@@ -185,7 +281,12 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
           deliveryAddress: fulfillmentMode === 'DELIVERY' ? deliveryAddress.trim() || undefined : undefined,
           deliveryNotes: deliveryNotes.trim() || undefined,
           websiteHp,
-          items: cart.map((c) => ({ productId: c.product.id, quantity: c.qty })),
+          items: cart.map((c) => ({
+            productId: c.product.id,
+            quantity: c.qty,
+            selectedSize: c.selectedSize || null,
+            selectedColor: c.selectedColor || null,
+          })),
         },
       });
       setConfirmed(res);
@@ -240,104 +341,116 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
       : confirmed?.trackingPath || '';
 
   return (
-    <div className="min-h-screen bg-porcelain-100 pb-24">
-      {/* En-tête Vitrine Obsidian Emerald */}
-      <header className="obsidian-hero text-white">
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5 min-w-0">
-              {shop.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={shop.logoUrl}
-                  alt={shop.name}
-                  className="h-14 w-14 shrink-0 rounded-2xl bg-white object-contain p-1.5 shadow-md sm:h-16 sm:w-16"
-                />
-              ) : (
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-xl font-black text-limeglow-400 ring-1 ring-white/20">
-                  <Store className="h-7 w-7" />
+    <div className="min-h-screen w-full bg-porcelain-100 pb-24">
+      {/* Barre supérieure fixe & 100% responsive mobile + desktop */}
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-forest-950/95 text-white backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {shop.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={shop.logoUrl}
+                alt={shop.name}
+                className="h-10 w-10 shrink-0 rounded-xl bg-white object-contain p-1 shadow-xs"
+              />
+            ) : (
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-limeglow-400 ring-1 ring-white/20">
+                <Store className="h-5 w-5" />
+              </span>
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h1 className="truncate text-sm font-extrabold tracking-tight text-white sm:text-base">
+                  {shop.name}
+                </h1>
+                <span
+                  className={`hidden shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold sm:inline-flex ${
+                    isOpenNow
+                      ? 'bg-emerald-500/20 text-limeglow-300'
+                      : 'bg-amber-400/20 text-amber-200'
+                  }`}
+                >
+                  <Clock className="h-2.5 w-2.5" />
+                  {isOpenNow ? 'Ouverte' : 'Fermée'}
                 </span>
-              )}
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="truncate text-xl font-extrabold tracking-tight text-white sm:text-2xl">
-                    {shop.name}
-                  </h1>
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                      isOpenNow
-                        ? 'bg-emerald-500/20 text-limeglow-300 ring-1 ring-limeglow-400/30'
-                        : 'bg-amber-400/20 text-amber-200 ring-1 ring-amber-300/30'
-                    }`}
-                  >
-                    <Clock className="h-3 w-3" />
-                    {isOpenNow ? 'Ouverte' : 'Fermée (commande différée)'}
-                  </span>
-                </div>
-                {shop.slogan ? (
-                  <p className="mt-0.5 text-xs text-emerald-100/80 sm:text-sm">{shop.slogan}</p>
-                ) : null}
-                <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[11px] text-emerald-200/75">
-                  {shop.address ? (
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin className="h-3 w-3 text-limeglow-400" />
-                      {shop.address}
-                    </span>
-                  ) : null}
-                  {shop.phone ? (
-                    <a href={`tel:${shop.phone}`} className="inline-flex items-center gap-1 hover:text-white">
-                      <Phone className="h-3 w-3 text-limeglow-400" />
-                      {shop.phone}
-                    </a>
-                  ) : null}
-                </div>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/s/${shop.slug}/track`}
-                className="rounded-full border border-white/15 bg-white/10 px-3.5 py-2 text-xs font-bold text-white hover:bg-white/15"
-              >
-                Suivre ma commande
-              </Link>
-              <button
-                type="button"
-                onClick={() => setChatOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3.5 py-2 text-xs font-bold text-white hover:bg-white/15"
-              >
-                <MessageCircle className="h-3.5 w-3.5 text-limeglow-400" />
-                Contacter
-              </button>
-              <button
-                type="button"
-                onClick={() => setCartOpen(true)}
-                className="relative inline-flex items-center gap-2 rounded-full bg-limeglow-400 px-4 py-2 text-xs font-extrabold text-forest-950 shadow-lime hover:bg-limeglow-300"
-              >
-                <ShoppingBag className="h-4 w-4" />
-                <span>Panier ({totalItems})</span>
-              </button>
+              {shop.address || shop.phone ? (
+                <p className="truncate text-[11px] text-emerald-200/70">
+                  {[shop.address, shop.phone].filter(Boolean).join(' · ')}
+                </p>
+              ) : null}
             </div>
           </div>
 
-          {/* Barre de recherche & Catégories */}
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <Link
+              href={`/s/${shop.slug}/track`}
+              className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-white/15 sm:px-3.5 sm:text-xs"
+            >
+              Suivi
+            </Link>
+            <button
+              type="button"
+              onClick={() => setChatOpen(true)}
+              aria-label="Contacter la boutique"
+              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-white/15 sm:px-3.5 sm:text-xs"
+            >
+              <MessageCircle className="h-3.5 w-3.5 text-limeglow-400" />
+              <span className="hidden sm:inline">Message</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCartOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-limeglow-400 px-3 py-1.5 text-xs font-extrabold text-forest-950 shadow-lime hover:bg-limeglow-300 sm:px-4"
+            >
+              <ShoppingBag className="h-3.5 w-3.5" />
+              <span>{totalItems}</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero boutique compact + Recherche & Catégories */}
+      <section className="obsidian-hero px-3 pb-6 pt-4 text-white sm:px-6">
+        <div className="mx-auto max-w-6xl space-y-3.5">
+          {shop.slogan || shop.address || shop.phone ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-emerald-100/80">
+              {shop.slogan ? <p className="font-medium text-white">{shop.slogan}</p> : <span />}
+              <div className="flex flex-wrap items-center gap-3 text-[11px]">
+                {shop.address ? (
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="h-3 w-3 text-limeglow-400" />
+                    {shop.address}
+                  </span>
+                ) : null}
+                {shop.phone ? (
+                  <a href={`tel:${shop.phone}`} className="inline-flex items-center gap-1 hover:text-white">
+                    <Phone className="h-3 w-3 text-limeglow-400" />
+                    {shop.phone}
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
             <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-emerald-200/60" />
+              <Search className="pointer-events-none absolute left-3.5 top-2.5 h-4 w-4 text-emerald-200/60" />
               <input
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher un article dans cette boutique…"
-                className="w-full rounded-2xl border border-white/15 bg-white/10 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-emerald-200/60 focus:border-limeglow-400 focus:bg-white/15"
+                placeholder="Rechercher un produit…"
+                className="w-full rounded-xl border border-white/15 bg-white/10 py-2 pl-10 pr-4 text-sm text-white placeholder:text-emerald-200/60 focus:border-limeglow-400 focus:bg-white/15"
               />
             </div>
+
             {categories.length > 0 ? (
               <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                 <button
                   type="button"
                   onClick={() => setCatId('')}
-                  className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition ${
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition ${
                     catId === ''
                       ? 'bg-white text-forest-950'
                       : 'bg-white/10 text-emerald-100 hover:bg-white/20'
@@ -350,7 +463,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                     key={c.id}
                     type="button"
                     onClick={() => setCatId(c.id)}
-                    className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition ${
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition ${
                       catId === c.id
                         ? 'bg-white text-forest-950'
                         : 'bg-white/10 text-emerald-100 hover:bg-white/20'
@@ -363,116 +476,302 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
             ) : null}
           </div>
         </div>
-      </header>
+      </section>
 
-      {/* Grille Catalogue Temps Réel */}
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+      {/* Grille Produits Responsive avec photos calibrées & bouton Voir plus */}
+      <main className="mx-auto max-w-6xl px-3 py-5 sm:px-6">
         {filteredProducts.length === 0 ? (
           <div className="sc-card p-10 text-center">
             <Package className="mx-auto h-10 w-10 text-slate-300" />
             <p className="mt-3 text-sm font-bold text-slate-800">Aucun article publié trouvé</p>
             <p className="mt-1 text-xs text-slate-500">
-              Essayez un autre mot-clé ou contactez directement la boutique.
+              Essayez un autre mot-clé ou écrivez directement à la boutique.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 sm:gap-4">
             {filteredProducts.map((p) => {
-              const inCart = cart.find((c) => c.product.id === p.id);
               const photo = p.imageUrls?.[0];
+              const sizes = p.availableSizes || [];
+              const colors = p.availableColors || [];
+              const hasVariants = sizes.length > 0 || colors.length > 0;
               return (
-                <div
+                <article
                   key={p.id}
                   className="sc-card-hover flex flex-col overflow-hidden rounded-2xl"
                 >
-                  <div className="relative aspect-square w-full overflow-hidden bg-porcelain-50">
+                  {/* Photo contrôlée et proportionnée (jamais démesurée) */}
+                  <button
+                    type="button"
+                    onClick={() => openProductDetail(p)}
+                    className="group relative h-36 w-full overflow-hidden bg-porcelain-50 sm:h-44"
+                  >
                     {photo ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={photo}
                         alt={p.name}
-                        className="h-full w-full object-cover transition duration-300 hover:scale-105"
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="flex h-full w-full flex-col items-center justify-center text-slate-300">
-                        <Package className="h-10 w-10" />
+                      <div className="flex h-full w-full items-center justify-center text-slate-300">
+                        <Package className="h-9 w-9" />
                       </div>
                     )}
                     <span
-                      className={`absolute left-2.5 top-2.5 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold backdrop-blur-xs ${
+                      className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-extrabold backdrop-blur-xs ${
                         p.inStock
                           ? 'bg-emerald-950/75 text-limeglow-300'
                           : 'bg-rose-600/90 text-white'
                       }`}
                     >
-                      {p.inStock ? `${p.stockAvailable} en stock` : 'Rupture'}
+                      {p.inStock ? `${p.stockAvailable} dispo` : 'Rupture'}
                     </span>
-                  </div>
+                  </button>
 
-                  <div className="flex flex-1 flex-col justify-between p-3 sm:p-3.5">
+                  <div className="flex flex-1 flex-col justify-between p-2.5 sm:p-3.5">
                     <div>
                       {p.categoryName ? (
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-brand-700">
+                        <p className="truncate text-[10px] font-bold uppercase tracking-wide text-brand-700">
                           {p.categoryName}
                         </p>
                       ) : null}
                       <h2 className="mt-0.5 line-clamp-2 text-xs font-extrabold text-slate-900 sm:text-sm">
                         {p.name}
                       </h2>
-                      {p.description ? (
-                        <p className="mt-1 line-clamp-2 text-[11px] text-slate-500">
-                          {p.description}
-                        </p>
+
+                      {/* Aperçu pastilles couleurs & tailles */}
+                      {hasVariants ? (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                          {colors.slice(0, 4).map((c) => (
+                            <span
+                              key={c}
+                              title={c}
+                              className="h-3 w-3 rounded-full border border-slate-300"
+                              style={{ backgroundColor: swatchHex(c) }}
+                            />
+                          ))}
+                          {sizes.length > 0 ? (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">
+                              {sizes.slice(0, 3).join(' · ')}
+                              {sizes.length > 3 ? '…' : ''}
+                            </span>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
 
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-2.5 space-y-2">
                       <p className="text-sm font-black text-forest-950 tabular sm:text-base">
                         {formatXof(p.salePriceXof)}
                       </p>
 
-                      {inCart ? (
-                        <div className="flex items-center justify-between rounded-xl border border-forest-900 bg-forest-900 px-2 py-1 text-white">
-                          <button
-                            type="button"
-                            onClick={() => updateQty(p.id, -1)}
-                            className="rounded-lg p-1 hover:bg-white/15"
-                            aria-label="Retirer"
-                          >
-                            <Minus className="h-3.5 w-3.5" />
-                          </button>
-                          <span className="text-xs font-extrabold tabular">{inCart.qty}</span>
-                          <button
-                            type="button"
-                            onClick={() => updateQty(p.id, 1)}
-                            className="rounded-lg p-1 hover:bg-white/15"
-                            aria-label="Ajouter"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ) : (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openProductDetail(p)}
+                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-porcelain-50 py-1.5 text-[11px] font-bold text-slate-700 transition hover:bg-slate-100"
+                        >
+                          <Eye className="h-3 w-3" />
+                          Voir plus
+                        </button>
                         <button
                           type="button"
                           disabled={!p.inStock}
-                          onClick={() => addItem(p)}
-                          className="w-full rounded-xl bg-forest-900 py-2 text-xs font-bold text-white transition hover:bg-forest-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                          onClick={() => {
+                            if (hasVariants) {
+                              openProductDetail(p);
+                            } else {
+                              addItemToCart(p);
+                            }
+                          }}
+                          className="rounded-xl bg-forest-900 py-1.5 text-[11px] font-bold text-white transition hover:bg-forest-800 disabled:bg-slate-200 disabled:text-slate-400"
                         >
-                          {p.inStock ? 'Ajouter au panier' : 'Indisponible'}
+                          {p.inStock ? '+ Panier' : 'Épuisé'}
                         </button>
-                      )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
         )}
       </main>
 
+      {/* Modale Détails / Voir plus Produit (Description, Tailles, Couleurs, Quantité) */}
+      {detailProduct ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-forest-950/70 p-0 backdrop-blur-xs sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Détails ${detailProduct.name}`}
+        >
+          <div className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-3.5 backdrop-blur-xs">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-brand-700">
+                  {detailProduct.categoryName || shop.name}
+                </p>
+                <h2 className="truncate text-base font-extrabold text-slate-900">
+                  {detailProduct.name}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailProduct(null)}
+                aria-label="Fermer"
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              {/* Photo produit bien cadrée */}
+              <div className="flex h-52 w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-porcelain-50 sm:h-60">
+                {detailProduct.imageUrls?.[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={detailProduct.imageUrls[0]}
+                    alt={detailProduct.name}
+                    className="h-full w-full object-contain p-2"
+                  />
+                ) : (
+                  <Package className="h-12 w-12 text-slate-300" />
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-2xl font-black text-forest-950 tabular">
+                  {formatXof(detailProduct.salePriceXof)}
+                </p>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-bold ${
+                    detailProduct.inStock
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-rose-50 text-rose-700'
+                  }`}
+                >
+                  {detailProduct.inStock
+                    ? `${detailProduct.stockAvailable} ${detailProduct.unit} en stock`
+                    : 'Rupture de stock'}
+                </span>
+              </div>
+
+              {/* Description */}
+              <div className="rounded-2xl bg-porcelain-50 p-3.5 text-xs leading-relaxed text-slate-700">
+                <p className="mb-1 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
+                  Description
+                </p>
+                <p className="whitespace-pre-wrap">
+                  {detailProduct.description?.trim() ||
+                    'Article disponible immédiatement en boutique ou en livraison.'}
+                </p>
+              </div>
+
+              {/* Sélection de la taille */}
+              {(detailProduct.availableSizes?.length || 0) > 0 ? (
+                <div className="space-y-2">
+                  <p className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+                    <Ruler className="h-3.5 w-3.5 text-brand-700" />
+                    Choisir votre taille :{' '}
+                    <span className="text-brand-700">{detailSize || 'Sélectionner'}</span>
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {detailProduct.availableSizes!.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setDetailSize(s)}
+                        className={`min-w-[44px] rounded-xl px-3 py-2 text-xs font-extrabold transition ${
+                          detailSize === s
+                            ? 'bg-forest-900 text-limeglow-400 shadow-sm'
+                            : 'border border-slate-200 bg-white text-slate-700 hover:border-forest-800'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Sélection de la couleur */}
+              {(detailProduct.availableColors?.length || 0) > 0 ? (
+                <div className="space-y-2">
+                  <p className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+                    <Palette className="h-3.5 w-3.5 text-brand-700" />
+                    Choisir votre couleur :{' '}
+                    <span className="text-brand-700">{detailColor || 'Sélectionner'}</span>
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {detailProduct.availableColors!.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setDetailColor(c)}
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                          detailColor === c
+                            ? 'bg-forest-900 text-white ring-2 ring-limeglow-400'
+                            : 'border border-slate-200 bg-white text-slate-700 hover:border-forest-800'
+                        }`}
+                      >
+                        <span
+                          className="h-3.5 w-3.5 rounded-full border border-slate-300"
+                          style={{ backgroundColor: swatchHex(c) }}
+                        />
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Quantité & Ajouter au panier */}
+              <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
+                <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-porcelain-50 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setDetailQty((q) => Math.max(1, q - 1))}
+                    className="rounded-lg bg-white p-2 text-slate-700 shadow-xs"
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="w-8 text-center text-sm font-extrabold tabular">{detailQty}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDetailQty((q) => Math.min(detailProduct.stockAvailable, q + 1))
+                    }
+                    className="rounded-lg bg-white p-2 text-slate-700 shadow-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={!detailProduct.inStock}
+                  onClick={() => {
+                    addItemToCart(detailProduct, detailSize, detailColor, detailQty);
+                    setDetailProduct(null);
+                    setCartOpen(true);
+                  }}
+                  className="sc-btn-lime flex-1 py-3 text-sm"
+                >
+                  <ShoppingBag className="h-4 w-4" />
+                  Ajouter · {formatXof(detailProduct.salePriceXof * detailQty)}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* Barre flottante Panier mobile */}
-      {totalItems > 0 && !cartOpen ? (
-        <div className="fixed inset-x-4 bottom-4 z-30 mx-auto flex max-w-md items-center justify-between rounded-2xl border border-limeglow-400/40 bg-forest-950 px-4 py-3 text-white shadow-2xl">
+      {totalItems > 0 && !cartOpen && !detailProduct ? (
+        <div className="fixed inset-x-3 bottom-4 z-30 mx-auto flex max-w-md items-center justify-between rounded-2xl border border-limeglow-400/40 bg-forest-950 px-4 py-3 text-white shadow-2xl">
           <div>
             <p className="text-[11px] text-emerald-200/80">{totalItems} article(s)</p>
             <p className="text-base font-extrabold tabular">{formatXof(subtotalXof)}</p>
@@ -482,12 +781,12 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
             onClick={() => setCartOpen(true)}
             className="sc-btn-lime rounded-full px-5 py-2 text-xs"
           >
-            Commander →
+            Voir panier & Commander →
           </button>
         </div>
       ) : null}
 
-      {/* Drawer Panier & Commande Sans Compte */}
+      {/* Drawer Panier avec sélection Taille & Couleur dans le panier + Commande sans compte */}
       {cartOpen ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-forest-950/70 backdrop-blur-xs">
           <div className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
@@ -507,7 +806,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5">
               {confirmed ? (
                 <div className="space-y-4 text-center">
                   <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -557,42 +856,115 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                 </div>
               ) : cart.length === 0 ? (
                 <p className="py-12 text-center text-sm text-slate-400">
-                  Ajoutez des articles depuis le catalogue pour commander sans créer de compte.
+                  Ajoutez des articles depuis la vitrine pour commander sans créer de compte.
                 </p>
               ) : (
                 <form onSubmit={handlePlaceOrder} className="space-y-4">
-                  {/* Articles */}
-                  <div className="space-y-2">
-                    {cart.map((c) => (
-                      <div
-                        key={c.product.id}
-                        className="flex items-center justify-between gap-2 rounded-2xl bg-porcelain-50 p-3 text-xs"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-bold text-slate-900">{c.product.name}</p>
-                          <p className="text-slate-500 tabular">
-                            {formatXof(c.product.salePriceXof)} × {c.qty}
-                          </p>
+                  {/* Articles du panier avec choix Taille & Couleur modifiables dans le panier ! */}
+                  <div className="space-y-2.5">
+                    {cart.map((c) => {
+                      const sizes = c.product.availableSizes || [];
+                      const colors = c.product.availableColors || [];
+                      return (
+                        <div
+                          key={c.key}
+                          className="space-y-2 rounded-2xl border border-slate-200/80 bg-porcelain-50 p-3 text-xs"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              {c.product.imageUrls?.[0] ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={c.product.imageUrls[0]}
+                                  alt={c.product.name}
+                                  className="h-10 w-10 shrink-0 rounded-xl border border-slate-200 bg-white object-cover"
+                                />
+                              ) : null}
+                              <div className="min-w-0">
+                                <p className="truncate font-bold text-slate-900">{c.product.name}</p>
+                                <p className="text-slate-500 tabular">
+                                  {formatXof(c.product.salePriceXof)} × {c.qty} ={' '}
+                                  <strong className="text-slate-900">
+                                    {formatXof(c.product.salePriceXof * c.qty)}
+                                  </strong>
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => updateCartItemQty(c.key, -1)}
+                                className="rounded-lg border border-slate-200 bg-white p-1"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="w-6 text-center font-bold tabular">{c.qty}</span>
+                              <button
+                                type="button"
+                                onClick={() => updateCartItemQty(c.key, 1)}
+                                className="rounded-lg border border-slate-200 bg-white p-1"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => updateCartItemQty(c.key, -c.qty)}
+                                aria-label="Supprimer"
+                                className="ml-0.5 rounded-lg p-1 text-rose-500 hover:bg-rose-50"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Sélecteurs Taille & Couleur directement dans le panier */}
+                          {(sizes.length > 0 || colors.length > 0) && (
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                              {sizes.length > 0 ? (
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500">
+                                    Taille
+                                  </label>
+                                  <select
+                                    value={c.selectedSize}
+                                    onChange={(e) =>
+                                      updateCartItemVariant(c.key, 'selectedSize', e.target.value)
+                                    }
+                                    className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-800"
+                                  >
+                                    {sizes.map((s) => (
+                                      <option key={s} value={s}>
+                                        {s}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ) : null}
+                              {colors.length > 0 ? (
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500">
+                                    Couleur
+                                  </label>
+                                  <select
+                                    value={c.selectedColor}
+                                    onChange={(e) =>
+                                      updateCartItemVariant(c.key, 'selectedColor', e.target.value)
+                                    }
+                                    className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-800"
+                                  >
+                                    {colors.map((col) => (
+                                      <option key={col} value={col}>
+                                        {col}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => updateQty(c.product.id, -1)}
-                            className="rounded-lg border border-slate-200 bg-white p-1"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span className="w-6 text-center font-bold">{c.qty}</span>
-                          <button
-                            type="button"
-                            onClick={() => updateQty(c.product.id, 1)}
-                            className="rounded-lg border border-slate-200 bg-white p-1"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Mode retrait / livraison */}
@@ -632,9 +1004,9 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                   </div>
 
                   {/* Coordonnées sans compte */}
-                  <div className="space-y-3 border-t border-slate-100 pt-3">
+                  <div className="space-y-2.5 border-t border-slate-100 pt-3">
                     <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
-                      Vos coordonnées (aucun compte requis)
+                      Vos coordonnées (sans compte)
                     </p>
                     <input
                       required
@@ -649,7 +1021,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                       minLength={6}
                       value={clientPhone}
                       onChange={(e) => setClientPhone(e.target.value)}
-                      placeholder="Téléphone / WhatsApp (ex. +223 70 00 00 00) *"
+                      placeholder="Téléphone / WhatsApp *"
                       className="sc-input"
                     />
                     {fulfillmentMode === 'DELIVERY' ? (
@@ -673,10 +1045,9 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                     <input
                       value={deliveryNotes}
                       onChange={(e) => setDeliveryNotes(e.target.value)}
-                      placeholder="Précision (taille, couleur, heure souhaitée…)"
+                      placeholder="Instructions particulières (optionnel)"
                       className="sc-input"
                     />
-                    {/* Honeypot anti-robot invisible */}
                     <input
                       type="text"
                       tabIndex={-1}
@@ -694,7 +1065,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                     </div>
                   ) : null}
 
-                  <div className="rounded-2xl bg-porcelain-50 p-3.5 text-xs space-y-1 tabular">
+                  <div className="space-y-1 rounded-2xl bg-porcelain-50 p-3.5 text-xs tabular">
                     <div className="flex justify-between text-slate-600">
                       <span>Sous-total articles</span>
                       <span>{formatXof(subtotalXof)}</span>
@@ -711,12 +1082,8 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="sc-btn-lime w-full py-3 text-sm"
-                  >
-                    {submitting ? 'Envoi de votre commande…' : 'Confirmer ma commande'}
+                  <button type="submit" disabled={submitting} className="sc-btn-lime w-full py-3 text-sm">
+                    {submitting ? 'Envoi en cours…' : 'Confirmer ma commande'}
                   </button>
                 </form>
               )}
@@ -725,16 +1092,46 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         </div>
       ) : null}
 
-      {/* Drawer Messagerie Directe Client <-> Boutique (Lot 6) */}
+      {/* Bouton flottant Chat boutique */}
+      {!chatOpen && !cartOpen && !detailProduct ? (
+        <button
+          type="button"
+          onClick={() => setChatOpen(true)}
+          aria-label="Ouvrir la messagerie avec la boutique"
+          className={`fixed right-4 z-30 flex items-center gap-2 rounded-full bg-forest-950 px-4 py-3 text-xs font-extrabold text-white shadow-2xl ring-2 ring-limeglow-400/60 transition hover:bg-forest-800 ${
+            totalItems > 0 ? 'bottom-20' : 'bottom-5'
+          }`}
+        >
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-limeglow-400 opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-limeglow-400" />
+          </span>
+          <MessageCircle className="h-4 w-4 text-limeglow-400" />
+          <span className="hidden sm:inline">Discuter avec la boutique</span>
+        </button>
+      ) : null}
+
+      {/* Drawer Messagerie Directe Client <-> Boutique (Design soigné) */}
       {chatOpen ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-forest-950/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex justify-end bg-forest-950/65 backdrop-blur-xs">
           <div className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-forest-950 px-5 py-4 text-white">
-              <div>
-                <h2 className="text-sm font-extrabold">Discuter avec {shop.name}</h2>
-                <p className="text-[11px] text-emerald-200/75">
-                  Réponse directe par la boutique · Sans création de compte
-                </p>
+            <div className="flex items-center justify-between border-b border-white/10 bg-forest-950 px-4 py-3.5 text-white">
+              <div className="flex items-center gap-3 min-w-0">
+                {shop.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={shop.logoUrl} alt={shop.name} className="h-9 w-9 rounded-xl bg-white object-contain p-1" />
+                ) : (
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 font-black text-limeglow-400">
+                    {shop.name.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-extrabold">{shop.name}</h2>
+                  <p className="flex items-center gap-1.5 text-[11px] text-emerald-200/80">
+                    <span className="h-2 w-2 rounded-full bg-limeglow-400" />
+                    Messagerie directe · Sans compte
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
@@ -745,32 +1142,59 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               </button>
             </div>
 
-            <div className="flex-1 space-y-2.5 overflow-y-auto bg-porcelain-50 p-4">
+            <div className="flex-1 space-y-3 overflow-y-auto bg-porcelain-100 p-4">
               {chatMessages.length === 0 ? (
-                <p className="py-8 text-center text-xs text-slate-400">
-                  Posez une question sur un produit, une taille ou la livraison !
-                </p>
-              ) : (
-                chatMessages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs ${
-                      m.senderRole === 'CLIENT'
-                        ? 'ml-auto bg-forest-900 text-white'
-                        : 'bg-white text-slate-800 shadow-xs border border-slate-200'
-                    }`}
-                  >
-                    <p className="text-[10px] font-bold opacity-70">{m.senderName}</p>
-                    <p className="mt-0.5 whitespace-pre-wrap">{m.body}</p>
+                <div className="space-y-3 py-6 text-center">
+                  <p className="text-xs font-semibold text-slate-600">
+                    Posez directement vos questions à <strong>{shop.name}</strong> :
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-1.5">
+                    {[
+                      'Quelles tailles sont disponibles ?',
+                      'Livrez-vous aujourd’hui ?',
+                      'Avez-vous d’autres couleurs ?',
+                    ].map((quick) => (
+                      <button
+                        key={quick}
+                        type="button"
+                        onClick={() => setChatText(quick)}
+                        className="rounded-full border border-brand-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-brand-800 hover:bg-brand-50"
+                      >
+                        {quick}
+                      </button>
+                    ))}
                   </div>
-                ))
+                </div>
+              ) : (
+                chatMessages.map((m) => {
+                  const isClient = m.senderRole === 'CLIENT';
+                  return (
+                    <div
+                      key={m.id}
+                      className={`flex flex-col ${isClient ? 'items-end' : 'items-start'}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs shadow-xs ${
+                          isClient
+                            ? 'rounded-br-sm bg-forest-900 text-white'
+                            : 'rounded-bl-sm border border-slate-200 bg-white text-slate-800'
+                        }`}
+                      >
+                        <p className="text-[10px] font-bold opacity-70">{m.senderName}</p>
+                        <p className="mt-0.5 whitespace-pre-wrap leading-relaxed">{m.body}</p>
+                      </div>
+                      <span className="mt-1 px-1 text-[9px] text-slate-400">
+                        {formatDateTimeInTimezone(m.createdAt)}
+                      </span>
+                    </div>
+                  );
+                })
               )}
+              <div ref={chatBottomRef} />
             </div>
 
-            <form onSubmit={handleSendChat} className="space-y-2 border-t border-slate-200 bg-white p-4">
-              {chatErr ? (
-                <p className="text-xs font-semibold text-rose-600">{chatErr}</p>
-              ) : null}
+            <form onSubmit={handleSendChat} className="space-y-2 border-t border-slate-200 bg-white p-3.5">
+              {chatErr ? <p className="text-xs font-semibold text-rose-600">{chatErr}</p> : null}
               {!chatToken ? (
                 <div className="grid grid-cols-2 gap-2">
                   <input
@@ -794,7 +1218,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                   required
                   value={chatText}
                   onChange={(e) => setChatText(e.target.value)}
-                  placeholder="Écrire un message à la boutique…"
+                  placeholder="Écrire un message…"
                   className="sc-input py-2 text-xs"
                 />
                 <button type="submit" disabled={chatBusy} className="sc-btn-primary px-3.5 py-2">

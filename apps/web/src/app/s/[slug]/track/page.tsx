@@ -35,7 +35,15 @@ interface FullTrackedOrder {
     totalXof: number;
     canClientCancel: boolean;
     cancelOrRejectReason: string | null;
-    lines: Array<{ id: string; productName: string; quantity: number; lineTotalXof: number }>;
+    lines: Array<{
+      id: string;
+      productName: string;
+      selectedSize?: string | null;
+      selectedColor?: string | null;
+      orderedQty?: number;
+      quantity?: number;
+      lineTotalXof: number;
+    }>;
     statusEvents: Array<{ toStatus: OnlineOrderStatus; reason: string | null; createdAt: string }>;
     createdAt: string;
   };
@@ -185,9 +193,21 @@ export default function PublicTrackOrderPage() {
             <div className="rounded-2xl bg-porcelain-50 p-4 text-xs space-y-2">
               <p className="font-extrabold text-slate-800">Articles commandés</p>
               {fullData.order.lines.map((l) => (
-                <div key={l.id} className="flex justify-between">
-                  <span>
-                    {l.quantity} × {l.productName}
+                <div key={l.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span>
+                      {l.orderedQty ?? l.quantity ?? 1} × {l.productName}
+                    </span>
+                    {l.selectedSize ? (
+                      <span className="rounded bg-forest-900 px-1.5 py-0.5 text-[10px] font-bold text-limeglow-400">
+                        {l.selectedSize}
+                      </span>
+                    ) : null}
+                    {l.selectedColor ? (
+                      <span className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
+                        {l.selectedColor}
+                      </span>
+                    ) : null}
                   </span>
                   <span className="font-bold tabular">{formatXof(l.lineTotalXof)}</span>
                 </div>

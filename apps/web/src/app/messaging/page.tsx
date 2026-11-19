@@ -1,11 +1,15 @@
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
+  ArrowLeft,
   MessageSquare,
+  Phone,
   Plus,
+  Search,
   Send,
+  ShoppingBag,
   UserCheck,
   X,
 } from 'lucide-react';
@@ -60,6 +64,17 @@ interface AgentOpt {
   fullName: string;
 }
 
+function getInitials(label: string): string {
+  return (
+    label
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase())
+      .join('') || 'SC'
+  );
+}
+
 function MessagingContent() {
   const searchParams = useSearchParams();
   const initialConvId = searchParams.get('c') || '';
@@ -67,6 +82,9 @@ function MessagingContent() {
 
   const [convs, setConvs] = useState<ConversationListItem[]>([]);
   const [selectedId, setSelectedId] = useState(initialConvId);
+  const [mobileShowThread, setMobileShowThread] = useState(Boolean(initialConvId));
+  const [typeFilter, setTypeFilter] = useState<'' | ConversationType>('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [agents, setAgents] = useState<AgentOpt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +93,7 @@ function MessagingContent() {
   const [bodyText, setBodyText] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const threadEndRef = useRef<HTMLDivElement | null>(null);
 
   // Modale nouvelle conversation
   const [newOpen, setNewOpen] = useState(false);
@@ -105,27 +124,30 @@ function MessagingContent() {
     }
   }, [user?.role, selectedShopId]);
 
-  const loadDetail = useCallback(async (id: string) => {
-    if (!id) {
-      setDetail(null);
-      return;
-    }
-    try {
-      const res = await apiFetch<ConversationDetail>(`/messaging/conversations/${id}`, {
-        requiresOnline: false,
-      });
-      setDetail(res);
-      if (user?.role === 'OWNER' && res.shopId) {
-        apiFetch<AgentOpt[]>(`/shops/${res.shopId}/agents`, { shopId: res.shopId })
-          .then(setAgents)
-          .catch(() => setAgents([]));
-      } else {
-        setAgents([]);
+  const loadDetail = useCallback(
+    async (id: string) => {
+      if (!id) {
+        setDetail(null);
+        return;
       }
-    } catch {
-      // ignore
-    }
-  }, [user?.role]);
+      try {
+        const res = await apiFetch<ConversationDetail>(`/messaging/conversations/${id}`, {
+          requiresOnline: false,
+        });
+        setDetail(res);
+        if (user?.role === 'OWNER' && res.shopId) {
+          apiFetch<AgentOpt[]>(`/shops/${res.shopId}/agents`, { shopId: res.shopId })
+            .then(setAgents)
+            .catch(() => setAgents([]));
+        } else {
+          setAgents([]);
+        }
+      } catch {
+        // ignore
+      }
+    },
+    [user?.role],
+  );
 
   useEffect(() => {
     void loadList();
@@ -136,12 +158,35 @@ function MessagingContent() {
   }, [selectedId, loadDetail]);
 
   useEffect(() => {
+    threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [detail?.messages.length, selectedId]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => {
       void loadList();
       if (selectedId) void loadDetail(selectedId);
     }, 8000);
     return () => window.clearInterval(timer);
   }, [loadList, loadDetail, selectedId]);
+
+  const filteredConvs = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return convs.filter((c) => {
+      if (typeFilter && c.type !== typeFilter) return false;
+      if (!q) return true;
+      return (
+        c.subject.toLowerCase().includes(q) ||
+        (c.clientName && c.clientName.toLowerCase().includes(q)) ||
+        (c.clientPhone && c.clientPhone.toLowerCase().includes(q)) ||
+        (c.lastMessagePreview && c.lastMessagePreview.toLowerCase().includes(q))
+      );
+    });
+  }, [convs, typeFilter, searchQuery]);
+
+  const handleSelectConversation = (id: string) => {
+    setSelectedId(id);
+    setMobileShowThread(true);
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,10 +225,14 @@ function MessagingContent() {
         method: 'POST',
         body: {
           type: newForm.type,
-          shopId: newForm.type === 'SUPPORT_ADMIN_OWNER' ? null : newForm.shopId || shops[0]?.shopId || null,
+          shopId:
+            newForm.type === 'SUPPORT_ADMIN_OWNER'
+              ? null
+              : newForm.shopId || shops[0]?.shopId || null,
           subject: newForm.subject.trim(),
           clientName: newForm.type === 'CLIENT_SHOP' ? newForm.clientName.trim() || undefined : undefined,
-          clientPhone: newForm.type === 'CLIENT_SHOP' ? newForm.clientPhone.trim() || undefined : undefined,
+          clientPhone:
+            newForm.type === 'CLIENT_SHOP' ? newForm.clientPhone.trim() || undefined : undefined,
           initialMessage: newForm.initialMessage.trim(),
         },
       });
@@ -197,6 +246,7 @@ function MessagingContent() {
         initialMessage: '',
       });
       setSelectedId(created.id);
+      setMobileShowThread(true);
       await loadList();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Impossible de créer la conversation.');
@@ -211,10 +261,10 @@ function MessagingContent() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-              Messagerie Intégrée
+              Messagerie Unifiée
             </h1>
             <p className="text-sm text-slate-600">
-              Échanges équipe boutique, messages clients vitrine QR et support plateforme en temps réel.
+              Discussions clients vitrine QR, coordination équipe et support plateforme.
             </p>
           </div>
           {user?.role !== 'SUPER_ADMIN' ? (
@@ -232,84 +282,190 @@ function MessagingContent() {
         ) : convs.length === 0 ? (
           <EmptyState
             title="Boîte de réception vide"
-            description="Les messages clients depuis votre vitrine QR et vos échanges d’équipe apparaîtront ici."
+            description="Les messages clients depuis votre vitrine QR et vos discussions d’équipe apparaîtront ici en temps réel."
             action={
               user?.role !== 'SUPER_ADMIN' ? (
                 <button type="button" onClick={() => setNewOpen(true)} className="sc-btn-primary text-xs">
-                  Démarrer une conversation
+                  Démarrer une discussion
                 </button>
               ) : undefined
             }
           />
         ) : (
-          <div className="grid gap-4 lg:grid-cols-12" style={{ minHeight: '66vh' }}>
-            {/* Colonne Liste des fils */}
-            <aside className="sc-card flex flex-col overflow-hidden lg:col-span-4">
-              <div className="border-b border-slate-100 bg-porcelain-50 px-4 py-3 text-xs font-extrabold uppercase tracking-wide text-slate-500">
-                Conversations ({convs.length})
-              </div>
-              <div className="flex-1 divide-y divide-slate-100 overflow-y-auto">
-                {convs.map((c) => {
-                  const active = c.id === selectedId;
-                  return (
+          <div className="sc-card grid overflow-hidden lg:grid-cols-12" style={{ height: 'calc(100dvh - 13.5rem)', minHeight: '520px' }}>
+            {/* Colonne Liste des conversations */}
+            <aside
+              className={`flex flex-col overflow-hidden border-r border-slate-200/80 bg-white lg:col-span-4 lg:flex ${
+                mobileShowThread ? 'hidden' : 'flex'
+              }`}
+            >
+              {/* Recherche & Filtres */}
+              <div className="space-y-2.5 border-b border-slate-100 bg-porcelain-50 p-3.5">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Rechercher un client, objet…"
+                    className="sc-input py-2 pl-8 text-xs"
+                  />
+                </div>
+                <div className="flex gap-1 overflow-x-auto pb-0.5 text-[11px] font-bold">
+                  {(
+                    [
+                      { key: '', label: `Toutes (${convs.length})` },
+                      { key: 'CLIENT_SHOP', label: 'Clients' },
+                      { key: 'INTERNAL_OWNER_AGENT', label: 'Équipe' },
+                      { key: 'SUPPORT_ADMIN_OWNER', label: 'Support' },
+                    ] as const
+                  ).map((f) => (
                     <button
-                      key={c.id}
+                      key={f.key}
                       type="button"
-                      onClick={() => setSelectedId(c.id)}
-                      className={`block w-full px-4 py-3.5 text-left transition ${
-                        active ? 'bg-forest-900 text-white' : 'hover:bg-porcelain-50'
+                      onClick={() => setTypeFilter(f.key)}
+                      className={`shrink-0 rounded-full px-2.5 py-1 transition ${
+                        typeFilter === f.key
+                          ? 'bg-forest-900 text-white'
+                          : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100'
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-2">
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Liste scrollable */}
+              <div className="flex-1 divide-y divide-slate-100 overflow-y-auto">
+                {filteredConvs.length === 0 ? (
+                  <p className="p-8 text-center text-xs text-slate-400">
+                    Aucune discussion ne correspond à votre recherche.
+                  </p>
+                ) : (
+                  filteredConvs.map((c) => {
+                    const active = c.id === selectedId;
+                    const displayTitle = c.clientName || c.subject;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => handleSelectConversation(c.id)}
+                        className={`flex w-full items-start gap-3 px-4 py-3.5 text-left transition ${
+                          active
+                            ? 'bg-forest-900 text-white'
+                            : c.unreadCount > 0
+                              ? 'bg-brand-50/40 hover:bg-porcelain-50'
+                              : 'hover:bg-porcelain-50'
+                        }`}
+                      >
                         <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-xs font-extrabold ${
                             active
-                              ? 'bg-white/15 text-limeglow-400'
+                              ? 'bg-limeglow-400 text-forest-950'
                               : c.type === 'CLIENT_SHOP'
-                                ? 'bg-brand-50 text-brand-800'
-                                : 'bg-slate-100 text-slate-600'
+                                ? 'bg-brand-100 text-brand-800'
+                                : 'bg-slate-200 text-slate-700'
                           }`}
                         >
-                          {CONVERSATION_TYPE_LABELS[c.type]}
+                          {getInitials(displayTitle)}
                         </span>
-                        {c.unreadCount > 0 ? (
-                          <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
-                            {c.unreadCount}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className={`mt-1.5 truncate text-sm font-bold ${active ? 'text-white' : 'text-slate-900'}`}>
-                        {c.subject}
-                      </p>
-                      {c.lastMessagePreview ? (
-                        <p className={`mt-0.5 truncate text-xs ${active ? 'text-emerald-100/75' : 'text-slate-500'}`}>
-                          {c.lastMessagePreview}
-                        </p>
-                      ) : null}
-                      <p className={`mt-1 text-[10px] ${active ? 'text-emerald-200/60' : 'text-slate-400'}`}>
-                        {c.shopName ? `${c.shopName} · ` : ''}
-                        {formatDateTimeInTimezone(c.lastMessageAt)}
-                      </p>
-                    </button>
-                  );
-                })}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p
+                              className={`truncate text-sm font-bold ${
+                                active ? 'text-white' : 'text-slate-900'
+                              }`}
+                            >
+                              {c.subject}
+                            </p>
+                            {c.unreadCount > 0 ? (
+                              <span className="shrink-0 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                                {c.unreadCount}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {c.lastMessagePreview ? (
+                            <p
+                              className={`mt-0.5 truncate text-xs ${
+                                active ? 'text-emerald-100/80' : 'text-slate-500'
+                              }`}
+                            >
+                              {c.lastMessagePreview}
+                            </p>
+                          ) : null}
+
+                          <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px]">
+                            <span
+                              className={`rounded-full px-2 py-0.5 font-bold ${
+                                active
+                                  ? 'bg-white/15 text-limeglow-300'
+                                  : c.type === 'CLIENT_SHOP'
+                                    ? 'bg-brand-50 text-brand-700'
+                                    : 'bg-slate-100 text-slate-600'
+                              }`}
+                            >
+                              {CONVERSATION_TYPE_LABELS[c.type]}
+                            </span>
+                            <span className={active ? 'text-emerald-200/70' : 'text-slate-400'}>
+                              {formatDateTimeInTimezone(c.lastMessageAt)}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </aside>
 
-            {/* Colonne Fil de messages actif */}
-            <section className="sc-card flex flex-col overflow-hidden lg:col-span-8">
+            {/* Colonne Fil de discussion actif */}
+            <section
+              className={`flex flex-col overflow-hidden bg-porcelain-50 lg:col-span-8 lg:flex ${
+                mobileShowThread ? 'flex' : 'hidden'
+              }`}
+            >
               {detail ? (
                 <>
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-porcelain-50 px-5 py-3.5">
-                    <div className="min-w-0">
-                      <h2 className="truncate text-sm font-extrabold text-slate-900">
-                        {detail.subject}
-                      </h2>
-                      <p className="text-xs text-slate-500">
-                        {CONVERSATION_TYPE_LABELS[detail.type]}
-                        {detail.clientPhone ? ` · Client : ${detail.clientPhone}` : ''}
-                        {detail.orderNumber ? ` · Commande ${detail.orderNumber}` : ''}
-                      </p>
+                  {/* En-tête thread */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 bg-white px-4 py-3 sm:px-5">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setMobileShowThread(false)}
+                        aria-label="Retour aux discussions"
+                        className="rounded-xl border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 lg:hidden"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                      </button>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-forest-900 text-xs font-extrabold text-limeglow-400">
+                        {getInitials(detail.clientName || detail.subject)}
+                      </span>
+                      <div className="min-w-0">
+                        <h2 className="truncate text-sm font-extrabold text-slate-900">
+                          {detail.subject}
+                        </h2>
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                          <span>{CONVERSATION_TYPE_LABELS[detail.type]}</span>
+                          {detail.clientPhone ? (
+                            <a
+                              href={`tel:${detail.clientPhone}`}
+                              className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline"
+                            >
+                              <Phone className="h-3 w-3" />
+                              {detail.clientPhone}
+                            </a>
+                          ) : null}
+                          {detail.orderNumber ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-1.5 py-0.5 font-mono font-bold text-brand-800">
+                              <ShoppingBag className="h-3 w-3" />
+                              {detail.orderNumber}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
 
                     {user?.role === 'OWNER' && agents.length > 0 ? (
@@ -318,7 +474,7 @@ function MessagingContent() {
                         <select
                           value={detail.assignedAgentUserId || ''}
                           onChange={(e) => handleAssign(e.target.value)}
-                          className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold"
+                          className="rounded-xl border border-slate-200 bg-porcelain-50 px-2.5 py-1.5 text-xs font-bold text-slate-700"
                         >
                           <option value="">Non assignée</option>
                           {agents.map((a) => (
@@ -331,51 +487,74 @@ function MessagingContent() {
                     ) : null}
                   </div>
 
-                  <div className="flex-1 space-y-3 overflow-y-auto p-5">
+                  {/* Messages bulles modernes */}
+                  <div className="flex-1 space-y-3 overflow-y-auto px-4 py-5 sm:px-6">
                     {detail.messages.map((m) => {
                       const isMine =
                         m.senderRole === user?.role && m.senderName === user?.fullName;
+                      const isClient = m.senderRole === 'CLIENT';
                       return (
                         <div
                           key={m.id}
-                          className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm ${
-                            isMine
-                              ? 'ml-auto bg-forest-900 text-white'
-                              : m.senderRole === 'CLIENT'
-                                ? 'border border-brand-200 bg-brand-50 text-slate-900'
-                                : 'border border-slate-200 bg-porcelain-50 text-slate-900'
-                          }`}
+                          className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
                         >
-                          <div className="flex items-center justify-between gap-3 text-[10px] opacity-75">
-                            <span className="font-bold">{m.senderName}</span>
-                            <span>{formatDateTimeInTimezone(m.createdAt)}</span>
-                          </div>
-                          <p className="mt-1 whitespace-pre-wrap text-xs sm:text-sm">{m.body}</p>
-                          {m.attachmentUrl ? (
-                            <a
-                              href={m.attachmentUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-2 block"
+                          <div
+                            className={`max-w-[85%] rounded-2xl px-4 py-2.5 shadow-xs sm:max-w-[74%] ${
+                              isMine
+                                ? 'rounded-br-sm bg-forest-900 text-white'
+                                : isClient
+                                  ? 'rounded-bl-sm border border-brand-200 bg-brand-50 text-slate-900'
+                                  : 'rounded-bl-sm border border-slate-200 bg-white text-slate-900'
+                            }`}
+                          >
+                            <p
+                              className={`text-[10px] font-extrabold ${
+                                isMine
+                                  ? 'text-limeglow-300'
+                                  : isClient
+                                    ? 'text-brand-800'
+                                    : 'text-slate-500'
+                              }`}
                             >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={m.attachmentUrl}
-                                alt="Pièce jointe"
-                                className="max-h-48 rounded-xl border border-white/20 object-cover"
-                              />
-                            </a>
-                          ) : null}
+                              {m.senderName}
+                            </p>
+                            <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed sm:text-sm">
+                              {m.body}
+                            </p>
+                            {m.attachmentUrl ? (
+                              <a
+                                href={m.attachmentUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 block"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={m.attachmentUrl}
+                                  alt="Pièce jointe"
+                                  className="max-h-48 rounded-xl border border-black/10 object-cover"
+                                />
+                              </a>
+                            ) : null}
+                          </div>
+                          <span className="mt-1 px-1 text-[10px] text-slate-400">
+                            {formatDateTimeInTimezone(m.createdAt)}
+                          </span>
                         </div>
                       );
                     })}
+                    <div ref={threadEndRef} />
                   </div>
 
-                  <form onSubmit={handleSend} className="space-y-2 border-t border-slate-100 bg-white p-4">
+                  {/* Zone de rédaction */}
+                  <form
+                    onSubmit={handleSend}
+                    className="space-y-2 border-t border-slate-200/80 bg-white p-3.5 sm:p-4"
+                  >
                     <ImageUploader
                       purpose="message"
                       compact
-                      label="Photo"
+                      label="Joindre une photo"
                       value={attachmentUrl}
                       onChange={setAttachmentUrl}
                     />
@@ -396,8 +575,15 @@ function MessagingContent() {
                 </>
               ) : (
                 <div className="flex flex-1 flex-col items-center justify-center p-10 text-center text-slate-400">
-                  <MessageSquare className="h-10 w-10 opacity-40" />
-                  <p className="mt-2 text-sm">Sélectionnez une conversation à gauche.</p>
+                  <span className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white shadow-xs">
+                    <MessageSquare className="h-7 w-7 text-brand-600" />
+                  </span>
+                  <p className="mt-3 text-sm font-bold text-slate-700">
+                    Sélectionnez une discussion
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Choisissez un échange dans la liste de gauche pour répondre immédiatement.
+                  </p>
                 </div>
               )}
             </section>
@@ -412,7 +598,7 @@ function MessagingContent() {
               className="w-full max-w-md space-y-3.5 rounded-3xl bg-white p-6 shadow-2xl"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-extrabold text-slate-900">Nouvelle conversation</h2>
+                <h2 className="text-lg font-extrabold text-slate-900">Nouvelle discussion</h2>
                 <button
                   type="button"
                   onClick={() => setNewOpen(false)}
@@ -509,7 +695,13 @@ function MessagingContent() {
 
 export default function MessagingPage() {
   return (
-    <Suspense fallback={<div className="p-6"><LoadingSkeleton rows={5} /></div>}>
+    <Suspense
+      fallback={
+        <div className="p-6">
+          <LoadingSkeleton rows={5} />
+        </div>
+      }
+    >
       <MessagingContent />
     </Suspense>
   );

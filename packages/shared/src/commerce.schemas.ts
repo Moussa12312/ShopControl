@@ -43,6 +43,8 @@ export const createProductSchema = z.object({
   alertThreshold: z.number().int().min(0).default(5),
   status: z.enum(PRODUCT_STATUSES).default('DRAFT'),
   imageUrls: z.array(z.string().trim().max(500)).max(8).default([]),
+  availableSizes: z.array(z.string().trim().min(1).max(32)).max(30).default([]),
+  availableColors: z.array(z.string().trim().min(1).max(40)).max(30).default([]),
   initialStockQty: z.number().int().min(0).optional(),
   variants: z.array(productVariantInputSchema).max(50).optional(),
 });

@@ -168,7 +168,7 @@ export function ImageUploader({
           <div className="flex w-full flex-col items-center gap-3 sm:flex-row">
             <div
               className={`relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs ${
-                aspect === 'wide' ? 'h-24 w-36' : 'h-24 w-24'
+                aspect === 'wide' ? 'h-20 w-28' : 'h-20 w-20'
               } shrink-0`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}

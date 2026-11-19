@@ -175,6 +175,8 @@ export class CatalogService {
           alertThreshold: p.alertThreshold,
           status: p.status,
           imageUrls: Array.isArray(p.imageUrls) ? p.imageUrls : [],
+          availableSizes: Array.isArray(p.availableSizes) ? p.availableSizes : [],
+          availableColors: Array.isArray(p.availableColors) ? p.availableColors : [],
           stockPhysical,
           stockReserved,
           stockAvailable: stockPhysical - stockReserved,
@@ -234,6 +236,8 @@ export class CatalogService {
           alertThreshold: input.alertThreshold ?? 5,
           status: input.status || 'DRAFT',
           imageUrls: input.imageUrls || [],
+          availableSizes: input.availableSizes || [],
+          availableColors: input.availableColors || [],
           ...(input.variants?.length
             ? {
                 variants: {
@@ -332,6 +336,8 @@ export class CatalogService {
         ...(input.alertThreshold !== undefined ? { alertThreshold: input.alertThreshold } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.imageUrls !== undefined ? { imageUrls: input.imageUrls } : {}),
+        ...(input.availableSizes !== undefined ? { availableSizes: input.availableSizes } : {}),
+        ...(input.availableColors !== undefined ? { availableColors: input.availableColors } : {}),
       },
     });
 

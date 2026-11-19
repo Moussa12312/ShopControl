@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { GlobalHttpExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { ControlPrismaService } from '../src/common/database/control-prisma.service';
 import { ShopDatabaseManagerService } from '../src/common/database/shop-database-manager.service';
 
 process.env.NODE_ENV = 'test';
@@ -102,6 +103,24 @@ describe('ShopControl Lots 3 à 7 + Correctifs — Recette intégrale (Documents
   }, 60000);
 
   afterAll(async () => {
+    const control = app.get(ControlPrismaService);
+    await control.platformAnnouncement
+      .deleteMany({ where: { title: { contains: runId } } })
+      .catch(() => undefined);
+    if (merchantId) {
+      await control.shop
+        .updateMany({
+          where: { merchantId },
+          data: { status: 'TERMINATED', dbStatus: 'MIGRATION_FAILED' },
+        })
+        .catch(() => undefined);
+      await control.merchant
+        .updateMany({
+          where: { id: merchantId },
+          data: { status: 'TERMINATED' },
+        })
+        .catch(() => undefined);
+    }
     for (const dbName of createdShopDbNames) {
       await shopDbManager.dropShopDatabaseForTest(dbName).catch(() => undefined);
     }
@@ -180,15 +199,20 @@ describe('ShopControl Lots 3 à 7 + Correctifs — Recette intégrale (Documents
       .send({
         name: 'Bazin Riche Getzner',
         sku: `BAZ-${runId}`,
+        description: 'Bazin 100% coton damassé importé, finitions haut de gamme.',
         salePriceXof: 25000,
         costPriceXof: 15000,
         alertThreshold: 2,
         status: 'PUBLISHED',
         imageUrls: [prodImg.body.url],
+        availableSizes: ['M', 'L', 'XL'],
+        availableColors: ['Bleu marine', 'Blanc', 'Or'],
       })
       .expect(201);
     prodAId = pRes.body.id;
     expect(pRes.body.imageUrls).toContain(prodImg.body.url);
+    expect(pRes.body.availableSizes).toEqual(['M', 'L', 'XL']);
+    expect(pRes.body.availableColors).toEqual(['Bleu marine', 'Blanc', 'Or']);
 
     // Entrée de stock initiale de 10 unités dans Boutique A
     await request(app.getHttpServer())
@@ -435,7 +459,7 @@ describe('ShopControl Lots 3 à 7 + Correctifs — Recette intégrale (Documents
         fulfillmentMode: 'DELIVERY',
         deliveryAddress: 'Badalabougou Rue 14',
         deliveryDistrict: 'Bamako Centre',
-        items: [{ productId: prodAId, quantity: 2 }],
+        items: [{ productId: prodAId, quantity: 2, selectedSize: 'L', selectedColor: 'Bleu marine' }],
       })
       .expect(201);
     order1Id = ord1.body.orderId;

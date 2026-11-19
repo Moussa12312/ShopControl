@@ -144,9 +144,11 @@ model Product {
   salePriceXof   Int      @map("sale_price_xof")
   costPriceXof   Int?     @map("cost_price_xof")
   alertThreshold Int      @default(5) @map("alert_threshold")
-  status         String   @default("DRAFT") @db.VarChar(20)
-  imageUrls      Json     @default("[]") @map("image_urls")
-  importBatchId  String?  @map("import_batch_id") @db.Uuid
+  status          String   @default("DRAFT") @db.VarChar(20)
+  imageUrls       Json     @default("[]") @map("image_urls")
+  availableSizes  Json     @default("[]") @map("available_sizes")
+  availableColors Json     @default("[]") @map("available_colors")
+  importBatchId   String?  @map("import_batch_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -745,9 +747,11 @@ model OnlineOrderLine {
   orderId      String  @map("order_id") @db.Uuid
   productId    String  @map("product_id") @db.Uuid
   variantId    String? @map("variant_id") @db.Uuid
-  productName  String  @map("product_name") @db.VarChar(160)
-  sku          String  @db.VarChar(64)
-  orderedQty   Int     @map("ordered_qty")
+  productName   String  @map("product_name") @db.VarChar(160)
+  sku           String  @db.VarChar(64)
+  selectedSize  String? @map("selected_size") @db.VarChar(32)
+  selectedColor String? @map("selected_color") @db.VarChar(40)
+  orderedQty    Int     @map("ordered_qty")
   deliveredQty Int     @default(0) @map("delivered_qty")
   unitPriceXof Int     @map("unit_price_xof")
   lineTotalXof Int     @map("line_total_xof")

@@ -222,12 +222,20 @@ export class AnalyticsService {
         grossSalesCurrentXof += sale.totalXof;
         currentSalesCount += 1;
         if (sale.stockConflict) stockConflictsCount += 1;
+        const hasExplicitReturns = sale.lines.some((l) => l.returnedQty > 0);
+        const refundScale =
+          !hasExplicitReturns && sale.totalXof > 0 && sale.refundedAmountXof > 0
+            ? Math.max(0, 1 - sale.refundedAmountXof / sale.totalXof)
+            : 1;
         for (const l of sale.lines) {
           const netQty = Math.max(0, l.quantity - l.returnedQty);
-          productSalesQty.set(l.productId, (productSalesQty.get(l.productId) ?? 0) + netQty);
+          productSalesQty.set(
+            l.productId,
+            (productSalesQty.get(l.productId) ?? 0) + Math.round(netQty * refundScale),
+          );
           if (l.unitCostXof !== null) {
-            cogsCurrentXof += l.unitCostXof * netQty;
-          } else if (netQty > 0) {
+            cogsCurrentXof += Math.round(l.unitCostXof * netQty * refundScale);
+          } else if (netQty > 0 && refundScale > 0) {
             missingCostProductIds.add(l.productId);
           }
         }

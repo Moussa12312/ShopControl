@@ -9,6 +9,7 @@ async function main(): Promise<void> {
 
   try {
     const shops = await control.shop.findMany({
+      where: { status: { not: 'TERMINATED' } },
       orderBy: { createdAt: 'asc' },
       select: { id: true, name: true, dbName: true, dbStatus: true },
     });

@@ -243,8 +243,8 @@ export default function OwnerDashboardPage() {
         </div>
       </div>
 
-      {/* 4 cartes KPI Obsidian Glass + Carte Lime-Glow */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3.5 xl:grid-cols-4">
+      {/* 4 cartes KPI Obsidian Glass sur 1 rangée dès lg (1024px+) */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* KPI 1 : Chiffre d'affaires Net (remboursements déduits !) */}
         <div className="sc-dark-glass min-w-0 p-4">
           <div className="flex items-start justify-between gap-2">
@@ -368,13 +368,7 @@ export default function OwnerDashboardPage() {
               </p>
             </div>
             <Link
-              href={
-                (kpis?.pendingOrdersCount ?? 0) > 0
-                  ? '/commerce/orders'
-                  : (kpis?.lowStockCount ?? 0) > 0
-                    ? '/commerce/stock'
-                    : '/owner/reports'
-              }
+              href={(kpis?.pendingOrdersCount ?? 0) > 0 ? '/commerce/orders' : '/owner/reports'}
               className="inline-flex shrink-0 items-center gap-1 rounded-full bg-limeglow-400 px-3.5 py-2 text-xs font-extrabold text-forest-950 shadow-lime transition hover:bg-limeglow-300"
             >
               <span>{(kpis?.pendingOrdersCount ?? 0) > 0 ? 'Commandes' : 'Bilans'}</span>

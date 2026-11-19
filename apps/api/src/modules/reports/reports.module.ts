@@ -146,12 +146,17 @@ export class ReportsService {
     for (const s of sales) {
       grossSalesXof += s.totalXof;
       receivablesCreatedXof += s.dueAmountXof;
+      const hasExplicitReturns = s.lines.some((l) => l.returnedQty > 0);
+      const refundScale =
+        !hasExplicitReturns && s.totalXof > 0 && s.refundedAmountXof > 0
+          ? Math.max(0, 1 - s.refundedAmountXof / s.totalXof)
+          : 1;
       for (const l of s.lines) {
         const netQty = Math.max(0, l.quantity - l.returnedQty);
-        itemsSoldQty += netQty;
+        itemsSoldQty += Math.round(netQty * refundScale);
         if (l.unitCostXof !== null) {
-          cogsXof += l.unitCostXof * netQty;
-        } else if (netQty > 0) {
+          cogsXof += Math.round(l.unitCostXof * netQty * refundScale);
+        } else if (netQty > 0 && refundScale > 0) {
           missingCostIds.add(l.productId);
         }
       }
