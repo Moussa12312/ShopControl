@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   AlertTriangle,
+  Banknote,
   Bell,
+  Boxes,
   Building2,
   CheckCheck,
   ChevronLeft,
@@ -15,16 +17,22 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Package,
+  Receipt,
   Settings,
   ShieldCheck,
+  ShoppingCart,
   Store,
+  Truck,
+  Upload,
   UserCheck,
   Users,
+  Wallet,
   Wifi,
   WifiOff,
   X,
 } from 'lucide-react';
-import { USER_ROLE_LABELS, UserRole } from '@shopcontrol/shared';
+import { PermissionKey, USER_ROLE_LABELS, UserRole } from '@shopcontrol/shared';
 import { apiFetch } from '@/lib/api-client';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useNetworkStatus } from '@/components/providers/NetworkStatusProvider';
@@ -34,6 +42,7 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  requiredPerm?: PermissionKey;
 }
 
 interface NotificationItem {
@@ -56,6 +65,14 @@ const NAV_BY_ROLE: Record<'SUPER_ADMIN' | 'OWNER' | 'AGENT', NavItem[]> = {
   ],
   OWNER: [
     { href: '/owner', label: 'Vue d’ensemble', icon: LayoutDashboard },
+    { href: '/pos', label: 'Ventes / POS', icon: ShoppingCart },
+    { href: '/commerce/products', label: 'Produits', icon: Package },
+    { href: '/commerce/stock', label: 'Stocks', icon: Boxes },
+    { href: '/commerce/cash', label: 'Caisse', icon: Banknote },
+    { href: '/commerce/purchases', label: 'Achats', icon: Truck },
+    { href: '/commerce/clients', label: 'Clients & Créances', icon: Receipt },
+    { href: '/commerce/expenses', label: 'Dépenses', icon: Wallet },
+    { href: '/commerce/import', label: 'Import CSV', icon: Upload },
     { href: '/owner/shops', label: 'Boutiques', icon: Store },
     { href: '/owner/agents', label: 'Agents', icon: Users },
     { href: '/owner/operators', label: 'Opérateurs', icon: UserCheck },
@@ -64,6 +81,13 @@ const NAV_BY_ROLE: Record<'SUPER_ADMIN' | 'OWNER' | 'AGENT', NavItem[]> = {
   ],
   AGENT: [
     { href: '/agent', label: 'Accueil boutique', icon: Store },
+    { href: '/pos', label: 'Ventes / POS', icon: ShoppingCart, requiredPerm: 'sales:read' },
+    { href: '/commerce/products', label: 'Produits', icon: Package, requiredPerm: 'products:read' },
+    { href: '/commerce/stock', label: 'Stocks', icon: Boxes, requiredPerm: 'stock:read' },
+    { href: '/commerce/cash', label: 'Caisse', icon: Banknote, requiredPerm: 'cash:read' },
+    { href: '/commerce/purchases', label: 'Achats', icon: Truck, requiredPerm: 'purchases:read' },
+    { href: '/commerce/clients', label: 'Clients', icon: Receipt, requiredPerm: 'clients:read' },
+    { href: '/commerce/expenses', label: 'Dépenses', icon: Wallet, requiredPerm: 'expenses:create' },
     { href: '/agent/profile', label: 'Mon profil', icon: UserCheck },
   ],
 };
@@ -132,9 +156,7 @@ export function AppShell({
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   const effectiveAllowed =
     allowedRoles.includes(user.role) ||
@@ -152,7 +174,12 @@ export function AppShell({
     user.role === 'SUPER_ADMIN' && supportGrantId
       ? 'OWNER'
       : (user.role as 'SUPER_ADMIN' | 'OWNER' | 'AGENT');
-  const navItems = NAV_BY_ROLE[navRole] || [];
+
+  const agentPerms = user.role === 'AGENT' ? shops[0]?.permissions : null;
+  const navItems = (NAV_BY_ROLE[navRole] || []).filter((item) => {
+    if (!item.requiredPerm || user.role !== 'AGENT') return true;
+    return Boolean(agentPerms?.[item.requiredPerm]);
+  });
 
   const activeShop = shops.find((s) => s.shopId === selectedShopId);
   const isSuspended =
@@ -188,7 +215,6 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      {/* Drawer mobile overlay */}
       {mobileOpen ? (
         <div
           className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
@@ -196,7 +222,6 @@ export function AppShell({
         />
       ) : null}
 
-      {/* Barre latérale repliable (Section 13.2) */}
       <aside
         aria-label="Navigation principale"
         className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-slate-200 bg-white transition-all duration-200 lg:static ${
@@ -235,7 +260,7 @@ export function AppShell({
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active =
@@ -250,13 +275,13 @@ export function AppShell({
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
                 title={collapsed ? item.label : undefined}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
                   active
                     ? 'bg-brand-50 text-brand-800'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`}
               >
-                <Icon className="h-5 w-5 shrink-0" />
+                <Icon className="h-4 w-4 shrink-0" />
                 {!collapsed ? <span className="truncate">{item.label}</span> : null}
               </Link>
             );
@@ -268,17 +293,15 @@ export function AppShell({
             type="button"
             onClick={handleLogout}
             title={collapsed ? 'Déconnexion' : undefined}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-700"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-700"
           >
-            <LogOut className="h-5 w-5 shrink-0" />
+            <LogOut className="h-4 w-4 shrink-0" />
             {!collapsed ? <span>Déconnexion</span> : null}
           </button>
         </div>
       </aside>
 
-      {/* Contenu principal */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* En-tête */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <button
@@ -290,7 +313,6 @@ export function AppShell({
               <Menu className="h-5 w-5" />
             </button>
 
-            {/* Sélecteur de boutique pour Propriétaire (Section 3.2 & 13.2) */}
             {(user.role === 'OWNER' || (user.role === 'SUPER_ADMIN' && supportGrantId)) && (
               <div className="flex items-center gap-2">
                 <Store className="hidden h-4 w-4 text-brand-700 sm:block" aria-hidden="true" />
@@ -313,7 +335,6 @@ export function AppShell({
               </div>
             )}
 
-            {/* Boutique fixe + opérateur déclaré pour Agent */}
             {user.role === 'AGENT' && shops[0] ? (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-800">
@@ -329,7 +350,6 @@ export function AppShell({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Indicateur de connexion permanent (Section 13.2 & Option B 14.3) */}
             <div
               role="status"
               aria-live="polite"
@@ -352,7 +372,6 @@ export function AppShell({
               )}
             </div>
 
-            {/* Centre de notifications */}
             <div className="relative">
               <button
                 type="button"
@@ -423,7 +442,6 @@ export function AppShell({
               ) : null}
             </div>
 
-            {/* Identité utilisateur */}
             <div className="hidden text-right sm:block">
               <p className="text-xs font-semibold text-slate-900">{user.fullName}</p>
               <p className="text-[11px] text-slate-500">{USER_ROLE_LABELS[user.role]}</p>
@@ -431,12 +449,11 @@ export function AppShell({
           </div>
         </header>
 
-        {/* Bandeaux contextuels obligatoires (Section 3.3 & 4.1 & 12.1) */}
         {user.mustSetupTwoFactor ? (
           <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-600 px-4 py-2 text-xs font-medium text-white">
             <span className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 shrink-0" />
-              Sécurité Super Admin : la double authentification (2FA) est obligatoire pour sécuriser votre compte.
+              Sécurité Super Admin : la double authentification (2FA) est obligatoire.
             </span>
             <Link
               href="/setup-2fa"
@@ -473,7 +490,7 @@ export function AppShell({
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>
               Accès en lecture seule : ce compte ou cette boutique est actuellement suspendu(e).
-              Vos données sont conservées et consultables, mais aucune modification n’est autorisée.
+              Vos données sont conservées, mais aucune modification n’est autorisée.
             </span>
           </div>
         ) : isPastDue ? (
