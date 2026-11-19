@@ -282,28 +282,23 @@ export default function ProductsPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER', 'AGENT']}>
+    <AppShell
+      allowedRoles={['OWNER', 'AGENT']}
+      title="Produits & Catégories"
+      subtitle="Photos, descriptions, tailles et couleurs disponibles — synchronisés en direct avec le POS et la vitrine QR."
+      headerActions={
+        <>
+          <ShopPickerInline shopId={shopId} onChange={selectShop} />
+          {canWrite && shopId ? (
+            <button type="button" onClick={openCreate} className="sc-hero-btn-primary">
+              <Plus className="h-3.5 w-3.5" />
+              Nouveau produit
+            </button>
+          ) : null}
+        </>
+      }
+    >
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-              Produits & Catégories
-            </h1>
-            <p className="text-sm text-slate-600">
-              Photos, descriptions, tailles et couleurs disponibles — synchronisés en direct avec le
-              POS et la vitrine QR.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ShopPickerInline shopId={shopId} onChange={selectShop} />
-            {canWrite && shopId ? (
-              <button type="button" onClick={openCreate} className="sc-btn-primary">
-                <Plus className="h-4 w-4" />
-                Nouveau produit
-              </button>
-            ) : null}
-          </div>
-        </div>
 
         {/* Catégories */}
         {shopId ? (

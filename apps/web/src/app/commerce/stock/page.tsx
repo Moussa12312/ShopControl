@@ -163,45 +163,46 @@ export default function StockPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER', 'AGENT']}>
-      <div className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
-              Stocks, Mouvements & Inventaire
-            </h1>
-            <p className="text-xs text-slate-600 sm:text-sm">
-              Registre immuable de mouvements (append-only) : le stock disponible est la somme exacte
-              des mouvements.
-            </p>
+    <AppShell
+      allowedRoles={['OWNER', 'AGENT']}
+      title="Stocks, Mouvements & Inventaire"
+      subtitle="Registre immuable de mouvements : le stock disponible est la somme exacte des mouvements."
+      headerActions={
+        <>
+          <ShopPickerInline shopId={shopId} onChange={selectShop} />
+          <div className="inline-flex rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setTab('movements')}
+              className={`rounded-full px-3 py-1 transition ${
+                tab === 'movements' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+              }`}
+            >
+              Mouvements
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('adjust')}
+              className={`rounded-full px-3 py-1 transition ${
+                tab === 'adjust' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+              }`}
+            >
+              Correction
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('inventory')}
+              className={`rounded-full px-3 py-1 transition ${
+                tab === 'inventory' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+              }`}
+            >
+              Inventaire
+            </button>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ShopPickerInline shopId={shopId} onChange={selectShop} />
-            <div className="grid w-full grid-cols-3 rounded-xl border border-slate-200 bg-white p-1 text-xs font-semibold sm:inline-flex sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setTab('movements')}
-                className={`rounded-lg px-2.5 py-1.5 text-center sm:px-3 ${tab === 'movements' ? 'bg-forest-900 text-white' : 'text-slate-600'}`}
-              >
-                Mouvements
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('adjust')}
-                className={`rounded-lg px-2.5 py-1.5 text-center sm:px-3 ${tab === 'adjust' ? 'bg-forest-900 text-white' : 'text-slate-600'}`}
-              >
-                Correction
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('inventory')}
-                className={`rounded-lg px-2.5 py-1.5 text-center sm:px-3 ${tab === 'inventory' ? 'bg-forest-900 text-white' : 'text-slate-600'}`}
-              >
-                Inventaire
-              </button>
-            </div>
-          </div>
-        </div>
+        </>
+      }
+    >
+      <div className="space-y-5">
 
         {alerts.length > 0 ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">

@@ -91,16 +91,12 @@ export default function AgentProfilePage() {
   };
 
   return (
-    <AppShell allowedRoles={['AGENT']}>
+    <AppShell
+      allowedRoles={['AGENT']}
+      title="Mon profil & Paramètres"
+      subtitle="Informations de votre compte, sécurité du mot de passe et appareils connectés."
+    >
       <div className="mx-auto max-w-3xl space-y-5">
-        <div>
-          <h1 className="text-lg font-extrabold tracking-tight text-slate-900 sm:text-xl">
-            Mon profil & Paramètres
-          </h1>
-          <p className="text-xs text-slate-500">
-            Informations de votre compte, sécurité du mot de passe et appareils connectés.
-          </p>
-        </div>
 
         {/* Identité & Boutique (aucune permission affichée) */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

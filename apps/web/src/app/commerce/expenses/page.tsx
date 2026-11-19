@@ -182,38 +182,39 @@ export default function ExpensesPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER', 'AGENT']}>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Dépenses</h1>
-            <p className="text-sm text-slate-600">
-              Prises en compte dans le bénéfice net estimé ; décaissement automatique si payée depuis
-              la caisse (Section 5.6).
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ShopPickerInline shopId={shopId} onChange={selectShop} />
-            {isOwner ? (
-              <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setTab('shop')}
-                  className={`rounded-lg px-3 py-1.5 ${tab === 'shop' ? 'bg-brand-700 text-white' : 'text-slate-600'}`}
-                >
-                  Boutique ({formatXof(shopTotal)})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTab('company')}
-                  className={`rounded-lg px-3 py-1.5 ${tab === 'company' ? 'bg-brand-700 text-white' : 'text-slate-600'}`}
-                >
-                  Entreprise ({formatXof(companyTotal)})
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </div>
+    <AppShell
+      allowedRoles={['OWNER', 'AGENT']}
+      title="Dépenses"
+      subtitle="Prises en compte dans le bénéfice net estimé ; décaissement automatique si payée depuis la caisse."
+      headerActions={
+        <>
+          <ShopPickerInline shopId={shopId} onChange={selectShop} />
+          {isOwner ? (
+            <div className="inline-flex rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setTab('shop')}
+                className={`rounded-full px-3 py-1 transition ${
+                  tab === 'shop' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+                }`}
+              >
+                Boutique ({formatXof(shopTotal)})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab('company')}
+                className={`rounded-full px-3 py-1 transition ${
+                  tab === 'company' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+                }`}
+              >
+                Entreprise ({formatXof(companyTotal)})
+              </button>
+            </div>
+          ) : null}
+        </>
+      }
+    >
+      <div className="space-y-5">
 
         {msg ? (
           <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm text-emerald-900">

@@ -71,24 +71,18 @@ export default function AdminSecurityPage() {
   };
 
   return (
-    <AppShell allowedRoles={['SUPER_ADMIN']}>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Sécurité & Journaux d’audit</h1>
-            <p className="text-sm text-slate-600">
-              Mandats d’assistance exceptionnels et journal plateforme immuable (append-only).
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleVerifyChain}
-            className="inline-flex items-center gap-2 rounded-xl border border-brand-700 bg-white px-4 py-2 text-sm font-semibold text-brand-800 hover:bg-brand-50"
-          >
-            <ShieldCheck className="h-4 w-4" />
-            Vérifier l’intégrité SHA-256
-          </button>
-        </div>
+    <AppShell
+      allowedRoles={['SUPER_ADMIN']}
+      title="Sécurité & Journaux d’audit"
+      subtitle="Mandats d’assistance exceptionnels et journal plateforme immuable."
+      headerActions={
+        <button type="button" onClick={handleVerifyChain} className="sc-hero-btn-primary">
+          <ShieldCheck className="h-3.5 w-3.5 text-brand-700" />
+          Vérifier l’intégrité SHA-256
+        </button>
+      }
+    >
+      <div className="space-y-5">
 
         {integrity ? (
           <div

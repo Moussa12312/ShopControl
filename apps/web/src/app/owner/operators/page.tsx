@@ -93,31 +93,28 @@ export default function OwnerOperatorsPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER']}>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Opérateurs déclarés</h1>
-            <p className="text-sm text-slate-600">
-              Prénoms stockés dans la base dédiée de chaque boutique pour tracer les opérations sur
-              compte Agent partagé (Section 4.3).
-            </p>
-          </div>
-          {shops.length > 0 ? (
-            <select
-              value={targetShopId}
-              onChange={(e) => setTargetShopId(e.target.value)}
-              aria-label="Choisir une boutique"
-              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-            >
-              {shops.map((s) => (
-                <option key={s.shopId} value={s.shopId}>
-                  {s.shopName}
-                </option>
-              ))}
-            </select>
-          ) : null}
-        </div>
+    <AppShell
+      allowedRoles={['OWNER']}
+      title="Opérateurs déclarés"
+      subtitle="Prénoms stockés dans la base dédiée de chaque boutique pour tracer les opérations au comptoir."
+      headerActions={
+        shops.length > 0 ? (
+          <select
+            value={targetShopId}
+            onChange={(e) => setTargetShopId(e.target.value)}
+            aria-label="Choisir une boutique"
+            className="rounded-full border border-white/15 bg-forest-800/90 px-3 py-1.5 text-xs font-semibold text-white"
+          >
+            {shops.map((s) => (
+              <option key={s.shopId} value={s.shopId} className="bg-forest-900 text-white">
+                {s.shopName}
+              </option>
+            ))}
+          </select>
+        ) : null
+      }
+    >
+      <div className="space-y-5">
 
         {!supportGrantId && targetShopId ? (
           <form

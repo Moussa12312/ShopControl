@@ -162,27 +162,20 @@ export default function OwnerShopsPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER']}>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Mes boutiques</h1>
-            <p className="text-sm text-slate-600">
-              Chaque boutique créée dispose automatiquement de sa propre base PostgreSQL isolée et
-              de son URL vitrine stable.
-            </p>
-          </div>
-          {!supportGrantId ? (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-800"
-            >
-              <Plus className="h-4 w-4" />
-              Nouvelle boutique
-            </button>
-          ) : null}
-        </div>
+    <AppShell
+      allowedRoles={['OWNER']}
+      title="Mes boutiques"
+      subtitle="Chaque boutique dispose automatiquement de sa propre base de données isolée et de son URL vitrine stable."
+      headerActions={
+        !supportGrantId ? (
+          <button type="button" onClick={openCreate} className="sc-hero-btn-primary">
+            <Plus className="h-4 w-4" />
+            Nouvelle boutique
+          </button>
+        ) : null
+      }
+    >
+      <div className="space-y-5">
 
         {loading ? (
           <LoadingSkeleton rows={4} />

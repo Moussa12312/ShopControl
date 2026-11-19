@@ -239,42 +239,36 @@ export default function OwnerAgentsPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER']}>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Comptes Agents & Permissions</h1>
-            <p className="text-sm text-slate-600">
-              Un compte Agent est strictement cloisonné à une seule boutique. Contrôle appliqué côté serveur.
-            </p>
-          </div>
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            {shops.length > 0 ? (
-              <select
-                value={targetShopId}
-                onChange={(e) => setTargetShopId(e.target.value)}
-                aria-label="Choisir la boutique"
-                className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm sm:flex-none"
-              >
-                {shops.map((s) => (
-                  <option key={s.shopId} value={s.shopId}>
-                    {s.shopName}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-            {!supportGrantId && targetShopId ? (
-              <button
-                type="button"
-                onClick={openCreate}
-                className="inline-flex items-center gap-2 rounded-xl bg-forest-900 px-4 py-2 text-sm font-semibold text-white hover:bg-forest-800"
-              >
-                <Plus className="h-4 w-4" />
-                Nouvel Agent
-              </button>
-            ) : null}
-          </div>
-        </div>
+    <AppShell
+      allowedRoles={['OWNER']}
+      title="Comptes Agents & Permissions"
+      subtitle="Un compte Agent est strictement cloisonné à une seule boutique. Contrôle appliqué côté serveur."
+      headerActions={
+        <>
+          {shops.length > 0 ? (
+            <select
+              value={targetShopId}
+              onChange={(e) => setTargetShopId(e.target.value)}
+              aria-label="Choisir la boutique"
+              className="rounded-full border border-white/15 bg-forest-800/90 px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              {shops.map((s) => (
+                <option key={s.shopId} value={s.shopId} className="bg-forest-900 text-white">
+                  {s.shopName}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          {!supportGrantId && targetShopId ? (
+            <button type="button" onClick={openCreate} className="sc-hero-btn-primary">
+              <Plus className="h-3.5 w-3.5" />
+              Nouvel Agent
+            </button>
+          ) : null}
+        </>
+      }
+    >
+      <div className="space-y-5">
 
         {loading ? (
           <LoadingSkeleton rows={4} />

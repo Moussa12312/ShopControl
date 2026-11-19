@@ -129,10 +129,16 @@ const AGENT_NAV: NavItem[] = [
 export function AppShell({
   allowedRoles,
   hero,
+  title,
+  subtitle,
+  headerActions,
   children,
 }: {
   allowedRoles: UserRole[];
   hero?: React.ReactNode;
+  title?: string;
+  subtitle?: string;
+  headerActions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -836,14 +842,8 @@ export function AppShell({
       <div
         className={`flex min-h-screen min-w-0 flex-col pt-14 transition-all duration-200 ${contentOffsetClass}`}
       >
-        {/* Bandeaux d'alertes uniquement si nécessaire */}
-        {visibleAnnouncements.length > 0 ||
-        user.mustSetupTwoFactor ||
-        supportGrantId ||
-        isSuspended ||
-        isPastDue ||
-        hero ? (
-          <div className="no-print">
+        {/* Bandeaux d'alertes + Entête Obsidian Emerald présente sur TOUTES les pages */}
+        <div className="no-print">
             {visibleAnnouncements.slice(0, 1).map((ann) => (
               <div
                 key={ann.id}
@@ -923,9 +923,24 @@ export function AppShell({
 
             {hero ? (
               <div className="obsidian-hero px-4 pb-5 pt-4 text-white sm:px-5 lg:px-6">{hero}</div>
-            ) : null}
+            ) : (
+              <div className="obsidian-hero px-4 py-4 text-white sm:px-5 lg:px-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <h1 className="truncate text-lg font-extrabold tracking-tight text-white sm:text-xl">
+                      {title || pageTitle}
+                    </h1>
+                    {subtitle ? (
+                      <p className="mt-0.5 text-xs text-emerald-200/75">{subtitle}</p>
+                    ) : null}
+                  </div>
+                  {headerActions ? (
+                    <div className="flex flex-wrap items-center gap-2">{headerActions}</div>
+                  ) : null}
+                </div>
+              </div>
+            )}
           </div>
-        ) : null}
 
         {/* Zone principale scrollable */}
         <main className="w-full min-w-0 flex-1 overflow-x-clip p-3 pb-24 sm:p-5 sm:pb-24 lg:p-6 lg:pb-8">

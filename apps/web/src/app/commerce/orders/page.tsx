@@ -255,31 +255,27 @@ export default function OrdersPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER', 'AGENT']}>
+    <AppShell
+      allowedRoles={['OWNER', 'AGENT']}
+      title="Commandes Vitrine QR"
+      subtitle="Confirmez pour réserver le stock immédiatement · Convertissez en vente + ticket lors de la remise."
+      headerActions={
+        <>
+          <ShopPickerInline shopId={shopId} onChange={selectShop} />
+          {activeShop ? (
+            <button
+              type="button"
+              onClick={() => setQrOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-limeglow-400 px-3.5 py-1.5 text-xs font-extrabold text-forest-950 shadow-lime hover:bg-limeglow-300"
+            >
+              <QrCode className="h-3.5 w-3.5" />
+              QR & Vitrine
+            </button>
+          ) : null}
+        </>
+      }
+    >
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-              Commandes Vitrine QR
-            </h1>
-            <p className="text-sm text-slate-600">
-              Confirmez pour réserver le stock immédiatement · Convertissez en vente + ticket lors de la remise.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ShopPickerInline shopId={shopId} onChange={selectShop} />
-            {activeShop ? (
-              <button
-                type="button"
-                onClick={() => setQrOpen(true)}
-                className="sc-btn-lime text-xs"
-              >
-                <QrCode className="h-4 w-4" />
-                QR & Vitrine
-              </button>
-            ) : null}
-          </div>
-        </div>
 
         {/* Onglets & Filtres */}
         <div className="sc-card flex flex-wrap items-center justify-between gap-3 p-3.5">

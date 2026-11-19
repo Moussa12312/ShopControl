@@ -247,43 +247,39 @@ export default function AdminPlatformPage() {
   };
 
   return (
-    <AppShell allowedRoles={['SUPER_ADMIN']}>
-      <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-              Administration SaaS Plateforme
-            </h1>
-            <p className="text-sm text-slate-600">
-              Gestion des abonnements & modules, encaissements SaaS, tickets support marchands et annonces globales.
-            </p>
-          </div>
-          <div className="inline-flex flex-wrap rounded-2xl border border-slate-200 bg-white p-1 text-xs font-bold shadow-xs">
-            {(
-              [
-                { id: 'subs', label: 'Abonnements', icon: Crown },
-                { id: 'payments', label: 'Paiements', icon: CreditCard },
-                { id: 'tickets', label: `Support (${tickets.filter((t) => t.status === 'OPEN').length})`, icon: LifeBuoy },
-                { id: 'announcements', label: 'Annonces', icon: Megaphone },
-              ] as const
-            ).map((t) => {
-              const Icon = t.icon;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTab(t.id)}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 transition ${
-                    tab === t.id ? 'bg-forest-900 text-white' : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
+    <AppShell
+      allowedRoles={['SUPER_ADMIN']}
+      title="Administration SaaS Plateforme"
+      subtitle="Gestion des abonnements & modules, encaissements SaaS, tickets support marchands et annonces globales."
+      headerActions={
+        <div className="inline-flex flex-wrap rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-xs font-semibold">
+          {(
+            [
+              { id: 'subs', label: 'Abonnements', icon: Crown },
+              { id: 'payments', label: 'Paiements', icon: CreditCard },
+              { id: 'tickets', label: `Support (${tickets.filter((t) => t.status === 'OPEN').length})`, icon: LifeBuoy },
+              { id: 'announcements', label: 'Annonces', icon: Megaphone },
+            ] as const
+          ).map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 transition ${
+                  tab === t.id ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {t.label}
+              </button>
+            );
+          })}
         </div>
+      }
+    >
+      <div className="space-y-5">
 
         {msg ? (
           <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm font-semibold text-emerald-900">

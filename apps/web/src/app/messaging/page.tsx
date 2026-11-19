@@ -256,24 +256,20 @@ function MessagingContent() {
   };
 
   return (
-    <AppShell allowedRoles={['SUPER_ADMIN', 'OWNER', 'AGENT']}>
+    <AppShell
+      allowedRoles={['SUPER_ADMIN', 'OWNER', 'AGENT']}
+      title="Messagerie Unifiée"
+      subtitle="Discussions clients vitrine QR, coordination équipe et support plateforme."
+      headerActions={
+        user?.role !== 'SUPER_ADMIN' ? (
+          <button type="button" onClick={() => setNewOpen(true)} className="sc-hero-btn-primary">
+            <Plus className="h-3.5 w-3.5" />
+            Nouvelle discussion
+          </button>
+        ) : null
+      }
+    >
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-              Messagerie Unifiée
-            </h1>
-            <p className="text-sm text-slate-600">
-              Discussions clients vitrine QR, coordination équipe et support plateforme.
-            </p>
-          </div>
-          {user?.role !== 'SUPER_ADMIN' ? (
-            <button type="button" onClick={() => setNewOpen(true)} className="sc-btn-primary text-xs">
-              <Plus className="h-4 w-4" />
-              Nouvelle discussion
-            </button>
-          ) : null}
-        </div>
 
         {error ? <ErrorState message={error} onRetry={loadList} /> : null}
 

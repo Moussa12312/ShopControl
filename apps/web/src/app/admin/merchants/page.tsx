@@ -156,24 +156,18 @@ export default function AdminMerchantsPage() {
   };
 
   return (
-    <AppShell allowedRoles={['SUPER_ADMIN']}>
-      <div className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Marchands</h1>
-            <p className="text-xs text-slate-600 sm:text-sm">
-              Créez des entreprises marchandes, gérez leur statut ou ouvrez un accès support borné.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowCreate(true)}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-forest-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-forest-800 sm:w-auto"
-          >
-            <Plus className="h-4 w-4" />
-            Nouveau marchand
-          </button>
-        </div>
+    <AppShell
+      allowedRoles={['SUPER_ADMIN']}
+      title="Marchands"
+      subtitle="Créez des entreprises marchandes, gérez leur statut ou ouvrez un accès support borné."
+      headerActions={
+        <button type="button" onClick={() => setShowCreate(true)} className="sc-hero-btn-primary">
+          <Plus className="h-3.5 w-3.5" />
+          Nouveau marchand
+        </button>
+      }
+    >
+      <div className="space-y-5">
 
         <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:gap-3">
           <div className="relative flex-1 sm:min-w-[220px]">

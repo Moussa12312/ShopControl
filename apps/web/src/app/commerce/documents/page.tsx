@@ -59,20 +59,13 @@ export default function DocumentsPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER', 'AGENT']}>
+    <AppShell
+      allowedRoles={['OWNER', 'AGENT']}
+      title="Tickets de caisse & Avoirs"
+      subtitle="Numérotation séquentielle immuable · Réimpression marquée DUPLICATA · Format thermique 58/80 mm et PDF."
+      headerActions={<ShopPickerInline shopId={shopId} onChange={selectShop} />}
+    >
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-              Tickets de caisse & Avoirs
-            </h1>
-            <p className="text-sm text-slate-600">
-              Numérotation séquentielle immuable · Réimpression marquée DUPLICATA · Format thermique
-              58/80 mm et PDF.
-            </p>
-          </div>
-          <ShopPickerInline shopId={shopId} onChange={selectShop} />
-        </div>
 
         {/* Filtres */}
         <div className="sc-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">

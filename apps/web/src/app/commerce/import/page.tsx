@@ -129,18 +129,13 @@ export default function CsvImportPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER']}>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Import de données CSV</h1>
-            <p className="text-sm text-slate-600">
-              Reprise rapide de vos produits, stocks initiaux, fournisseurs et clients avec aperçu,
-              rapport d’erreurs ligne par ligne et annulation possible (Section 2.2).
-            </p>
-          </div>
-          <ShopPickerInline shopId={shopId} onChange={selectShop} />
-        </div>
+    <AppShell
+      allowedRoles={['OWNER']}
+      title="Import de données CSV"
+      subtitle="Reprise rapide de vos produits, stocks initiaux, fournisseurs et clients avec aperçu et annulation possible."
+      headerActions={<ShopPickerInline shopId={shopId} onChange={selectShop} />}
+    >
+      <div className="space-y-5">
 
         {error ? <ErrorState message={error} /> : null}
         {msg ? (

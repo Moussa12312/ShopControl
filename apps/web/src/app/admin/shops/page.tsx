@@ -84,14 +84,12 @@ export default function AdminShopsPage() {
   };
 
   return (
-    <AppShell allowedRoles={['SUPER_ADMIN']}>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Boutiques & Bases de données dédiées</h1>
-          <p className="text-sm text-slate-600">
-            Chaque boutique dispose de sa propre base PostgreSQL isolée et migrée automatiquement.
-          </p>
-        </div>
+    <AppShell
+      allowedRoles={['SUPER_ADMIN']}
+      title="Boutiques & Bases de données dédiées"
+      subtitle="Chaque boutique dispose de sa propre base PostgreSQL isolée et migrée automatiquement."
+    >
+      <div className="space-y-5">
 
         {loading ? (
           <LoadingSkeleton rows={5} />

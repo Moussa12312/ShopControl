@@ -242,46 +242,43 @@ export default function PurchasesPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER', 'AGENT']}>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Achats & Fournisseurs</h1>
-            <p className="text-sm text-slate-600">
-              Les commandes n’augmentent jamais le stock avant réception (partielle ou totale) avec
-              recalcul automatique du CMP.
-            </p>
+    <AppShell
+      allowedRoles={['OWNER', 'AGENT']}
+      title="Achats & Fournisseurs"
+      subtitle="Les commandes n’augmentent jamais le stock avant réception (partielle ou totale) avec recalcul automatique du CMP."
+      headerActions={
+        <>
+          <ShopPickerInline shopId={shopId} onChange={selectShop} />
+          <div className="inline-flex rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setTab('orders')}
+              className={`rounded-full px-3 py-1 transition ${
+                tab === 'orders' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+              }`}
+            >
+              Commandes ({orders.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('suppliers')}
+              className={`rounded-full px-3 py-1 transition ${
+                tab === 'suppliers' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+              }`}
+            >
+              Fournisseurs ({suppliers.length})
+            </button>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ShopPickerInline shopId={shopId} onChange={selectShop} />
-            <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setTab('orders')}
-                className={`rounded-lg px-3 py-1.5 ${tab === 'orders' ? 'bg-brand-700 text-white' : 'text-slate-600'}`}
-              >
-                Commandes ({orders.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('suppliers')}
-                className={`rounded-lg px-3 py-1.5 ${tab === 'suppliers' ? 'bg-brand-700 text-white' : 'text-slate-600'}`}
-              >
-                Fournisseurs ({suppliers.length})
-              </button>
-            </div>
-            {tab === 'orders' && suppliers.length > 0 && products.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setShowNewPo(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-sm font-semibold text-white"
-              >
-                <Plus className="h-4 w-4" />
-                Nouvel achat
-              </button>
-            ) : null}
-          </div>
-        </div>
+          {tab === 'orders' && suppliers.length > 0 && products.length > 0 ? (
+            <button type="button" onClick={() => setShowNewPo(true)} className="sc-hero-btn-primary">
+              <Plus className="h-3.5 w-3.5" />
+              Nouvel achat
+            </button>
+          ) : null}
+        </>
+      }
+    >
+      <div className="space-y-5">
 
         {msg ? (
           <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm text-emerald-900">

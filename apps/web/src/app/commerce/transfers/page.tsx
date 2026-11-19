@@ -245,25 +245,20 @@ export default function TransfersPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER', 'AGENT']}>
+    <AppShell
+      allowedRoles={['OWNER', 'AGENT']}
+      title="Transferts Inter-Boutiques"
+      subtitle="Validation obligatoire du Propriétaire avant expédition · Stock en transit isolé · Traçabilité des écarts."
+      headerActions={
+        shops.length >= 2 ? (
+          <button type="button" onClick={openCreateModal} className="sc-hero-btn-primary">
+            <Plus className="h-3.5 w-3.5" />
+            Nouveau transfert
+          </button>
+        ) : null
+      }
+    >
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-              Transferts Inter-Boutiques
-            </h1>
-            <p className="text-sm text-slate-600">
-              Validation obligatoire du Propriétaire avant expédition · Stock en transit isolé ·
-              Traçabilité des écarts à réception.
-            </p>
-          </div>
-          {shops.length >= 2 ? (
-            <button type="button" onClick={openCreateModal} className="sc-btn-primary">
-              <Plus className="h-4 w-4" />
-              Nouveau transfert
-            </button>
-          ) : null}
-        </div>
 
         {shops.length < 2 && isOwner ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-900">

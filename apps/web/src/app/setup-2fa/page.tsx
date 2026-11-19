@@ -61,18 +61,22 @@ export default function SetupTwoFactorPage() {
   };
 
   return (
-    <AppShell allowedRoles={['SUPER_ADMIN', 'OWNER']}>
-      <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+    <AppShell
+      allowedRoles={['SUPER_ADMIN', 'OWNER']}
+      title="Double authentification (2FA)"
+      subtitle="Scannez le QR code avec Google Authenticator, Authy ou FreeOTP pour sécuriser votre compte."
+    >
+      <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-slate-900">
-              Configuration de la double authentification (2FA)
-            </h1>
+            <h2 className="text-sm font-bold text-slate-900">
+              Activation TOTP par application d’authentification
+            </h2>
             <p className="text-xs text-slate-500">
-              Scannez le QR code avec Google Authenticator, Authy ou FreeOTP.
+              Protection renforcée à chaque nouvelle connexion.
             </p>
           </div>
         </div>

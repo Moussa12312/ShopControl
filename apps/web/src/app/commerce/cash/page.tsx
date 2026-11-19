@@ -195,18 +195,13 @@ export default function CashPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER', 'AGENT']}>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Caisse & Clôtures</h1>
-            <p className="text-sm text-slate-600">
-              Session rattachée à la boutique · Solde théorique temps réel · Clôture immuable avec
-              alerte d’écart au propriétaire.
-            </p>
-          </div>
-          <ShopPickerInline shopId={shopId} onChange={selectShop} />
-        </div>
+    <AppShell
+      allowedRoles={['OWNER', 'AGENT']}
+      title="Caisse & Clôtures"
+      subtitle="Session rattachée à la boutique · Solde théorique temps réel · Clôture immuable avec alerte d’écart."
+      headerActions={<ShopPickerInline shopId={shopId} onChange={selectShop} />}
+    >
+      <div className="space-y-5">
 
         {msg ? (
           <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm text-emerald-900">

@@ -46,24 +46,40 @@ export function useActiveOperationalShop() {
 export function ShopPickerInline({
   shopId,
   onChange,
+  variant = 'dark',
 }: {
   shopId: string;
   onChange: (shopId: string) => void;
+  variant?: 'light' | 'dark';
 }) {
   const { user, shops } = useAuth();
   if (user?.role !== 'OWNER' || shops.length <= 1) return null;
 
+  const isDark = variant === 'dark';
+
   return (
-    <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200/90 bg-white px-3 py-2 text-sm shadow-xs">
-      <Store className="h-4 w-4 text-brand-600" />
+    <div
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm ${
+        isDark
+          ? 'border-white/15 bg-forest-800/90 text-white'
+          : 'border-slate-200/90 bg-white text-slate-800'
+      }`}
+    >
+      <Store className={`h-3.5 w-3.5 shrink-0 ${isDark ? 'text-limeglow-400' : 'text-brand-600'}`} />
       <select
         value={shopId}
         onChange={(e) => onChange(e.target.value)}
         aria-label="Boutique active"
-        className="bg-transparent font-semibold text-slate-800 focus:outline-none"
+        className={`bg-transparent font-semibold focus:outline-none ${
+          isDark ? 'text-white' : 'text-slate-800'
+        }`}
       >
         {shops.map((s) => (
-          <option key={s.shopId} value={s.shopId}>
+          <option
+            key={s.shopId}
+            value={s.shopId}
+            className={isDark ? 'bg-forest-900 text-white' : 'bg-white text-slate-900'}
+          >
             {s.shopName}
           </option>
         ))}

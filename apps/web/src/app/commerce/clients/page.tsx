@@ -305,39 +305,34 @@ export default function ClientsReceivablesPage() {
     paymentMethods.find((m) => m.code === code)?.label || code;
 
   return (
-    <AppShell allowedRoles={['OWNER', 'AGENT']}>
+    <AppShell
+      allowedRoles={['OWNER', 'AGENT']}
+      title="Clients & Dettes"
+      subtitle="Suivi des crédits clients, enregistrement de dettes directes, échéances et encaissements."
+      headerActions={
+        <>
+          <ShopPickerInline shopId={shopId} onChange={selectShop} />
+          <button
+            type="button"
+            onClick={() => setShowNewClient((v) => !v)}
+            className="sc-hero-btn-ghost"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nouveau client
+          </button>
+          <button
+            type="button"
+            disabled={clients.length === 0}
+            onClick={() => openNewDebtModal()}
+            className="sc-hero-btn-primary"
+          >
+            <HandCoins className="h-3.5 w-3.5 text-brand-700" />
+            Enregistrer une dette
+          </button>
+        </>
+      }
+    >
       <div className="space-y-4 sm:space-y-5">
-        {/* Entête allégée + Actions */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-lg font-extrabold tracking-tight text-slate-900 sm:text-xl">
-              Clients & Dettes
-            </h1>
-            <p className="text-xs text-slate-500">
-              Suivi des crédits clients, enregistrement de dettes directes, échéances et encaissements.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ShopPickerInline shopId={shopId} onChange={selectShop} />
-            <button
-              type="button"
-              onClick={() => setShowNewClient((v) => !v)}
-              className="sc-btn-ghost flex-1 text-xs sm:flex-none"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Nouveau client
-            </button>
-            <button
-              type="button"
-              disabled={clients.length === 0}
-              onClick={() => openNewDebtModal()}
-              className="sc-btn-primary flex-1 text-xs sm:flex-none"
-            >
-              <HandCoins className="h-3.5 w-3.5 text-limeglow-400" />
-              Enregistrer une dette
-            </button>
-          </div>
-        </div>
 
         {/* 4 KPIs Dettes & Clients */}
         <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">

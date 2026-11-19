@@ -358,49 +358,43 @@ export default function OwnerSettingsPage() {
   const currentShop = shopList.find((s) => s.id === activeShopId) || null;
 
   return (
-    <AppShell allowedRoles={['OWNER']}>
-      <div className="space-y-6">
-        {/* En-tête + Onglets */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-              Paramètres, Logo & Boutique
-            </h1>
-            <p className="text-sm text-slate-600">
-              Personnalisez l’identité visuelle (logo, coordonnées, tickets, vitrine QR), votre abonnement et votre sécurité.
-            </p>
-          </div>
-
-          <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-xs">
-            {(
-              [
-                { id: 'shop', label: 'Logo & Boutique', icon: Store },
-                { id: 'company', label: 'Entreprise & SaaS', icon: Building2 },
-                { id: 'security', label: 'Sécurité', icon: ShieldCheck },
-              ] as const
-            ).map((t) => {
-              const Icon = t.icon;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    setTab(t.id);
-                    setSavedMsg(null);
-                  }}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
-                    tab === t.id
-                      ? 'bg-forest-900 text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span>{t.label}</span>
-                </button>
-              );
-            })}
-          </div>
+    <AppShell
+      allowedRoles={['OWNER']}
+      title="Paramètres, Logo & Boutique"
+      subtitle="Personnalisez l’identité visuelle (logo, coordonnées, tickets, vitrine QR), votre abonnement et votre sécurité."
+      headerActions={
+        <div className="inline-flex rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-xs font-semibold">
+          {(
+            [
+              { id: 'shop', label: 'Logo & Boutique', icon: Store },
+              { id: 'company', label: 'Entreprise & SaaS', icon: Building2 },
+              { id: 'security', label: 'Sécurité', icon: ShieldCheck },
+            ] as const
+          ).map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  setTab(t.id);
+                  setSavedMsg(null);
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                  tab === t.id
+                    ? 'bg-white text-forest-950 shadow-sm'
+                    : 'text-[#8aa8a2] hover:text-white'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
         </div>
+      }
+    >
+      <div className="space-y-5">
 
         {savedMsg ? (
           <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">

@@ -72,25 +72,18 @@ export default function OwnerAuditPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER']}>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Journal d’audit immuable</h1>
-            <p className="text-sm text-slate-600">
-              Traçabilité consolidée (plateforme + bases dédiées des boutiques), avec compte et
-              opérateur déclaré.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleVerifyIntegrity}
-            className="inline-flex items-center gap-2 rounded-xl border border-brand-700 bg-white px-4 py-2 text-sm font-semibold text-brand-800 hover:bg-brand-50"
-          >
-            <ShieldCheck className="h-4 w-4" />
-            Vérifier l’intégrité SHA-256
-          </button>
-        </div>
+    <AppShell
+      allowedRoles={['OWNER']}
+      title="Journal d’audit immuable"
+      subtitle="Traçabilité consolidée (plateforme + bases dédiées des boutiques), avec compte et opérateur déclaré."
+      headerActions={
+        <button type="button" onClick={handleVerifyIntegrity} className="sc-hero-btn-primary">
+          <ShieldCheck className="h-3.5 w-3.5 text-brand-700" />
+          Vérifier l’intégrité SHA-256
+        </button>
+      }
+    >
+      <div className="space-y-5">
 
         {integrity ? (
           <div

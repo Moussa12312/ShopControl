@@ -169,39 +169,34 @@ export default function OwnerReportsPage() {
   const breakdown = t?.paymentsBreakdown || report?.paymentsBreakdown || {};
 
   return (
-    <AppShell allowedRoles={['OWNER']}>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-              Bilans Financiers & Exports
-            </h1>
-            <p className="text-sm text-slate-600">
-              Somme exacte multi-boutiques · Dépenses entreprise distinctes · Stock en transit
-              compté une seule fois.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <a
-              href={`${API_BASE_URL}/merchant/reports/export.csv?from=${from}&to=${to}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="sc-btn-ghost text-xs"
-            >
-              <FileSpreadsheet className="h-4 w-4 text-emerald-700" />
-              Export CSV
-            </a>
-            <a
-              href={`${API_BASE_URL}/merchant/reports/export.pdf?from=${from}&to=${to}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="sc-btn-primary text-xs"
-            >
-              <Download className="h-4 w-4" />
-              Exporter PDF
-            </a>
-          </div>
-        </div>
+    <AppShell
+      allowedRoles={['OWNER']}
+      title="Bilans Financiers & Exports"
+      subtitle="Somme exacte multi-boutiques · Dépenses entreprise distinctes · Stock en transit compté une seule fois."
+      headerActions={
+        <>
+          <a
+            href={`${API_BASE_URL}/merchant/reports/export.csv?from=${from}&to=${to}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="sc-hero-btn-ghost"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-limeglow-400" />
+            Export CSV
+          </a>
+          <a
+            href={`${API_BASE_URL}/merchant/reports/export.pdf?from=${from}&to=${to}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="sc-hero-btn-primary"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Exporter PDF
+          </a>
+        </>
+      }
+    >
+      <div className="space-y-5">
 
         {/* Sélecteur période */}
         <div className="sc-card flex flex-wrap items-end gap-3 p-4">

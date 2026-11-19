@@ -510,40 +510,37 @@ export default function PosPage() {
   };
 
   return (
-    <AppShell allowedRoles={['OWNER', 'AGENT']}>
-      <div className="space-y-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Ventes & Comptoir POS</h1>
-            <p className="text-xs text-slate-600 sm:text-sm">
-              Validation atomique (stock + caisse + créances) · Montants entiers XOF · Mode dégradé
-              Option B.
-            </p>
+    <AppShell
+      allowedRoles={['OWNER', 'AGENT']}
+      title="Ventes & Comptoir POS"
+      subtitle="Validation atomique (stock + caisse + créances) · Montants entiers XOF · Mode hors-ligne."
+      headerActions={
+        <>
+          <ShopPickerInline shopId={shopId} onChange={selectShop} />
+          <div className="inline-flex rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setTab('pos')}
+              className={`rounded-full px-3 py-1 transition ${
+                tab === 'pos' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+              }`}
+            >
+              Comptoir POS
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('history')}
+              className={`rounded-full px-3 py-1 transition ${
+                tab === 'history' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+              }`}
+            >
+              Historique ({sales.length})
+            </button>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ShopPickerInline shopId={shopId} onChange={selectShop} />
-            <div className="grid w-full grid-cols-2 rounded-xl border border-slate-200 bg-white p-1 text-xs font-semibold sm:inline-flex sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setTab('pos')}
-                className={`rounded-lg px-3 py-1.5 text-center ${
-                  tab === 'pos' ? 'bg-forest-900 text-white' : 'text-slate-600'
-                }`}
-              >
-                Comptoir POS
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('history')}
-                className={`rounded-lg px-3 py-1.5 text-center ${
-                  tab === 'history' ? 'bg-forest-900 text-white' : 'text-slate-600'
-                }`}
-              >
-                Historique ({sales.length})
-              </button>
-            </div>
-          </div>
-        </div>
+        </>
+      }
+    >
+      <div className="space-y-4">
 
         {/* File de synchronisation Option B */}
         {pendingOffline.length > 0 ? (
