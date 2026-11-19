@@ -26,6 +26,7 @@ import { ClientsModule } from './modules/clients/clients.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { ImportsModule } from './modules/imports/imports.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { ImportsModule } from './modules/imports/imports.module';
     SalesModule,
     ExpensesModule,
     ImportsModule,
+    AnalyticsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
