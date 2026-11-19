@@ -3,8 +3,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
+  Camera,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Copy,
   ExternalLink,
@@ -173,6 +176,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
 
   // Modale Détail / Voir plus produit
   const [detailProduct, setDetailProduct] = useState<StorefrontProduct | null>(null);
+  const [detailPhotoIndex, setDetailPhotoIndex] = useState(0);
   const [detailSize, setDetailSize] = useState('');
   const [detailColor, setDetailColor] = useState('');
   const [detailQty, setDetailQty] = useState(1);
@@ -336,6 +340,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
 
   const openProductDetail = (p: StorefrontProduct) => {
     setDetailProduct(p);
+    setDetailPhotoIndex(0);
     setDetailSize(p.availableSizes?.[0] || '');
     setDetailColor(p.availableColors?.[0] || '');
     setDetailQty(1);
@@ -686,6 +691,12 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                     >
                       {p.inStock ? `${p.stockAvailable} dispo` : 'Rupture'}
                     </span>
+                    {(p.imageUrls?.length || 0) > 1 ? (
+                      <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-forest-950/80 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
+                        <Camera className="h-2.5 w-2.5 text-limeglow-400" />
+                        {p.imageUrls.length}
+                      </span>
+                    ) : null}
                   </button>
 
                   <div className="flex flex-1 flex-col justify-between p-2.5 sm:p-3.5">
@@ -787,19 +798,79 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
             </div>
 
             <div className="space-y-4 p-5">
-              {/* Photo produit bien cadrée */}
-              <div className="flex h-52 w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-porcelain-50 sm:h-60">
-                {detailProduct.imageUrls?.[0] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={detailProduct.imageUrls[0]}
-                    alt={detailProduct.name}
-                    className="h-full w-full object-contain p-2"
-                  />
-                ) : (
-                  <Package className="h-12 w-12 text-slate-300" />
-                )}
-              </div>
+              {/* Galerie photos interactive (carrousel + miniatures cliquables) */}
+              {(() => {
+                const photos = detailProduct.imageUrls || [];
+                const activeIdx = Math.min(detailPhotoIndex, Math.max(0, photos.length - 1));
+                const activePhoto = photos[activeIdx];
+                return (
+                  <div className="space-y-2.5">
+                    <div className="relative flex h-56 w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-porcelain-50 sm:h-64">
+                      {activePhoto ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={activePhoto}
+                          alt={`${detailProduct.name} — photo ${activeIdx + 1}`}
+                          className="h-full w-full object-contain p-2"
+                        />
+                      ) : (
+                        <Package className="h-12 w-12 text-slate-300" />
+                      )}
+
+                      {photos.length > 1 ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDetailPhotoIndex((i) => (i - 1 + photos.length) % photos.length)
+                            }
+                            aria-label="Photo précédente"
+                            className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-forest-950/75 text-white shadow-md backdrop-blur-xs transition hover:bg-forest-900"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDetailPhotoIndex((i) => (i + 1) % photos.length)}
+                            aria-label="Photo suivante"
+                            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-forest-950/75 text-white shadow-md backdrop-blur-xs transition hover:bg-forest-900"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                          <span className="absolute bottom-2 right-2 rounded-full bg-forest-950/80 px-2.5 py-0.5 text-[11px] font-bold text-white tabular backdrop-blur-xs">
+                            {activeIdx + 1} / {photos.length}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+
+                    {photos.length > 1 ? (
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {photos.map((url, idx) => (
+                          <button
+                            key={`${url}-${idx}`}
+                            type="button"
+                            onClick={() => setDetailPhotoIndex(idx)}
+                            aria-label={`Voir photo ${idx + 1}`}
+                            className={`h-14 w-14 shrink-0 overflow-hidden rounded-xl border-2 bg-white transition ${
+                              idx === activeIdx
+                                ? 'border-brand-600 ring-2 ring-brand-500/25'
+                                : 'border-slate-200 opacity-70 hover:opacity-100'
+                            }`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={url}
+                              alt={`Miniature ${idx + 1}`}
+                              className="h-full w-full object-cover"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })()}
 
               <div className="flex items-center justify-between gap-2">
                 <p className="text-2xl font-black text-forest-950 tabular">

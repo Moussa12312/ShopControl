@@ -14,7 +14,7 @@ import {
   ShopPickerInline,
   useActiveOperationalShop,
 } from '@/components/commerce/ActiveShopHeader';
-import { ImageUploader } from '@/components/ui/ImageUploader';
+import { MultiImageUploader } from '@/components/ui/ImageUploader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateViews';
 
 const PRESET_CLOTHING_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Taille unique'];
@@ -103,7 +103,7 @@ export default function ProductsPage() {
     alertThreshold: 5,
     status: 'PUBLISHED' as ProductStatus,
     initialStockQty: 0,
-    primaryImageUrl: null as string | null,
+    imageUrls: [] as string[],
     availableSizes: [] as string[],
     availableColors: [] as string[],
   });
@@ -169,7 +169,7 @@ export default function ProductsPage() {
       alertThreshold: 5,
       status: 'PUBLISHED',
       initialStockQty: 0,
-      primaryImageUrl: null,
+      imageUrls: [],
       availableSizes: [],
       availableColors: [],
     });
@@ -193,7 +193,7 @@ export default function ProductsPage() {
       alertThreshold: p.alertThreshold,
       status: p.status,
       initialStockQty: 0,
-      primaryImageUrl: Array.isArray(p.imageUrls) && p.imageUrls[0] ? p.imageUrls[0] : null,
+      imageUrls: Array.isArray(p.imageUrls) ? p.imageUrls : [],
       availableSizes: Array.isArray(p.availableSizes) ? p.availableSizes : [],
       availableColors: Array.isArray(p.availableColors) ? p.availableColors : [],
     });
@@ -253,7 +253,7 @@ export default function ProductsPage() {
         costPriceXof: form.costPriceXof.trim() === '' ? null : Math.round(Number(form.costPriceXof)),
         alertThreshold: Math.round(Number(form.alertThreshold) || 0),
         status: form.status,
-        imageUrls: form.primaryImageUrl ? [form.primaryImageUrl] : [],
+        imageUrls: form.imageUrls,
         availableSizes: form.availableSizes,
         availableColors: form.availableColors,
         ...(!editing && form.initialStockQty > 0 ? { initialStockQty: form.initialStockQty } : {}),
@@ -387,12 +387,19 @@ export default function ProductsPage() {
                   <div key={`m-${p.id}`} className="sc-card p-4">
                     <div className="flex items-start gap-3">
                       {thumb ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={thumb}
-                          alt={p.name}
-                          className="h-14 w-14 shrink-0 rounded-xl border border-slate-200 bg-white object-cover"
-                        />
+                        <div className="relative h-14 w-14 shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={thumb}
+                            alt={p.name}
+                            className="h-14 w-14 rounded-xl border border-slate-200 bg-white object-cover"
+                          />
+                          {(p.imageUrls?.length || 0) > 1 ? (
+                            <span className="absolute -bottom-1 -right-1 rounded-md bg-forest-900 px-1 py-0.5 text-[9px] font-bold text-limeglow-400 shadow-xs">
+                              +{(p.imageUrls?.length || 1) - 1}
+                            </span>
+                          ) : null}
+                        </div>
                       ) : (
                         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
                           <Package className="h-6 w-6" />
@@ -496,12 +503,19 @@ export default function ProductsPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             {thumb ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={thumb}
-                                alt={p.name}
-                                className="h-11 w-11 shrink-0 rounded-xl border border-slate-200 bg-white object-cover"
-                              />
+                              <div className="relative h-11 w-11 shrink-0">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={thumb}
+                                  alt={p.name}
+                                  className="h-11 w-11 rounded-xl border border-slate-200 bg-white object-cover"
+                                />
+                                {(p.imageUrls?.length || 0) > 1 ? (
+                                  <span className="absolute -bottom-1 -right-1 rounded-md bg-forest-900 px-1 py-0.5 text-[9px] font-bold text-limeglow-400 shadow-xs">
+                                    +{(p.imageUrls?.length || 1) - 1}
+                                  </span>
+                                ) : null}
+                              </div>
                             ) : (
                               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
                                 <Package className="h-5 w-5" />
@@ -644,12 +658,13 @@ export default function ProductsPage() {
                 </div>
               ) : null}
 
-              <ImageUploader
+              <MultiImageUploader
                 purpose="product"
-                label="Photo du produit (POS & Vitrine QR)"
-                hint="Photo optimisée automatiquement — appareil photo mobile accepté."
-                value={form.primaryImageUrl}
-                onChange={(url) => setForm((f) => ({ ...f, primaryImageUrl: url }))}
+                maxImages={10}
+                label="Photos du produit (jusqu’à 10 photos — POS & Vitrine QR)"
+                hint="Vous pouvez ajouter 5 photos ou plus d’un coup. La photo #1 est l’image principale."
+                values={form.imageUrls}
+                onChange={(urls) => setForm((f) => ({ ...f, imageUrls: urls }))}
               />
 
               <div className="grid gap-3 sm:grid-cols-2">

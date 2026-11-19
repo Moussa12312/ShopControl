@@ -1,7 +1,17 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { Camera, ImagePlus, Loader2, Trash2, Upload } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Camera,
+  ImagePlus,
+  Loader2,
+  Plus,
+  Star,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { apiFetch, ApiError } from '@/lib/api-client';
 
 interface ImageUploaderProps {
@@ -229,6 +239,284 @@ export function ImageUploader({
               </p>
             </div>
           </button>
+        )}
+      </div>
+
+      {error ? (
+        <p className="text-xs font-semibold text-rose-600" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+interface MultiImageUploaderProps {
+  values: string[];
+  onChange: (urls: string[]) => void;
+  purpose: 'product' | 'logo' | 'message';
+  maxImages?: number;
+  label?: string;
+  hint?: string;
+}
+
+export function MultiImageUploader({
+  values,
+  onChange,
+  purpose,
+  maxImages = 10,
+  label,
+  hint,
+}: MultiImageUploaderProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [progressText, setProgressText] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleFiles = async (fileList: FileList | null | undefined) => {
+    if (!fileList || fileList.length === 0) return;
+    setError(null);
+
+    const remainingSlots = Math.max(0, maxImages - values.length);
+    if (remainingSlots === 0) {
+      setError(`Maximum ${maxImages} photos atteint pour ce produit.`);
+      return;
+    }
+
+    const files = Array.from(fileList).slice(0, remainingSlots);
+    const rejectedCount = fileList.length - files.length;
+
+    setUploading(true);
+    const uploaded: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      for (let idx = 0; idx < files.length; idx++) {
+        const file = files[idx];
+        setProgressText(`Envoi ${idx + 1}/${files.length}…`);
+        if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) {
+          errors.push(`${file.name} : format non supporté (JPG, PNG ou WebP).`);
+          continue;
+        }
+        if (file.size > 15 * 1024 * 1024) {
+          errors.push(`${file.name} : trop volumineuse (max 15 Mo).`);
+          continue;
+        }
+        try {
+          const dataUrl = await compressImageToDataUrl(file, purpose === 'logo' ? 800 : 1200);
+          const res = await apiFetch<{ url: string }>('/uploads/image', {
+            method: 'POST',
+            body: { dataUrl, purpose },
+          });
+          uploaded.push(res.url);
+        } catch (e) {
+          errors.push(
+            e instanceof ApiError
+              ? e.message
+              : (e as Error).message || `Échec d’envoi pour ${file.name}.`,
+          );
+        }
+      }
+
+      if (uploaded.length > 0) {
+        onChange([...values, ...uploaded]);
+      }
+
+      if (rejectedCount > 0) {
+        errors.push(`${rejectedCount} image(s) ignorée(s) (limite de ${maxImages} photos).`);
+      }
+      if (errors.length > 0) {
+        setError(errors[0]);
+      }
+    } finally {
+      setUploading(false);
+      setProgressText(null);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  const removeAt = (index: number) => {
+    onChange(values.filter((_, i) => i !== index));
+  };
+
+  const makePrimary = (index: number) => {
+    if (index === 0 || index >= values.length) return;
+    const next = [...values];
+    const [picked] = next.splice(index, 1);
+    next.unshift(picked);
+    onChange(next);
+  };
+
+  const moveAt = (index: number, delta: -1 | 1) => {
+    const target = index + delta;
+    if (target < 0 || target >= values.length) return;
+    const next = [...values];
+    const [item] = next.splice(index, 1);
+    next.splice(target, 0, item);
+    onChange(next);
+  };
+
+  const canAddMore = values.length < maxImages;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {label ? <label className="text-xs font-semibold text-slate-700">{label}</label> : <span />}
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular ${
+            values.length >= 5
+              ? 'bg-emerald-50 text-emerald-700'
+              : 'bg-slate-100 text-slate-600'
+          }`}
+        >
+          {values.length} / {maxImages} photos
+        </span>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => void handleFiles(e.target.files)}
+      />
+
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          void handleFiles(e.dataTransfer.files);
+        }}
+        className={`rounded-2xl border-2 border-dashed p-3 transition ${
+          dragOver
+            ? 'border-brand-500 bg-brand-50/70'
+            : 'border-slate-200 bg-porcelain-50'
+        }`}
+      >
+        {values.length === 0 ? (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className="flex w-full flex-col items-center justify-center gap-2 py-4 text-center"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-100 text-brand-700">
+              {uploading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Camera className="h-5 w-5" />
+              )}
+            </span>
+            <div>
+              <p className="text-xs font-bold text-slate-800">
+                {uploading
+                  ? progressText || 'Envoi en cours…'
+                  : 'Ajouter jusqu’à 10 photos produit (sélection multiple possible)'}
+              </p>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                {hint || 'PNG, JPG ou WebP — vous pouvez choisir 5 photos ou plus d’un seul coup.'}
+              </p>
+            </div>
+          </button>
+        ) : (
+          <div className="space-y-2.5">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+              {values.map((url, idx) => (
+                <div
+                  key={`${url}-${idx}`}
+                  className={`group relative overflow-hidden rounded-xl border bg-white ${
+                    idx === 0 ? 'border-brand-500 ring-2 ring-brand-500/20' : 'border-slate-200'
+                  }`}
+                >
+                  <div className="relative h-20 w-full bg-porcelain-50">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`Photo ${idx + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                    {idx === 0 ? (
+                      <span className="absolute left-1 top-1 rounded-md bg-forest-900/90 px-1.5 py-0.5 text-[9px] font-bold text-limeglow-400">
+                        Principale
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => makePrimary(idx)}
+                        title="Définir comme photo principale"
+                        className="absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded-md bg-white/90 text-slate-600 shadow-xs hover:bg-amber-50 hover:text-amber-600"
+                      >
+                        <Star className="h-3 w-3" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeAt(idx)}
+                      aria-label={`Retirer la photo ${idx + 1}`}
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-md bg-rose-600/90 text-white shadow-xs hover:bg-rose-700"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+
+                  {/* Barre de réorganisation rapide */}
+                  <div className="flex items-center justify-between border-t border-slate-100 bg-white px-1 py-0.5 text-[10px] text-slate-400">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={() => moveAt(idx, -1)}
+                      aria-label="Déplacer à gauche"
+                      className="rounded p-0.5 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-25"
+                    >
+                      <ArrowLeft className="h-3 w-3" />
+                    </button>
+                    <span className="font-mono text-[9px] font-semibold text-slate-500">
+                      #{idx + 1}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={idx === values.length - 1}
+                      onClick={() => moveAt(idx, 1)}
+                      aria-label="Déplacer à droite"
+                      className="rounded p-0.5 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-25"
+                    >
+                      <ArrowRight className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {canAddMore ? (
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  disabled={uploading}
+                  className="flex h-[102px] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 bg-white text-slate-500 transition hover:border-brand-500 hover:bg-brand-50/40 hover:text-brand-700 disabled:opacity-50"
+                >
+                  {uploading ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-brand-600" />
+                  ) : (
+                    <Plus className="h-5 w-5" />
+                  )}
+                  <span className="px-1 text-center text-[10px] font-bold">
+                    {uploading ? progressText || 'Envoi…' : 'Ajouter'}
+                  </span>
+                </button>
+              ) : null}
+            </div>
+
+            <p className="text-[11px] text-slate-500">
+              {hint ||
+                'La photo #1 est l’image principale. Cliquez sur ★ pour changer l’image principale ou utilisez les flèches pour réordonner.'}
+            </p>
+          </div>
         )}
       </div>
 
