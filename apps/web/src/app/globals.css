@@ -10,7 +10,6 @@
     touch-action: manipulation;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
   a,
@@ -79,6 +78,9 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+}
+
+@layer components {
   .sc-card {
     @apply rounded-2xl border border-slate-200/80 bg-white shadow-card transition-shadow;
   }

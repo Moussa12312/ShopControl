@@ -659,11 +659,10 @@ export default function ProductsPage() {
               <button
                 type="button"
                 onClick={() => setCatFilter('')}
-                className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-                  catFilter === ''
-                    ? 'bg-forest-900 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
+                className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${catFilter === ''
+                  ? 'bg-forest-900 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
               >
                 Toutes ({products.length})
               </button>
@@ -677,19 +676,17 @@ export default function ProductsPage() {
                     type="button"
                     onClick={() => setCatFilter(c.id)}
                     title={`Mode de vente : ${spec.label}`}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${
-                      active
-                        ? 'bg-forest-900 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
-                    }`}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${active
+                      ? 'bg-forest-900 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+                      }`}
                   >
                     <span>{c.name}</span>
                     <span
-                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-semibold ${
-                        active
-                          ? 'bg-white/15 text-limeglow-400'
-                          : 'bg-white text-slate-500'
-                      }`}
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-semibold ${active
+                        ? 'bg-white/15 text-limeglow-400'
+                        : 'bg-white text-slate-500'
+                        }`}
                     >
                       {spec.shortLabel}
                     </span>
@@ -858,9 +855,8 @@ export default function ProductsPage() {
                     </div>
 
                     <div
-                      className={`mt-3 grid gap-2 rounded-xl bg-porcelain-50 p-2.5 text-center text-xs ${
-                        canReadCost ? 'grid-cols-3' : 'grid-cols-2'
-                      }`}
+                      className={`mt-3 grid gap-2 rounded-xl bg-porcelain-50 p-2.5 text-center text-xs ${canReadCost ? 'grid-cols-3' : 'grid-cols-2'
+                        }`}
                     >
                       <div>
                         <p className="text-[10px] text-slate-500">Prix vente</p>
@@ -879,13 +875,12 @@ export default function ProductsPage() {
                       <div>
                         <p className="text-[10px] text-slate-500">Stock</p>
                         <p
-                          className={`font-extrabold tabular ${
-                            p.stockAvailable <= 0
-                              ? 'text-rose-600'
-                              : p.stockAvailable <= p.alertThreshold
-                                ? 'text-amber-700'
-                                : 'text-emerald-700'
-                          }`}
+                          className={`font-extrabold tabular ${p.stockAvailable <= 0
+                            ? 'text-rose-600'
+                            : p.stockAvailable <= p.alertThreshold
+                              ? 'text-amber-700'
+                              : 'text-emerald-700'
+                            }`}
                         >
                           {p.stockAvailableDecimal ?? p.stockAvailable} {p.unit}
                         </p>
@@ -1059,26 +1054,24 @@ export default function ProductsPage() {
                         ) : null}
                         <td className="px-4 py-3">
                           <span
-                            className={`font-extrabold tabular ${
-                              p.stockAvailable <= 0
-                                ? 'text-rose-600'
-                                : p.stockAvailable <= p.alertThreshold
-                                  ? 'text-amber-700'
-                                  : 'text-emerald-700'
-                            }`}
+                            className={`font-extrabold tabular ${p.stockAvailable <= 0
+                              ? 'text-rose-600'
+                              : p.stockAvailable <= p.alertThreshold
+                                ? 'text-amber-700'
+                                : 'text-emerald-700'
+                              }`}
                           >
                             {p.stockAvailableDecimal ?? p.stockAvailable} {p.unit}
                           </span>
                         </td>
                         <td className="px-4 py-3">
                           <span
-                            className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                              p.status === 'PUBLISHED'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : p.status === 'DRAFT'
-                                  ? 'bg-slate-100 text-slate-600'
-                                  : 'bg-rose-50 text-rose-700'
-                            }`}
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${p.status === 'PUBLISHED'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : p.status === 'DRAFT'
+                                ? 'bg-slate-100 text-slate-600'
+                                : 'bg-rose-50 text-rose-700'
+                              }`}
                           >
                             {PRODUCT_STATUS_LABELS[p.status]}
                           </span>
@@ -1172,42 +1165,37 @@ export default function ProductsPage() {
                             key={c.id}
                             type="button"
                             onClick={() => selectCategoryForProduct(c)}
-                            className={`group flex flex-col justify-between rounded-2xl border p-3.5 text-left transition ${
-                              isSelected
-                                ? 'border-forest-900 bg-forest-900 text-white shadow-md'
-                                : 'border-slate-200 bg-porcelain-50 text-slate-900 hover:border-brand-500 hover:bg-white'
-                            }`}
+                            className={`group flex flex-col justify-between rounded-2xl border p-3.5 text-left transition ${isSelected
+                              ? 'border-forest-900 bg-forest-900 text-white shadow-md'
+                              : 'border-slate-200 bg-porcelain-50 text-slate-900 hover:border-brand-500 hover:bg-white'
+                              }`}
                           >
                             <div>
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-sm font-extrabold">{c.name}</span>
                                 <ChevronRight
-                                  className={`h-4 w-4 shrink-0 transition group-hover:translate-x-0.5 ${
-                                    isSelected ? 'text-limeglow-400' : 'text-slate-400'
-                                  }`}
+                                  className={`h-4 w-4 shrink-0 transition group-hover:translate-x-0.5 ${isSelected ? 'text-limeglow-400' : 'text-slate-400'
+                                    }`}
                                 />
                               </div>
                               <span
-                                className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                  isSelected
-                                    ? 'bg-white/15 text-limeglow-400'
-                                    : 'bg-brand-50 text-brand-800'
-                                }`}
+                                className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${isSelected
+                                  ? 'bg-white/15 text-limeglow-400'
+                                  : 'bg-brand-50 text-brand-800'
+                                  }`}
                               >
                                 {spec.shortLabel}
                               </span>
                               <p
-                                className={`mt-1.5 line-clamp-2 text-[11px] leading-snug ${
-                                  isSelected ? 'text-emerald-100/85' : 'text-slate-500'
-                                }`}
+                                className={`mt-1.5 line-clamp-2 text-[11px] leading-snug ${isSelected ? 'text-emerald-100/85' : 'text-slate-500'
+                                  }`}
                               >
                                 {c.description || spec.description}
                               </p>
                             </div>
                             <p
-                              className={`mt-2 text-[10px] font-semibold ${
-                                isSelected ? 'text-emerald-200' : 'text-slate-400'
-                              }`}
+                              className={`mt-2 text-[10px] font-semibold ${isSelected ? 'text-emerald-200' : 'text-slate-400'
+                                }`}
                             >
                               {c.productsCount} produit(s) dans cette catégorie
                             </p>
@@ -1342,8 +1330,8 @@ export default function ProductsPage() {
 
                   {/* Marque / Modèle / Contenance-Dimension (uniquement si la catégorie l'utilise) */}
                   {activeSpec.showBrand ||
-                  activeSpec.showModel ||
-                  activeSpec.showVolumeDimension ? (
+                    activeSpec.showModel ||
+                    activeSpec.showVolumeDimension ? (
                     <div className="grid gap-3 rounded-2xl border border-slate-200 bg-porcelain-50 p-3.5 sm:grid-cols-3">
                       {activeSpec.showBrand ? (
                         <div>
@@ -1421,11 +1409,10 @@ export default function ProductsPage() {
                               key={size}
                               type="button"
                               onClick={() => toggleSize(size)}
-                              className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${
-                                active
-                                  ? 'bg-forest-900 text-limeglow-400 shadow-xs'
-                                  : 'border border-slate-200 bg-white text-slate-700 hover:border-brand-400'
-                              }`}
+                              className={`rounded-xl px-2.5 py-1 text-xs font-bold transition ${active
+                                ? 'bg-forest-900 text-limeglow-400 shadow-xs'
+                                : 'border border-slate-200 bg-white text-slate-700 hover:border-brand-400'
+                                }`}
                             >
                               {size}
                             </button>
@@ -1491,11 +1478,10 @@ export default function ProductsPage() {
                               key={c.name}
                               type="button"
                               onClick={() => toggleColor(c.name)}
-                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition ${
-                                active
-                                  ? 'bg-forest-900 text-white ring-2 ring-limeglow-400'
-                                  : 'border border-slate-200 bg-white text-slate-700 hover:border-brand-400'
-                              }`}
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition ${active
+                                ? 'bg-forest-900 text-white ring-2 ring-limeglow-400'
+                                : 'border border-slate-200 bg-white text-slate-700 hover:border-brand-400'
+                                }`}
                             >
                               <span
                                 className="h-3 w-3 shrink-0 rounded-full border border-slate-300"
@@ -1607,11 +1593,10 @@ export default function ProductsPage() {
                               key={u}
                               type="button"
                               onClick={() => setForm((f) => ({ ...f, unit: u }))}
-                              className={`rounded-lg px-2 py-0.5 text-[10px] font-bold transition ${
-                                form.unit === u
-                                  ? 'bg-forest-900 text-limeglow-400'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                              }`}
+                              className={`rounded-lg px-2 py-0.5 text-[10px] font-bold transition ${form.unit === u
+                                ? 'bg-forest-900 text-limeglow-400'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
                             >
                               {u}
                             </button>
@@ -1889,13 +1874,12 @@ export default function ProductsPage() {
                         type="button"
                         disabled={alreadyActive}
                         onClick={() => setRequestedShopType(t)}
-                        className={`rounded-xl border p-2.5 text-left transition ${
-                          alreadyActive
-                            ? 'cursor-not-allowed border-emerald-200 bg-emerald-50/60 text-emerald-800 opacity-75'
-                            : selected
-                              ? 'border-forest-900 bg-forest-900 text-white shadow-xs'
-                              : 'border-slate-200 bg-slate-50 text-slate-800 hover:border-brand-400'
-                        }`}
+                        className={`rounded-xl border p-2.5 text-left transition ${alreadyActive
+                          ? 'cursor-not-allowed border-emerald-200 bg-emerald-50/60 text-emerald-800 opacity-75'
+                          : selected
+                            ? 'border-forest-900 bg-forest-900 text-white shadow-xs'
+                            : 'border-slate-200 bg-slate-50 text-slate-800 hover:border-brand-400'
+                          }`}
                       >
                         <div className="flex items-center justify-between gap-1">
                           <p className="text-xs font-extrabold">{SHOP_TYPE_SHORT_LABELS[t]}</p>
@@ -1906,9 +1890,8 @@ export default function ProductsPage() {
                           ) : null}
                         </div>
                         <p
-                          className={`mt-0.5 line-clamp-2 text-[10px] leading-snug ${
-                            selected && !alreadyActive ? 'text-emerald-100/85' : 'text-slate-500'
-                          }`}
+                          className={`mt-0.5 line-clamp-2 text-[10px] leading-snug ${selected && !alreadyActive ? 'text-emerald-100/85' : 'text-slate-500'
+                            }`}
                         >
                           {SHOP_TYPE_DESCRIPTIONS[t]}
                         </p>

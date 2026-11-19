@@ -89,7 +89,7 @@ const OWNER_SUPERVISION_NAV: NavItem[] = [
 
 const OWNER_MANAGEMENT_NAV: NavItem[] = [
   { href: '/pos', label: 'Ventes / POS', shortLabel: 'POS', group: 'Comptoir', icon: ShoppingCart, inMobileDock: true },
-  { href: '/commerce/orders', label: 'Commandes QR', shortLabel: 'Commandes', group: 'Comptoir', icon: ShoppingBag, inMobileDock: true },
+  { href: '/commerce/orders', label: 'Commandes QR', shortLabel: 'Cmds', group: 'Comptoir', icon: ShoppingBag, inMobileDock: true },
   { href: '/commerce/cash', label: 'Caisse', group: 'Comptoir', icon: Banknote, inMobileDock: true },
   { href: '/commerce/documents', label: 'Tickets & Avoirs', shortLabel: 'Tickets', group: 'Comptoir', icon: FileText },
   { href: '/commerce/products', label: 'Produits', group: 'Catalogue', icon: Package, inMobileDock: true },
@@ -114,7 +114,7 @@ const ADMIN_NAV: NavItem[] = [
 const AGENT_NAV: NavItem[] = [
   { href: '/agent', label: 'Accueil boutique', shortLabel: 'Accueil', group: 'Comptoir', icon: Store, inMobileDock: true },
   { href: '/pos', label: 'Ventes / POS', shortLabel: 'POS', group: 'Comptoir', icon: ShoppingCart, requiredPerm: 'sales:read', inMobileDock: true },
-  { href: '/commerce/orders', label: 'Commandes QR', shortLabel: 'Commandes', group: 'Comptoir', icon: ShoppingBag, requiredPerm: 'orders:read', inMobileDock: true },
+  { href: '/commerce/orders', label: 'Commandes QR', shortLabel: 'Cmds', group: 'Comptoir', icon: ShoppingBag, requiredPerm: 'orders:read', inMobileDock: true },
   { href: '/commerce/cash', label: 'Caisse', group: 'Comptoir', icon: Banknote, requiredPerm: 'cash:read', inMobileDock: true },
   { href: '/commerce/documents', label: 'Tickets & Avoirs', shortLabel: 'Tickets', group: 'Comptoir', icon: FileText, requiredPerm: 'sales:read' },
   { href: '/commerce/products', label: 'Produits', group: 'Gestion', icon: Package, requiredPerm: 'products:read' },
