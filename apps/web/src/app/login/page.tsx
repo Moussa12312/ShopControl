@@ -96,24 +96,35 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="grid min-h-screen w-full bg-white lg:grid-cols-12">
-      {/* Panneau gauche Obsidian Emerald */}
-      <div className="obsidian-hero flex flex-col justify-between px-6 py-8 text-white sm:px-10 lg:col-span-5 lg:min-h-screen lg:px-12 lg:py-12">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#f4f8f7] lg:grid lg:grid-cols-12 lg:bg-white">
+      {/* Panneau gauche Obsidian Emerald (compact sur mobile, plein écran sur desktop) */}
+      <div className="obsidian-hero flex flex-col justify-between px-4 py-5 text-white sm:px-8 sm:py-7 lg:col-span-5 lg:min-h-screen lg:px-12 lg:py-12">
         <div>
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-forest-700 font-black text-white shadow-sm ring-1 ring-white/20">
-              SC
-            </span>
-            <div>
-              <p className="text-lg font-extrabold tracking-tight">ShopControl</p>
-              <p className="text-xs text-emerald-200/75">Gestion de Boutique & Vitrine QR</p>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-forest-700 text-sm font-black text-white shadow-sm ring-1 ring-white/20 sm:h-11 sm:w-11">
+                SC
+              </span>
+              <div>
+                <p className="text-base font-extrabold tracking-tight sm:text-lg">ShopControl</p>
+                <p className="text-[11px] text-emerald-200/75 sm:text-xs">
+                  Gestion de Boutique & Vitrine QR
+                </p>
+              </div>
             </div>
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-limeglow-400 transition hover:bg-white/20 lg:hidden"
+            >
+              <span>S’inscrire</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
 
-          <h1 className="mt-6 text-2xl font-extrabold leading-snug text-white sm:text-3xl lg:mt-14">
+          <h1 className="mt-4 text-lg font-extrabold leading-snug text-white sm:mt-6 sm:text-2xl lg:mt-14 lg:text-3xl">
             Gérez vos ventes, votre stock et votre vitrine en ligne en toute simplicité.
           </h1>
-          <p className="mt-3 max-w-md text-xs leading-relaxed text-[#9bb5b0] sm:text-sm">
+          <p className="mt-1.5 max-w-md text-xs leading-relaxed text-[#9bb5b0] sm:mt-3 sm:text-sm">
             Adapté à tous les commerces : alimentation, cosmétique, mode & vêtements,
             quincaillerie, électronique et pièces auto.
           </p>
@@ -136,8 +147,8 @@ export default function LoginPage() {
       </div>
 
       {/* Panneau droit Formulaire de connexion épuré */}
-      <div className="flex flex-1 flex-col justify-center bg-[#f4f8f7] px-5 py-8 sm:px-10 lg:col-span-7 lg:bg-white">
-        <div className="mx-auto w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-6 shadow-card sm:p-8 lg:border-0 lg:p-0 lg:shadow-none">
+      <div className="flex flex-1 flex-col justify-start px-3 py-4 sm:px-8 sm:py-8 lg:col-span-7 lg:justify-center lg:bg-white">
+        <div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card sm:rounded-3xl sm:p-8 lg:border-0 lg:p-0 lg:shadow-none">
           <h2 className="text-2xl font-extrabold text-slate-900">Connexion</h2>
           <p className="mt-1 text-sm text-slate-500">
             Accédez au tableau de bord de votre boutique.
