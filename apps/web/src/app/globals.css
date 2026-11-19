@@ -54,7 +54,7 @@
 
   /* Modales : jamais plus hautes que l'écran mobile (barre d'adresse comprise) */
   .fixed.inset-0 > form,
-  .fixed.inset-0 > div {
+  .fixed.inset-0 > div:not(.sc-drawer) {
     max-height: 92dvh;
   }
 

@@ -130,9 +130,9 @@ export default function PublicTrackOrderPage() {
   };
 
   return (
-    <div className="min-h-screen bg-porcelain-100">
+    <div className="min-h-screen w-full overflow-x-clip bg-porcelain-100">
       <header className="obsidian-hero px-4 py-5 text-white">
-        <div className="mx-auto flex max-w-2xl items-center justify-between">
+        <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-between gap-2">
           <Link
             href={`/s/${slug}`}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-200 hover:text-white"
@@ -147,19 +147,19 @@ export default function PublicTrackOrderPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl space-y-5 px-4 py-8">
+      <main className="mx-auto max-w-2xl space-y-5 px-3 py-5 sm:px-4 sm:py-8">
         {loading ? (
           <div className="sc-card p-8 text-center text-sm text-slate-500">
             Chargement de votre commande…
           </div>
         ) : fullData ? (
-          <div className="sc-card space-y-5 p-6">
+          <div className="sc-card space-y-5 p-4 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-brand-700">
                   {fullData.shop.name}
                 </p>
-                <h1 className="font-mono text-2xl font-black text-slate-950">
+                <h1 className="font-mono text-xl font-black text-slate-950 sm:text-2xl">
                   {fullData.order.orderNumber}
                 </h1>
               </div>
@@ -223,7 +223,7 @@ export default function PublicTrackOrderPage() {
                 type="button"
                 disabled={busy}
                 onClick={handleCancelOrder}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100"
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 sm:w-auto"
               >
                 <XCircle className="h-4 w-4" />
                 Annuler ma commande avant confirmation
@@ -231,12 +231,12 @@ export default function PublicTrackOrderPage() {
             ) : null}
           </div>
         ) : (
-          <div className="sc-card space-y-5 p-6">
+          <div className="sc-card space-y-5 p-4 sm:p-6">
             <div className="flex items-center gap-2.5">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
                 <Package className="h-5 w-5" />
               </span>
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-lg font-extrabold text-slate-900">Suivre ma commande</h1>
                 <p className="text-xs text-slate-500">
                   Saisissez votre référence (ex. CMD-000001) et votre numéro de téléphone.
@@ -273,7 +273,7 @@ export default function PublicTrackOrderPage() {
 
             {minimalData ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-mono text-sm font-black text-slate-900">
                     {minimalData.orderNumber}
                   </span>

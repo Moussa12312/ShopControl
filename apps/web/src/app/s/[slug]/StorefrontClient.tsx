@@ -581,24 +581,24 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
       : confirmed?.trackingPath || '';
 
   return (
-    <div className="min-h-screen w-full bg-porcelain-100 pb-24">
+    <div className="min-h-screen w-full overflow-x-clip bg-porcelain-100 pb-28 sm:pb-24">
       {/* Barre supérieure fixe & 100% responsive mobile + desktop */}
       <header className="sticky top-0 z-30 border-b border-white/10 bg-forest-950/95 text-white backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:px-6">
-          <div className="flex min-w-0 items-center gap-2.5">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2.5">
             {shop.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={shop.logoUrl}
                 alt={shop.name}
-                className="h-10 w-10 shrink-0 rounded-xl bg-white object-contain p-1 shadow-xs"
+                className="h-9 w-9 shrink-0 rounded-xl bg-white object-contain p-1 shadow-xs sm:h-10 sm:w-10"
               />
             ) : (
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-limeglow-400 ring-1 ring-white/20">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-limeglow-400 ring-1 ring-white/20 sm:h-10 sm:w-10">
                 <Store className="h-5 w-5" />
               </span>
             )}
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <h1 className="truncate text-sm font-extrabold tracking-tight text-white sm:text-base">
                   {shop.name}
@@ -614,8 +614,20 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                   {isOpenNow ? 'Ouverte' : 'Fermée'}
                 </span>
               </div>
+              <p
+                className={`flex items-center gap-1 text-[10px] font-semibold sm:hidden ${
+                  isOpenNow ? 'text-limeglow-300' : 'text-amber-200'
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    isOpenNow ? 'bg-limeglow-400' : 'bg-amber-400'
+                  }`}
+                />
+                {isOpenNow ? 'Ouverte' : 'Fermée'}
+              </p>
               {shop.address || shop.phone ? (
-                <p className="truncate text-[11px] text-emerald-200/70">
+                <p className="hidden truncate text-[11px] text-emerald-200/70 sm:block">
                   {[shop.address, shop.phone].filter(Boolean).join(' · ')}
                 </p>
               ) : null}
@@ -625,9 +637,12 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <Link
               href={`/s/${shop.slug}/track`}
-              className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-white/15 sm:px-3 sm:text-xs"
+              aria-label="Suivre ma commande"
+              title="Suivi commande"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/15 sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs sm:font-bold"
             >
-              Suivi
+              <Package className="h-4 w-4 text-limeglow-400 sm:h-3.5 sm:w-3.5" />
+              <span className="hidden sm:inline">Suivi</span>
             </Link>
             <button
               type="button"
@@ -637,10 +652,12 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                 void loadCustomerProfile();
               }}
               aria-label="Mon compte client"
-              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-white/15 sm:px-3 sm:text-xs"
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/15 sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs sm:font-bold ${
+                customerData?.authenticated ? 'ring-1 ring-limeglow-400/60' : ''
+              }`}
             >
-              <User className="h-3.5 w-3.5 text-limeglow-400" />
-              <span className="max-w-[72px] truncate">
+              <User className="h-4 w-4 text-limeglow-400 sm:h-3.5 sm:w-3.5" />
+              <span className="hidden max-w-[76px] truncate sm:inline">
                 {customerData?.authenticated && customerData.customer
                   ? customerData.customer.fullName.split(' ')[0]
                   : 'Compte'}
@@ -650,7 +667,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               type="button"
               onClick={() => setChatOpen(true)}
               aria-label="Contacter la boutique"
-              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-white/15 sm:px-3 sm:text-xs"
+              className="hidden items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/15 sm:inline-flex"
             >
               <MessageCircle className="h-3.5 w-3.5 text-limeglow-400" />
               <span className="hidden sm:inline">Message</span>
@@ -658,7 +675,8 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
             <button
               type="button"
               onClick={() => setCartOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-limeglow-400 px-3 py-1.5 text-xs font-extrabold text-forest-950 shadow-lime hover:bg-limeglow-300 sm:px-4"
+              aria-label="Ouvrir le panier"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-limeglow-400 px-3 text-xs font-extrabold text-forest-950 shadow-lime hover:bg-limeglow-300 sm:h-auto sm:px-4 sm:py-1.5"
             >
               <ShoppingBag className="h-3.5 w-3.5" />
               <span>{totalItems}</span>
@@ -672,17 +690,17 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         <div className="mx-auto max-w-6xl space-y-3.5">
           {shop.slogan || shop.address || shop.phone ? (
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-emerald-100/80">
-              {shop.slogan ? <p className="font-medium text-white">{shop.slogan}</p> : <span />}
-              <div className="flex flex-wrap items-center gap-3 text-[11px]">
+              {shop.slogan ? <p className="min-w-0 break-words font-medium text-white">{shop.slogan}</p> : <span />}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
                 {shop.address ? (
                   <span className="inline-flex items-center gap-1">
-                    <MapPin className="h-3 w-3 text-limeglow-400" />
-                    {shop.address}
+                    <MapPin className="h-3 w-3 shrink-0 text-limeglow-400" />
+                    <span className="break-words">{shop.address}</span>
                   </span>
                 ) : null}
                 {shop.phone ? (
                   <a href={`tel:${shop.phone}`} className="inline-flex items-center gap-1 hover:text-white">
-                    <Phone className="h-3 w-3 text-limeglow-400" />
+                    <Phone className="h-3 w-3 shrink-0 text-limeglow-400" />
                     {shop.phone}
                   </a>
                 ) : null}
@@ -691,19 +709,19 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
           ) : null}
 
           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3.5 top-2.5 h-4 w-4 text-emerald-200/60" />
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-200/60" />
               <input
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Rechercher un produit…"
-                className="w-full rounded-xl border border-white/15 bg-white/10 py-2 pl-10 pr-4 text-sm text-white placeholder:text-emerald-200/60 focus:border-limeglow-400 focus:bg-white/15"
+                className="w-full rounded-xl border border-white/15 bg-white/10 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-emerald-200/60 focus:border-limeglow-400 focus:bg-white/15"
               />
             </div>
 
             {categories.length > 0 ? (
-              <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              <div className="flex w-full max-w-full min-w-0 gap-1.5 overflow-x-auto pb-1 sm:w-auto sm:max-w-[60%] sm:pb-0">
                 <button
                   type="button"
                   onClick={() => setCatId('')}
@@ -736,16 +754,16 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
           {/* Filtres rapides par Taille & Couleur (Mode & Cosmétique — Lot 11) */}
           {(profile.enableSizes && allSizes.length > 0) ||
           (profile.enableColors && allColors.length > 0) ? (
-            <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-2.5 text-xs">
+            <div className="flex flex-col gap-2 border-t border-white/10 pt-2.5 text-xs sm:flex-row sm:flex-wrap sm:items-center">
               {profile.enableSizes && allSizes.length > 0 ? (
-                <div className="flex items-center gap-1 overflow-x-auto">
+                <div className="flex w-full max-w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 sm:w-auto sm:pb-0">
                   <span className="shrink-0 text-[11px] font-bold text-emerald-200/80">
                     Taille :
                   </span>
                   <button
                     type="button"
                     onClick={() => setSizeFilter('')}
-                    className={`rounded-lg px-2 py-0.5 text-[11px] font-bold ${
+                    className={`shrink-0 !min-h-0 rounded-lg px-2 py-1 text-[11px] font-bold ${
                       sizeFilter === ''
                         ? 'bg-limeglow-400 text-forest-950'
                         : 'bg-white/10 text-white hover:bg-white/20'
@@ -758,7 +776,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                       key={sz}
                       type="button"
                       onClick={() => setSizeFilter((prev) => (prev === sz ? '' : sz))}
-                      className={`rounded-lg px-2 py-0.5 text-[11px] font-bold ${
+                      className={`shrink-0 !min-h-0 rounded-lg px-2 py-1 text-[11px] font-bold ${
                         sizeFilter === sz
                           ? 'bg-limeglow-400 text-forest-950'
                           : 'bg-white/10 text-white hover:bg-white/20'
@@ -771,14 +789,14 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               ) : null}
 
               {profile.enableColors && allColors.length > 0 ? (
-                <div className="flex items-center gap-1 overflow-x-auto">
+                <div className="flex w-full max-w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 sm:w-auto sm:pb-0">
                   <span className="shrink-0 text-[11px] font-bold text-emerald-200/80">
                     Couleur :
                   </span>
                   <button
                     type="button"
                     onClick={() => setColorFilter('')}
-                    className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                    className={`shrink-0 !min-h-0 rounded-full px-2 py-1 text-[11px] font-bold ${
                       colorFilter === ''
                         ? 'bg-limeglow-400 text-forest-950'
                         : 'bg-white/10 text-white hover:bg-white/20'
@@ -791,7 +809,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                       key={col}
                       type="button"
                       onClick={() => setColorFilter((prev) => (prev === col ? '' : col))}
-                      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                      className={`inline-flex shrink-0 !min-h-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${
                         colorFilter === col
                           ? 'bg-limeglow-400 text-forest-950'
                           : 'bg-white/10 text-white hover:bg-white/20'
@@ -840,7 +858,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               return (
                 <article
                   key={p.id}
-                  className="sc-card flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4"
+                  className="sc-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4"
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     <button
@@ -880,7 +898,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                       <button
                         type="button"
                         onClick={() => openProductDetail(p)}
-                        className="mt-0.5 block truncate text-left text-sm font-extrabold text-slate-900 hover:text-brand-700"
+                        className="mt-0.5 block !min-h-0 w-full line-clamp-2 text-left text-sm font-extrabold text-slate-900 hover:text-brand-700"
                       >
                         {p.name}
                       </button>
@@ -900,13 +918,13 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                   </div>
 
                   {/* Contrôles directs - / + Détail et Carton sans ouvrir de modale */}
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-2.5 sm:w-auto sm:border-t-0 sm:pt-0">
                     {unitCartItem ? (
-                      <div className="inline-flex items-center gap-1.5 rounded-xl border border-forest-900 bg-forest-900 px-2 py-1 text-white">
+                      <div className="inline-flex flex-1 items-center justify-between gap-1.5 rounded-xl border border-forest-900 bg-forest-900 px-2 py-1 text-white sm:flex-none">
                         <button
                           type="button"
                           onClick={() => updateCartItemQty(unitCartItem.key, -1)}
-                          className="rounded-lg bg-white/15 p-1 hover:bg-white/25"
+                          className="!min-h-0 rounded-lg bg-white/15 p-1.5 hover:bg-white/25"
                         >
                           <Minus className="h-3.5 w-3.5" />
                         </button>
@@ -916,7 +934,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                         <button
                           type="button"
                           onClick={() => updateCartItemQty(unitCartItem.key, 1)}
-                          className="rounded-lg bg-white/15 p-1 hover:bg-white/25"
+                          className="!min-h-0 rounded-lg bg-white/15 p-1.5 hover:bg-white/25"
                         >
                           <Plus className="h-3.5 w-3.5" />
                         </button>
@@ -926,7 +944,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                         type="button"
                         disabled={!p.inStock}
                         onClick={() => addItemToCart(p, '', '', 1, false)}
-                        className="inline-flex items-center gap-1 rounded-xl bg-forest-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-forest-800 disabled:bg-slate-200 disabled:text-slate-400"
+                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-forest-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-forest-800 disabled:bg-slate-200 disabled:text-slate-400 sm:flex-none"
                       >
                         <Plus className="h-3.5 w-3.5" />
                         {p.unit}
@@ -935,11 +953,11 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
 
                     {hasBulk ? (
                       bulkCartItem ? (
-                        <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-700 bg-emerald-50 px-2 py-1 text-emerald-950">
+                        <div className="inline-flex flex-1 items-center justify-between gap-1.5 rounded-xl border border-emerald-700 bg-emerald-50 px-2 py-1 text-emerald-950 sm:flex-none">
                           <button
                             type="button"
                             onClick={() => updateCartItemQty(bulkCartItem.key, -1)}
-                            className="rounded-lg bg-white p-1 shadow-2xs"
+                            className="!min-h-0 rounded-lg bg-white p-1.5 shadow-2xs"
                           >
                             <Minus className="h-3.5 w-3.5" />
                           </button>
@@ -949,7 +967,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                           <button
                             type="button"
                             onClick={() => updateCartItemQty(bulkCartItem.key, 1)}
-                            className="rounded-lg bg-white p-1 shadow-2xs"
+                            className="!min-h-0 rounded-lg bg-white p-1.5 shadow-2xs"
                           >
                             <Plus className="h-3.5 w-3.5" />
                           </button>
@@ -959,7 +977,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                           type="button"
                           disabled={!canOrderBulk}
                           onClick={() => addItemToCart(p, '', '', 1, true)}
-                          className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-extrabold text-emerald-900 transition hover:bg-emerald-100 disabled:opacity-40"
+                          className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-extrabold text-emerald-900 transition hover:bg-emerald-100 disabled:opacity-40 sm:flex-none"
                         >
                           <Boxes className="h-3.5 w-3.5" />+ {p.bulkUnitLabel || 'carton'}
                         </button>
@@ -978,7 +996,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               return (
                 <article
                   key={p.id}
-                  className="sc-card-hover flex flex-col justify-between overflow-hidden rounded-2xl p-4"
+                  className="sc-card-hover flex min-w-0 flex-col justify-between overflow-hidden rounded-2xl p-3.5 sm:p-4"
                 >
                   <div>
                     <div className="flex items-start gap-3.5">
@@ -1014,7 +1032,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                         <h2 className="mt-1 line-clamp-2 text-sm font-extrabold text-slate-900">
                           {p.name}
                         </h2>
-                        <p className="mt-0.5 font-mono text-[11px] text-slate-500">
+                        <p className="mt-0.5 truncate font-mono text-[11px] text-slate-500">
                           {p.modelName ? `Modèle : ${p.modelName} · ` : ''}Réf : {p.sku}
                         </p>
                       </div>
@@ -1028,7 +1046,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                   </div>
 
                   <div className="mt-4 space-y-2.5 border-t border-slate-100 pt-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-base font-black text-forest-950 tabular">
                         {formatXof(p.salePriceXof)}
                       </p>
@@ -1047,9 +1065,9 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                       <button
                         type="button"
                         onClick={() => openProductDetail(p)}
-                        className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-porcelain-50 py-2 text-[11px] font-bold text-slate-700 hover:bg-slate-100"
+                        className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-xl border border-slate-200 bg-porcelain-50 px-1.5 py-2 text-[11px] font-bold text-slate-700 hover:bg-slate-100"
                       >
-                        <Eye className="h-3 w-3" />
+                        <Eye className="h-3 w-3 shrink-0" />
                         Fiche
                       </button>
                       <button
@@ -1060,16 +1078,16 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                           );
                           setChatOpen(true);
                         }}
-                        className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white py-2 text-[11px] font-bold text-brand-700 hover:bg-brand-50"
+                        className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-1.5 py-2 text-[11px] font-bold text-brand-700 hover:bg-brand-50"
                       >
-                        <MessageCircle className="h-3 w-3" />
+                        <MessageCircle className="h-3 w-3 shrink-0" />
                         Question
                       </button>
                       <button
                         type="button"
                         disabled={!p.inStock}
                         onClick={() => addItemToCart(p)}
-                        className="rounded-xl bg-forest-900 py-2 text-[11px] font-bold text-white hover:bg-forest-800 disabled:bg-slate-200 disabled:text-slate-400"
+                        className="inline-flex items-center justify-center whitespace-nowrap rounded-xl bg-forest-900 px-1.5 py-2 text-[11px] font-bold text-white hover:bg-forest-800 disabled:bg-slate-200 disabled:text-slate-400"
                       >
                         + Panier
                       </button>
@@ -1080,7 +1098,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
             })}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 sm:gap-4">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
             {filteredProducts.map((p) => {
               const photo = p.imageUrls?.[0];
               const sizes = p.availableSizes || [];
@@ -1089,7 +1107,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               return (
                 <article
                   key={p.id}
-                  className="sc-card-hover flex flex-col overflow-hidden rounded-2xl"
+                  className="sc-card-hover flex min-w-0 flex-col overflow-hidden rounded-2xl"
                 >
                   {/* Photo contrôlée et proportionnée (jamais démesurée) */}
                   <button
@@ -1126,7 +1144,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                     ) : null}
                   </button>
 
-                  <div className="flex flex-1 flex-col justify-between p-2.5 sm:p-3.5">
+                  <div className="flex min-w-0 flex-1 flex-col justify-between p-2.5 sm:p-3.5">
                     <div>
                       {p.categoryName ? (
                         <p className="truncate text-[10px] font-bold uppercase tracking-wide text-brand-700">
@@ -1159,18 +1177,20 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                     </div>
 
                     <div className="mt-2.5 space-y-2">
-                      <p className="text-sm font-black text-forest-950 tabular sm:text-base">
+                      <p className="truncate text-sm font-black text-forest-950 tabular sm:text-base">
                         {formatXof(p.salePriceXof)}
                       </p>
 
-                      <div className="grid grid-cols-2 gap-1.5">
+                      <div className="flex items-center gap-1.5 sm:grid sm:grid-cols-2">
                         <button
                           type="button"
                           onClick={() => openProductDetail(p)}
-                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-porcelain-50 py-1.5 text-[11px] font-bold text-slate-700 transition hover:bg-slate-100"
+                          aria-label={`Voir les détails de ${p.name}`}
+                          title="Voir plus"
+                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-porcelain-50 text-[11px] font-bold text-slate-700 transition hover:bg-slate-100 sm:h-auto sm:w-auto sm:gap-1 sm:py-1.5"
                         >
-                          <Eye className="h-3 w-3" />
-                          Voir plus
+                          <Eye className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
+                          <span className="hidden sm:inline">Voir plus</span>
                         </button>
                         <button
                           type="button"
@@ -1182,7 +1202,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                               addItemToCart(p);
                             }
                           }}
-                          className="rounded-xl bg-forest-900 py-1.5 text-[11px] font-bold text-white transition hover:bg-forest-800 disabled:bg-slate-200 disabled:text-slate-400"
+                          className="inline-flex h-9 min-w-0 flex-1 items-center justify-center truncate rounded-xl bg-forest-900 px-2 text-[11px] font-bold text-white transition hover:bg-forest-800 disabled:bg-slate-200 disabled:text-slate-400 sm:h-auto sm:py-1.5"
                         >
                           {p.inStock ? '+ Panier' : 'Épuisé'}
                         </button>
@@ -1205,7 +1225,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
           aria-label={`Détails ${detailProduct.name}`}
         >
           <div className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-3.5 backdrop-blur-xs">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-xs sm:px-5 sm:py-3.5">
               <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-brand-700">
                   {detailProduct.categoryName || shop.name}
@@ -1224,7 +1244,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               </button>
             </div>
 
-            <div className="space-y-4 p-5">
+            <div className="space-y-4 p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-5">
               {/* Galerie photos interactive (carrousel + miniatures cliquables) */}
               {(() => {
                 const photos = detailProduct.imageUrls || [];
@@ -1232,7 +1252,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                 const activePhoto = photos[activeIdx];
                 return (
                   <div className="space-y-2.5">
-                    <div className="relative flex h-56 w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-porcelain-50 sm:h-64">
+                    <div className="relative flex h-52 w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-porcelain-50 sm:h-64">
                       {activePhoto ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -1300,7 +1320,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               })()}
 
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-2xl font-black text-forest-950 tabular">
+                <p className="text-xl font-black text-forest-950 tabular sm:text-2xl">
                   {formatXof(resolveProductUnitPrice(detailProduct, detailSoldInBulk))}
                   <span className="ml-1 text-xs font-semibold text-slate-500">
                     /{' '}
@@ -1332,14 +1352,14 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
 
               {/* Choix Détail (Unité) vs Gros (Carton/Sac) si configuré */}
               {detailProduct.unitsPerBulk && detailProduct.unitsPerBulk >= 2 ? (
-                <div className="grid grid-cols-2 gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-2 text-xs font-bold">
+                <div className="grid grid-cols-1 gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-2 text-xs font-bold sm:grid-cols-2">
                   <button
                     type="button"
                     onClick={() => {
                       setDetailSoldInBulk(false);
                       setDetailQty(1);
                     }}
-                    className={`rounded-xl py-2 transition ${
+                    className={`rounded-xl px-3 py-2 text-center transition ${
                       !detailSoldInBulk
                         ? 'bg-forest-900 text-white shadow-xs'
                         : 'bg-white text-slate-700'
@@ -1354,7 +1374,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                       setDetailSoldInBulk(true);
                       setDetailQty(1);
                     }}
-                    className={`rounded-xl py-2 transition disabled:opacity-40 ${
+                    className={`rounded-xl px-3 py-2 text-center transition disabled:opacity-40 ${
                       detailSoldInBulk
                         ? 'bg-forest-900 text-limeglow-400 shadow-xs'
                         : 'bg-white text-emerald-900'
@@ -1436,8 +1456,8 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               ) : null}
 
               {/* Quantité & Ajouter au panier */}
-              <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
-                <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-porcelain-50 p-1">
+              <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:gap-3">
+                <div className="inline-flex items-center justify-between gap-2 self-stretch rounded-xl border border-slate-200 bg-porcelain-50 p-1 sm:self-auto">
                   <button
                     type="button"
                     onClick={() => setDetailQty((q) => Math.max(1, q - 1))}
@@ -1476,7 +1496,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                     setDetailProduct(null);
                     setCartOpen(true);
                   }}
-                  className="sc-btn-lime flex-1 py-3 text-sm"
+                  className="sc-btn-lime w-full py-3 text-sm sm:flex-1"
                 >
                   <ShoppingBag className="h-4 w-4" />
                   Ajouter ·{' '}
@@ -1492,17 +1512,18 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
 
       {/* Barre flottante Panier mobile */}
       {totalItems > 0 && !cartOpen && !detailProduct ? (
-        <div className="fixed inset-x-3 bottom-4 z-30 mx-auto flex max-w-md items-center justify-between rounded-2xl border border-limeglow-400/40 bg-forest-950 px-4 py-3 text-white shadow-2xl">
-          <div>
+        <div className="fixed inset-x-3 bottom-3 z-30 mx-auto flex max-w-md items-center justify-between gap-2 rounded-2xl border border-limeglow-400/40 bg-forest-950 px-3.5 py-2.5 text-white shadow-2xl sm:bottom-4 sm:px-4 sm:py-3">
+          <div className="min-w-0">
             <p className="text-[11px] text-emerald-200/80">{totalItems} article(s)</p>
-            <p className="text-base font-extrabold tabular">{formatXof(subtotalXof)}</p>
+            <p className="truncate text-base font-extrabold tabular">{formatXof(subtotalXof)}</p>
           </div>
           <button
             type="button"
             onClick={() => setCartOpen(true)}
-            className="sc-btn-lime rounded-full px-5 py-2 text-xs"
+            className="sc-btn-lime shrink-0 rounded-full px-3.5 py-2 text-xs sm:px-5"
           >
-            Voir panier & Commander →
+            <span className="sm:hidden">Panier →</span>
+            <span className="hidden sm:inline">Voir panier & Commander →</span>
           </button>
         </div>
       ) : null}
@@ -1510,8 +1531,8 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
       {/* Drawer Panier avec sélection Taille & Couleur dans le panier + Commande sans compte */}
       {cartOpen ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-forest-950/70 backdrop-blur-xs">
-          <div className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div className="sc-drawer flex h-dvh w-full max-w-md flex-col bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3.5 sm:px-5 sm:py-4">
               <h2 className="text-base font-extrabold text-slate-900">
                 {confirmed ? 'Commande enregistrée !' : `Votre panier (${totalItems})`}
               </h2>
@@ -1527,7 +1548,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5">
+            <div className="flex-1 overflow-y-auto p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-5">
               {confirmed ? (
                 <div className="space-y-4 text-center">
                   <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -1556,7 +1577,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                     <p className="mt-1 break-all font-mono text-[11px] text-brand-700">
                       {fullTrackUrl}
                     </p>
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                       <button
                         type="button"
                         onClick={() => {
@@ -1591,8 +1612,8 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                           key={c.key}
                           className="space-y-2 rounded-2xl border border-slate-200/80 bg-porcelain-50 p-3 text-xs"
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2.5">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="flex min-w-0 flex-1 items-center gap-2.5">
                               {c.product.imageUrls?.[0] ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
@@ -1623,7 +1644,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                               <button
                                 type="button"
                                 onClick={() => updateCartItemQty(c.key, -1)}
-                                className="rounded-lg border border-slate-200 bg-white p-1"
+                                className="inline-flex h-8 w-8 !min-h-0 items-center justify-center rounded-lg border border-slate-200 bg-white"
                               >
                                 <Minus className="h-3 w-3" />
                               </button>
@@ -1631,7 +1652,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                               <button
                                 type="button"
                                 onClick={() => updateCartItemQty(c.key, 1)}
-                                className="rounded-lg border border-slate-200 bg-white p-1"
+                                className="inline-flex h-8 w-8 !min-h-0 items-center justify-center rounded-lg border border-slate-200 bg-white"
                               >
                                 <Plus className="h-3 w-3" />
                               </button>
@@ -1639,7 +1660,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                                 type="button"
                                 onClick={() => updateCartItemQty(c.key, -c.qty)}
                                 aria-label="Supprimer"
-                                className="ml-0.5 rounded-lg p-1 text-rose-500 hover:bg-rose-50"
+                                className="ml-0.5 inline-flex h-8 w-8 !min-h-0 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-50"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
@@ -1678,7 +1699,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
 
                           {/* Sélecteurs Taille & Couleur directement dans le panier */}
                           {(sizes.length > 0 || colors.length > 0) && (
-                            <div className="grid grid-cols-2 gap-2 pt-1">
+                            <div className="grid grid-cols-1 gap-2 pt-1 min-[360px]:grid-cols-2">
                               {sizes.length > 0 ? (
                                 <div>
                                   <label className="block text-[10px] font-bold text-slate-500">
@@ -1727,7 +1748,13 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                   </div>
 
                   {/* Mode retrait / livraison */}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div
+                    className={`grid gap-2 ${
+                      deliveryCfg.pickupEnabled && deliveryCfg.deliveryEnabled
+                        ? 'grid-cols-2'
+                        : 'grid-cols-1'
+                    }`}
+                  >
                     {deliveryCfg.pickupEnabled ? (
                       <button
                         type="button"
@@ -1858,7 +1885,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
           onClick={() => setChatOpen(true)}
           aria-label="Ouvrir la messagerie avec la boutique"
           className={`fixed right-4 z-30 flex items-center gap-2 rounded-full bg-forest-950 px-4 py-3 text-xs font-extrabold text-white shadow-2xl ring-2 ring-limeglow-400/60 transition hover:bg-forest-800 ${
-            totalItems > 0 ? 'bottom-20' : 'bottom-5'
+            totalItems > 0 ? 'bottom-24' : 'bottom-4 sm:bottom-5'
           }`}
         >
           <span className="relative flex h-2.5 w-2.5">
@@ -1873,7 +1900,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
       {/* Drawer Messagerie Directe Client <-> Boutique (Design soigné) */}
       {chatOpen ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-forest-950/65 backdrop-blur-xs">
-          <div className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+          <div className="sc-drawer flex h-dvh w-full max-w-md flex-col bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 bg-forest-950 px-4 py-3.5 text-white">
               <div className="flex items-center gap-3 min-w-0">
                 {shop.logoUrl ? (
@@ -1952,10 +1979,10 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
               <div ref={chatBottomRef} />
             </div>
 
-            <form onSubmit={handleSendChat} className="space-y-2 border-t border-slate-200 bg-white p-3.5">
+            <form onSubmit={handleSendChat} className="space-y-2 border-t border-slate-200 bg-white p-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
               {chatErr ? <p className="text-xs font-semibold text-rose-600">{chatErr}</p> : null}
               {!chatToken ? (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <input
                     required
                     value={chatName}
@@ -1978,9 +2005,9 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                   value={chatText}
                   onChange={(e) => setChatText(e.target.value)}
                   placeholder="Écrire un message…"
-                  className="sc-input py-2 text-xs"
+                  className="sc-input min-w-0 flex-1 py-2 text-xs"
                 />
-                <button type="submit" disabled={chatBusy} className="sc-btn-primary px-3.5 py-2">
+                <button type="submit" disabled={chatBusy} className="sc-btn-primary shrink-0 px-3.5 py-2">
                   <Send className="h-4 w-4" />
                 </button>
               </div>
@@ -1998,28 +2025,28 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
             className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:max-w-lg sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 bg-forest-950 px-5 py-3.5 text-white">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-limeglow-400" />
-                <div>
-                  <h2 className="text-sm font-bold text-white">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-forest-950 px-4 py-3 text-white sm:px-5 sm:py-3.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <User className="h-4 w-4 shrink-0 text-limeglow-400" />
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-bold text-white">
                     {customerData?.authenticated && customerData.customer
                       ? `Mon compte · ${customerData.customer.fullName}`
                       : 'Compte client (optionnel)'}
                   </h2>
-                  <p className="text-[11px] text-emerald-200/70">{shop.name}</p>
+                  <p className="truncate text-[11px] text-emerald-200/70">{shop.name}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setAccountOpen(false)}
-                className="rounded-xl p-1.5 text-emerald-200 hover:bg-white/10"
+                className="shrink-0 rounded-xl p-1.5 text-emerald-200 hover:bg-white/10"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+            <div className="flex-1 space-y-4 overflow-y-auto p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-5">
               {customerData?.authenticated && customerData.customer ? (
                 <>
                   {/* Coordonnées client */}
@@ -2108,7 +2135,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                               </p>
                             ))}
                           </div>
-                          <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
+                          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
                             <span className="font-extrabold text-slate-900 tabular">
                               {formatXof(ord.totalXof)}
                             </span>

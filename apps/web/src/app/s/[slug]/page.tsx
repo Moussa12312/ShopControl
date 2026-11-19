@@ -33,8 +33,8 @@ export default async function PublicShopStorefrontPage({
 
   if (!data || !data.available) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-porcelain-100 p-6 text-center">
-        <div className="sc-card max-w-md p-8">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-porcelain-100 p-4 text-center sm:p-6">
+        <div className="sc-card w-full max-w-md p-6 sm:p-8">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-forest-900 text-limeglow-400">
             <Store className="h-7 w-7" />
           </span>
