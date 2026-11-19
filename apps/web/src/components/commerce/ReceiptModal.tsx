@@ -85,16 +85,16 @@ export function ReceiptModal({
     >
       <div className="flex max-h-[94vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-porcelain-100 shadow-2xl">
         {/* Barre d'actions */}
-        <div className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-slate-900">
-              {isCredit ? 'Justificatif d’Avoir' : 'Ticket de caisse'} · {currentDoc.documentNumber}
+        <div className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3.5 py-2.5 sm:px-5 sm:py-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="truncate text-xs font-bold text-slate-900 sm:text-sm">
+              {isCredit ? 'Avoir' : 'Ticket'} · {currentDoc.documentNumber}
             </span>
-            <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
+            <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-semibold sm:text-xs">
               <button
                 type="button"
                 onClick={() => setPaperWidth(58)}
-                className={`rounded-lg px-2.5 py-1 transition ${
+                className={`rounded-lg px-2 py-0.5 transition sm:px-2.5 sm:py-1 ${
                   paperWidth === 58 ? 'bg-forest-900 text-white' : 'text-slate-600'
                 }`}
               >
@@ -103,7 +103,7 @@ export function ReceiptModal({
               <button
                 type="button"
                 onClick={() => setPaperWidth(80)}
-                className={`rounded-lg px-2.5 py-1 transition ${
+                className={`rounded-lg px-2 py-0.5 transition sm:px-2.5 sm:py-1 ${
                   paperWidth === 80 ? 'bg-forest-900 text-white' : 'text-slate-600'
                 }`}
               >
@@ -112,7 +112,7 @@ export function ReceiptModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button type="button" onClick={handleWhatsAppShare} className="sc-btn-ghost px-2.5 py-1.5 text-xs">
               <Share2 className="h-3.5 w-3.5 text-emerald-600" />
               <span className="hidden sm:inline">WhatsApp</span>
@@ -125,10 +125,10 @@ export function ReceiptModal({
               type="button"
               onClick={handlePrint}
               disabled={printing}
-              className="sc-btn-primary px-3 py-1.5 text-xs"
+              className="sc-btn-primary px-2.5 py-1.5 text-xs sm:px-3"
             >
               <Printer className="h-3.5 w-3.5" />
-              <span>{currentDoc.printCount >= 1 ? 'Réimprimer (Duplicata)' : 'Imprimer'}</span>
+              <span>{currentDoc.printCount >= 1 ? 'Duplicata' : 'Imprimer'}</span>
             </button>
             <button
               type="button"

@@ -316,11 +316,11 @@ export default function OwnerAgentsPage() {
                   </div>
 
                   {!supportGrantId ? (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
                       <button
                         type="button"
                         onClick={() => openEdit(agent)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                       >
                         <Shield className="h-3.5 w-3.5" />
                         Permissions
@@ -328,7 +328,7 @@ export default function OwnerAgentsPage() {
                       <button
                         type="button"
                         onClick={() => setResetModal({ agent, newPassword: '' })}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                       >
                         <KeyRound className="h-3.5 w-3.5" />
                         Mot de passe
@@ -336,7 +336,7 @@ export default function OwnerAgentsPage() {
                       <button
                         type="button"
                         onClick={() => openSessions(agent)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                       >
                         <Laptop className="h-3.5 w-3.5" />
                         Sessions ({agent.activeSessionsCount})
@@ -344,7 +344,7 @@ export default function OwnerAgentsPage() {
                       <button
                         type="button"
                         onClick={() => handleToggleActive(agent)}
-                        className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                        className={`inline-flex items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold ${
                           agent.isActive
                             ? 'bg-red-50 text-red-700 hover:bg-red-100'
                             : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
@@ -482,18 +482,18 @@ export default function OwnerAgentsPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     onClick={() => setModalOpen(false)}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700"
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 sm:w-auto"
                   >
                     Annuler
                   </button>
                   <button
                     type="submit"
                     disabled={busy}
-                    className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
+                    className="w-full rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50 sm:w-auto"
                   >
                     {busy ? 'Enregistrement…' : 'Enregistrer'}
                   </button>

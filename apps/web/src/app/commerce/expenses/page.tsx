@@ -231,7 +231,7 @@ export default function ExpensesPage() {
           <div className="space-y-4">
             <form
               onSubmit={handleCreateShopExpense}
-              className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-5"
+              className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-5"
             >
               <select
                 value={form.categoryId}
@@ -395,7 +395,7 @@ export default function ExpensesPage() {
           <div className="space-y-4">
             <form
               onSubmit={handleCreateCompanyExpense}
-              className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-4"
+              className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-4 sm:p-5"
             >
               <input
                 required

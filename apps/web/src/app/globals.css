@@ -34,6 +34,38 @@
     @apply text-lg font-bold tracking-tight text-slate-900 sm:text-xl;
   }
 
+  /* Filet de sécurité responsive : aucun média, champ ou mot long ne doit déborder de l'écran */
+  img,
+  video,
+  canvas {
+    max-width: 100%;
+  }
+
+  select,
+  input,
+  textarea {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  main {
+    overflow-wrap: anywhere;
+  }
+
+  /* Modales : jamais plus hautes que l'écran mobile (barre d'adresse comprise) */
+  .fixed.inset-0 > form,
+  .fixed.inset-0 > div {
+    max-height: 92dvh;
+  }
+
+  /* Cibles tactiles confortables sur mobile */
+  @media (max-width: 639px) {
+    button,
+    [role='button'] {
+      min-height: 36px;
+    }
+  }
+
   h2 {
     @apply text-sm font-bold tracking-tight text-slate-900 sm:text-[15px];
   }

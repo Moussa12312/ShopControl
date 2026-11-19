@@ -557,15 +557,15 @@ export default function AdminShopsPage() {
                 </span>
               </label>
 
-              <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setTypeModal(null)}
-                  className="sc-btn-ghost"
+                  className="sc-btn-ghost w-full sm:w-auto"
                 >
                   Annuler
                 </button>
-                <button type="submit" disabled={busy} className="sc-btn-primary">
+                <button type="submit" disabled={busy} className="sc-btn-primary w-full sm:w-auto">
                   {busy ? 'Enregistrement…' : 'Activer ce(s) type(s) sur la boutique'}
                 </button>
               </div>
@@ -667,15 +667,15 @@ export default function AdminShopsPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setCreateOpen(false)}
-                  className="sc-btn-ghost"
+                  className="sc-btn-ghost w-full sm:w-auto"
                 >
                   Annuler
                 </button>
-                <button type="submit" disabled={busy} className="sc-btn-primary">
+                <button type="submit" disabled={busy} className="sc-btn-primary w-full sm:w-auto">
                   {busy ? 'Provisionnement…' : 'Créer la boutique & sa BDD'}
                 </button>
               </div>

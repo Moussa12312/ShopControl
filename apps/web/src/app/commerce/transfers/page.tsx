@@ -420,7 +420,7 @@ export default function TransfersPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/65 p-4 backdrop-blur-xs">
             <form
               onSubmit={handleCreate}
-              className="w-full max-w-lg space-y-4 rounded-3xl bg-white p-6 shadow-2xl"
+              className="max-h-[92dvh] w-full max-w-lg space-y-4 overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-6"
             >
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-extrabold text-slate-900">
@@ -475,7 +475,7 @@ export default function TransfersPage() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-700">Article *</label>
                   <select

@@ -145,9 +145,9 @@ export default function CsvImportPage() {
           </div>
         ) : null}
 
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
               {(['PRODUCTS', 'SUPPLIERS', 'CLIENTS'] as const).map((t) => (
                 <button
                   key={t}
@@ -182,12 +182,12 @@ export default function CsvImportPage() {
             className="w-full rounded-xl border border-slate-300 p-3 font-mono text-xs"
           />
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <button
               type="button"
               disabled={busy || !shopId}
               onClick={handlePreview}
-              className="rounded-xl border border-brand-700 bg-white px-4 py-2 text-sm font-semibold text-brand-800 hover:bg-brand-50"
+              className="w-full rounded-xl border border-brand-700 bg-white px-4 py-2 text-sm font-semibold text-brand-800 hover:bg-brand-50 sm:w-auto"
             >
               1. Prévisualiser et valider
             </button>
@@ -196,7 +196,7 @@ export default function CsvImportPage() {
                 type="button"
                 disabled={busy}
                 onClick={handleCommit}
-                className="rounded-xl bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800"
+                className="w-full rounded-xl bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 sm:w-auto"
               >
                 2. Importer les {preview.validCount} ligne(s) valide(s)
               </button>

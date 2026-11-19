@@ -324,7 +324,7 @@ export default function PurchasesPage() {
               {orders.map((po) => (
                 <div
                   key={po.id}
-                  className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5"
+                  className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4 sm:p-5"
                 >
                   <div>
                     <div className="flex items-center gap-2">
@@ -475,18 +475,18 @@ export default function PurchasesPage() {
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setShowNewPo(false)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 sm:w-auto"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={busy}
-                  className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white"
+                  className="w-full rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white sm:w-auto"
                 >
                   Créer commande
                 </button>

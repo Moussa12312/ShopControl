@@ -252,7 +252,7 @@ export default function AdminPlatformPage() {
       title="Administration SaaS Plateforme"
       subtitle="Gestion des abonnements & modules, encaissements SaaS, tickets support marchands et annonces globales."
       headerActions={
-        <div className="inline-flex flex-wrap rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-xs font-semibold">
+        <div className="grid w-full grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-forest-800/80 p-1 text-xs font-semibold sm:inline-flex sm:w-auto sm:flex-wrap sm:rounded-full sm:p-0.5">
           {(
             [
               { id: 'subs', label: 'Abonnements', icon: Crown },
@@ -267,12 +267,12 @@ export default function AdminPlatformPage() {
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 transition ${
+                className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 transition sm:rounded-full sm:py-1 ${
                   tab === t.id ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
                 }`}
               >
-                <Icon className="h-3.5 w-3.5" />
-                {t.label}
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{t.label}</span>
               </button>
             );
           })}
@@ -353,7 +353,7 @@ export default function AdminPlatformPage() {
                   </option>
                 ))}
               </select>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <input
                   type="number"
                   min={1}
@@ -518,7 +518,7 @@ export default function AdminPlatformPage() {
                 placeholder="Message affiché dans le bandeau supérieur…"
                 className="sc-input"
               />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <select
                   value={annForm.priority}
                   onChange={(e) => setAnnForm({ ...annForm, priority: e.target.value })}
@@ -642,7 +642,7 @@ export default function AdminPlatformPage() {
 
               <div>
                 <p className="mb-2 text-xs font-semibold text-slate-700">Modules activés</p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {PLATFORM_MODULES.map((m) => (
                     <label
                       key={m}
@@ -660,11 +660,11 @@ export default function AdminPlatformPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setEditingSub(null)} className="sc-btn-ghost">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button type="button" onClick={() => setEditingSub(null)} className="sc-btn-ghost w-full sm:w-auto">
                   Annuler
                 </button>
-                <button type="submit" disabled={busy} className="sc-btn-primary">
+                <button type="submit" disabled={busy} className="sc-btn-primary w-full sm:w-auto">
                   Enregistrer
                 </button>
               </div>

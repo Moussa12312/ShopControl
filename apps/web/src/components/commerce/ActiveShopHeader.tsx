@@ -59,7 +59,7 @@ export function ShopPickerInline({
 
   return (
     <div
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm ${
+      className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs shadow-sm sm:px-3 ${
         isDark
           ? 'border-white/15 bg-forest-800/90 text-white'
           : 'border-slate-200/90 bg-white text-slate-800'
@@ -70,7 +70,7 @@ export function ShopPickerInline({
         value={shopId}
         onChange={(e) => onChange(e.target.value)}
         aria-label="Boutique active"
-        className={`bg-transparent font-semibold focus:outline-none ${
+        className={`max-w-[150px] truncate bg-transparent font-semibold focus:outline-none sm:max-w-[220px] ${
           isDark ? 'text-white' : 'text-slate-800'
         }`}
       >

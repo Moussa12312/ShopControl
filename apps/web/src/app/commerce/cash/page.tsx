@@ -219,7 +219,7 @@ export default function CashPage() {
             {!current ? (
               <form
                 onSubmit={handleOpenSession}
-                className="max-w-lg space-y-4 rounded-2xl border border-slate-200 bg-white p-6"
+                className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6"
               >
                 <div className="flex items-center gap-2">
                   <Unlock className="h-5 w-5 text-brand-700" />
@@ -245,7 +245,7 @@ export default function CashPage() {
                 <button
                   type="submit"
                   disabled={busy}
-                  className="rounded-xl bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-800"
+                  className="w-full rounded-xl bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-800 sm:w-auto"
                 >
                   Ouvrir la caisse
                 </button>

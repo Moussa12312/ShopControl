@@ -370,12 +370,12 @@ export default function OwnerSettingsPage() {
       title="Paramètres, Logo & Boutique"
       subtitle="Personnalisez l’identité visuelle (logo, coordonnées, tickets, vitrine QR), votre abonnement et votre sécurité."
       headerActions={
-        <div className="inline-flex rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-xs font-semibold">
+        <div className="grid w-full grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-forest-800/80 p-0.5 text-[11px] font-semibold sm:inline-flex sm:w-auto sm:rounded-full sm:text-xs">
           {(
             [
-              { id: 'shop', label: 'Logo & Boutique', icon: Store },
-              { id: 'company', label: 'Entreprise & SaaS', icon: Building2 },
-              { id: 'security', label: 'Sécurité', icon: ShieldCheck },
+              { id: 'shop', label: 'Logo & Boutique', shortLabel: 'Boutique', icon: Store },
+              { id: 'company', label: 'Entreprise & SaaS', shortLabel: 'Entreprise', icon: Building2 },
+              { id: 'security', label: 'Sécurité', shortLabel: 'Sécurité', icon: ShieldCheck },
             ] as const
           ).map((t) => {
             const Icon = t.icon;
@@ -387,14 +387,15 @@ export default function OwnerSettingsPage() {
                   setTab(t.id);
                   setSavedMsg(null);
                 }}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-xl px-2 py-1.5 font-bold transition sm:gap-1.5 sm:rounded-full sm:px-3 ${
                   tab === t.id
                     ? 'bg-white text-forest-950 shadow-sm'
                     : 'text-[#8aa8a2] hover:text-white'
                 }`}
               >
-                <Icon className="h-3.5 w-3.5" />
-                <span>{t.label}</span>
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate sm:hidden">{t.shortLabel}</span>
+                <span className="hidden truncate sm:inline">{t.label}</span>
               </button>
             );
           })}
@@ -538,7 +539,7 @@ export default function OwnerSettingsPage() {
                       </h2>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label className="block text-xs font-semibold text-slate-700">
                           Largeur imprimante
@@ -554,7 +555,7 @@ export default function OwnerSettingsPage() {
                           <option value={58}>58 mm (Mobile / Bluetooth)</option>
                         </select>
                       </div>
-                      <label className="mt-5 flex items-center gap-2 rounded-xl border border-slate-200 bg-porcelain-50 px-3 py-2 text-xs font-semibold text-slate-700">
+                      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-porcelain-50 px-3 py-2.5 text-xs font-semibold text-slate-700 sm:mt-5">
                         <input
                           type="checkbox"
                           checked={shopForm.showLogo}
@@ -818,7 +819,7 @@ export default function OwnerSettingsPage() {
 
                     <div className="flex justify-end pt-2">
                       {!supportGrantId ? (
-                        <button type="submit" disabled={busy} className="sc-btn-primary px-6">
+                        <button type="submit" disabled={busy} className="sc-btn-primary w-full px-6 sm:w-auto">
                           <Save className="h-4 w-4" />
                           {busy ? 'Enregistrement…' : 'Enregistrer le logo & les infos boutique'}
                         </button>

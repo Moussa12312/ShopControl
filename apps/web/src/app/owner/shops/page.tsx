@@ -530,18 +530,18 @@ export default function OwnerShopsPage() {
                   </span>
                 </label>
 
-                <div className="flex justify-end gap-2 pt-3">
+                <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     onClick={() => setModalOpen(false)}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700"
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 sm:w-auto"
                   >
                     Annuler
                   </button>
                   <button
                     type="submit"
                     disabled={busy}
-                    className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
+                    className="w-full rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50 sm:w-auto"
                   >
                     {busy ? 'Enregistrement…' : editingShop ? 'Enregistrer' : 'Créer & provisionner BDD'}
                   </button>
@@ -630,18 +630,18 @@ export default function OwnerShopsPage() {
                   />
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     onClick={() => setRequestTypeShop(null)}
-                    className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 sm:w-auto"
                   >
                     Annuler
                   </button>
                   <button
                     type="submit"
                     disabled={busy}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-xs font-bold text-white hover:bg-brand-800 disabled:opacity-50"
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-xs font-bold text-white hover:bg-brand-800 disabled:opacity-50 sm:w-auto"
                   >
                     <Send className="h-3.5 w-3.5" />
                     {busy ? 'Envoi…' : 'Envoyer la demande au Super Admin'}

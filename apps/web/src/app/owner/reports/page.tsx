@@ -199,8 +199,8 @@ export default function OwnerReportsPage() {
       <div className="space-y-5">
 
         {/* Sélecteur période */}
-        <div className="sc-card flex flex-wrap items-end gap-3 p-4">
-          <div>
+        <div className="sc-card grid grid-cols-2 items-end gap-2.5 p-3.5 sm:flex sm:flex-wrap sm:gap-3 sm:p-4">
+          <div className="min-w-0">
             <label className="block text-xs font-semibold text-slate-600">Du</label>
             <input
               type="date"
@@ -209,7 +209,7 @@ export default function OwnerReportsPage() {
               className="sc-input mt-1 py-2 text-xs"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs font-semibold text-slate-600">Au</label>
             <input
               type="date"
@@ -218,7 +218,11 @@ export default function OwnerReportsPage() {
               className="sc-input mt-1 py-2 text-xs"
             />
           </div>
-          <button type="button" onClick={() => void load()} className="sc-btn-ghost py-2 text-xs">
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="sc-btn-ghost col-span-2 w-full py-2 text-xs sm:col-span-1 sm:w-auto"
+          >
             <RefreshCw className="h-3.5 w-3.5" />
             Actualiser
           </button>

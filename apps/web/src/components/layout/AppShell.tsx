@@ -924,18 +924,22 @@ export function AppShell({
             {hero ? (
               <div className="obsidian-hero px-4 pb-5 pt-4 text-white sm:px-5 lg:px-6">{hero}</div>
             ) : (
-              <div className="obsidian-hero px-4 py-4 text-white sm:px-5 lg:px-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="obsidian-hero px-3.5 py-3.5 text-white sm:px-5 sm:py-4 lg:px-6">
+                <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
                   <div className="min-w-0">
-                    <h1 className="truncate text-lg font-extrabold tracking-tight text-white sm:text-xl">
+                    <h1 className="line-clamp-2 text-base font-extrabold tracking-tight text-white sm:truncate sm:text-xl">
                       {title || pageTitle}
                     </h1>
                     {subtitle ? (
-                      <p className="mt-0.5 text-xs text-emerald-200/75">{subtitle}</p>
+                      <p className="mt-0.5 line-clamp-2 text-[11px] text-emerald-200/75 sm:text-xs">
+                        {subtitle}
+                      </p>
                     ) : null}
                   </div>
                   {headerActions ? (
-                    <div className="flex flex-wrap items-center gap-2">{headerActions}</div>
+                    <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:gap-2">
+                      {headerActions}
+                    </div>
                   ) : null}
                 </div>
               </div>
