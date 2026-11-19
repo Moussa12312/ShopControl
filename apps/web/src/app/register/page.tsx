@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -10,6 +10,7 @@ import {
   CreditCard,
   Eye,
   EyeOff,
+  Gift,
   Layers,
   MapPin,
   Phone,
@@ -27,8 +28,12 @@ import {
   SHOP_TYPE_SHORT_LABELS,
   SHOP_TYPES,
   ShopType,
+  SUBSCRIPTION_BILLING_CYCLE_LABELS,
+  SUBSCRIPTION_BILLING_CYCLE_SUFFIX,
+  SUBSCRIPTION_BILLING_CYCLES,
   SUBSCRIPTION_PAYMENT_METHOD_LABELS,
   SUBSCRIPTION_PAYMENT_METHODS,
+  SubscriptionBillingCycle,
   SubscriptionPaymentMethod,
   SubscriptionPlan,
 } from '@shopcontrol/shared';
@@ -50,41 +55,28 @@ const SHOP_PAYMENT_OPTIONS: Array<{
   { code: 'CARD', label: 'Carte bancaire / Virement', desc: 'TPE ou virement bancaire' },
 ];
 
-const PLAN_CARDS: Array<{
+interface PublicPlan {
   code: SubscriptionPlan;
-  title: string;
-  priceXof: number;
-  badge?: string;
+  name: string;
+  tagline: string;
+  badge: string | null;
+  monthlyPriceXof: number;
+  yearlyPriceXof: number;
+  directSalePriceXof: number;
+  allowMonthly: boolean;
+  allowYearly: boolean;
+  allowDirectSale: boolean;
+  trialDays: number;
+  maxShops: number;
+  maxAgentsPerShop: number;
   features: string[];
-}> = [
-  {
-    code: 'STARTER',
-    title: 'Starter',
-    priceXof: 15000,
-    features: ['1 boutique dédiée', 'Jusqu’à 3 comptes agents', 'Caisse POS, Stocks & Vitrine QR'],
-  },
-  {
-    code: 'PRO',
-    title: 'Pro Multi-Boutiques',
-    priceXof: 25000,
-    badge: 'Recommandé',
-    features: [
-      'Jusqu’à 5 boutiques',
-      'Jusqu’à 10 agents / boutique',
-      'Transferts inter-boutiques & Bilans consolidés',
-    ],
-  },
-  {
-    code: 'ENTERPRISE',
-    title: 'Entreprise',
-    priceXof: 50000,
-    features: [
-      'Jusqu’à 20 boutiques',
-      'Jusqu’à 50 agents / boutique',
-      'Tous les modules + Support prioritaire',
-    ],
-  },
-];
+}
+
+function priceForCycle(plan: PublicPlan, cycle: SubscriptionBillingCycle): number {
+  if (cycle === 'YEARLY') return plan.yearlyPriceXof;
+  if (cycle === 'DIRECT_SALE') return plan.directSalePriceXof;
+  return plan.monthlyPriceXof;
+}
 
 export default function RegisterMerchantPage() {
   const router = useRouter();
@@ -94,6 +86,10 @@ export default function RegisterMerchantPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [plans, setPlans] = useState<PublicPlan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [plansErr, setPlansErr] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     // Étape 1 : Boutique, Type & Logo
@@ -107,6 +103,8 @@ export default function RegisterMerchantPage() {
     // Étape 2 : Modes de paiement & Formule
     shopPaymentMethodCodes: ['CASH', 'ORANGE_MONEY', 'WAVE'] as ShopPaymentCode[],
     planCode: 'PRO' as SubscriptionPlan,
+    billingCycle: 'MONTHLY' as SubscriptionBillingCycle,
+    startFreeTrial: true,
     subscriptionPaymentMethod: 'ORANGE_MONEY' as SubscriptionPaymentMethod,
     subscriptionPaymentReference: '',
     // Étape 3 : Compte Propriétaire
@@ -116,8 +114,65 @@ export default function RegisterMerchantPage() {
     confirmPassword: '',
   });
 
+  const loadPlans = useCallback(async () => {
+    setPlansLoading(true);
+    setPlansErr(null);
+    try {
+      const list = await apiFetch<PublicPlan[]>('/public/plans', { requiresOnline: false });
+      setPlans(Array.isArray(list) ? list : []);
+    } catch (err) {
+      setPlansErr(
+        err instanceof ApiError ? err.message : 'Impossible de charger les tarifs en direct.',
+      );
+    } finally {
+      setPlansLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPlans();
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const qPlan = sp.get('plan');
+      const qBilling = sp.get('billing');
+      const qTrial = sp.get('trial');
+      setForm((prev) => ({
+        ...prev,
+        ...(qPlan === 'STARTER' || qPlan === 'PRO' || qPlan === 'ENTERPRISE'
+          ? { planCode: qPlan }
+          : {}),
+        ...(qBilling === 'MONTHLY' || qBilling === 'YEARLY' || qBilling === 'DIRECT_SALE'
+          ? { billingCycle: qBilling }
+          : {}),
+        ...(qTrial === '0' ? { startFreeTrial: false } : qTrial === '1' ? { startFreeTrial: true } : {}),
+      }));
+    }
+  }, [loadPlans]);
+
   const suggestedCategories = getSuggestedCategoriesForShopTypes(form.shopType);
-  const selectedPlan = PLAN_CARDS.find((p) => p.code === form.planCode) || PLAN_CARDS[1];
+  const selectedPlan =
+    plans.find((p) => p.code === form.planCode) ||
+    plans[0] ||
+    null;
+
+  const isCycleAllowedOnAnyPlan = (cycle: SubscriptionBillingCycle) =>
+    plans.some((p) =>
+      cycle === 'MONTHLY'
+        ? p.allowMonthly
+        : cycle === 'YEARLY'
+          ? p.allowYearly
+          : p.allowDirectSale,
+    );
+
+  const visibleCycles = SUBSCRIPTION_BILLING_CYCLES.filter((c) =>
+    plans.length === 0 ? true : isCycleAllowedOnAnyPlan(c),
+  );
+  const activeCycle: SubscriptionBillingCycle = visibleCycles.includes(form.billingCycle)
+    ? form.billingCycle
+    : visibleCycles[0] || 'MONTHLY';
+  const activePriceXof = selectedPlan ? priceForCycle(selectedPlan, activeCycle) : 0;
+  const trialDays = selectedPlan?.trialDays ?? 14;
+  const isTrialApplied = form.startFreeTrial && trialDays > 0;
 
   const toggleShopPaymentMethod = (code: ShopPaymentCode) => {
     setForm((prev) => {
@@ -209,7 +264,9 @@ export default function RegisterMerchantPage() {
           shopPhone: form.shopPhone.trim(),
           currency: form.currency,
           shopPaymentMethodCodes: form.shopPaymentMethodCodes,
-          planCode: form.planCode,
+          planCode: selectedPlan ? selectedPlan.code : form.planCode,
+          billingCycle: activeCycle,
+          startFreeTrial: isTrialApplied,
           subscriptionPaymentMethod: form.subscriptionPaymentMethod,
           subscriptionPaymentReference:
             form.subscriptionPaymentReference.trim() || undefined,
@@ -237,7 +294,7 @@ export default function RegisterMerchantPage() {
       <div className="obsidian-hero flex flex-col justify-between px-4 py-4 text-white sm:px-8 sm:py-6 lg:col-span-5 lg:min-h-screen lg:px-10 lg:py-10">
         <div className="space-y-4 lg:space-y-6">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+            <Link href="/" className="flex min-w-0 items-center gap-2.5 hover:opacity-90 sm:gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-forest-700 text-sm font-black text-white shadow-sm ring-1 ring-white/20 sm:h-11 sm:w-11">
                 SC
               </span>
@@ -249,7 +306,7 @@ export default function RegisterMerchantPage() {
                   Ouverture de compte boutiquier
                 </p>
               </div>
-            </div>
+            </Link>
             <Link
               href="/login"
               className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-white/20"
@@ -283,7 +340,11 @@ export default function RegisterMerchantPage() {
                 </span>
               </div>
               <p className="truncate text-[11px] text-emerald-200/80">
-                Formule {selectedPlan.title} · {formatXof(selectedPlan.priceXof)}/mois
+                {selectedPlan
+                  ? isTrialApplied
+                    ? `Formule ${selectedPlan.name} · Essai gratuit ${trialDays}j (puis ${formatXof(activePriceXof)} ${SUBSCRIPTION_BILLING_CYCLE_SUFFIX[activeCycle]})`
+                    : `Formule ${selectedPlan.name} · ${formatXof(activePriceXof)} ${SUBSCRIPTION_BILLING_CYCLE_SUFFIX[activeCycle]}`
+                  : 'Chargement des offres…'}
               </p>
             </div>
           </div>
@@ -662,55 +723,140 @@ export default function RegisterMerchantPage() {
                 </div>
               </div>
 
-              {/* 2. Formule d'abonnement */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
-                  <Sparkles className="h-4 w-4 shrink-0 text-brand-700" />
-                  <span>Choisissez votre formule ShopControl *</span>
-                </label>
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                  {PLAN_CARDS.map((p) => {
-                    const active = form.planCode === p.code;
-                    return (
-                      <button
-                        key={p.code}
-                        type="button"
-                        onClick={() => setForm({ ...form, planCode: p.code })}
-                        className={`relative flex flex-col justify-between rounded-2xl border p-3.5 text-left transition ${
-                          active
-                            ? 'border-forest-900 bg-forest-900 text-white shadow-md'
-                            : 'border-slate-200 bg-porcelain-50 text-slate-800 hover:border-brand-400'
-                        }`}
-                      >
-                        {p.badge ? (
-                          <span className="mb-1.5 inline-block w-fit rounded-full bg-limeglow-400 px-2 py-0.5 text-[9px] font-black uppercase text-forest-950">
-                            {p.badge}
-                          </span>
-                        ) : null}
-                        <div>
-                          <p className="text-xs font-extrabold">{p.title}</p>
-                          <p
-                            className={`mt-1 text-base font-black tabular ${
-                              active ? 'text-limeglow-400' : 'text-slate-900'
-                            }`}
-                          >
-                            {formatXof(p.priceXof)}
-                            <span className="text-[10px] font-normal opacity-80"> / mois</span>
-                          </p>
-                          <ul
-                            className={`mt-2 space-y-1 text-[10px] ${
-                              active ? 'text-emerald-100/90' : 'text-slate-600'
-                            }`}
-                          >
-                            {p.features.map((f) => (
-                              <li key={f}>• {f}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </button>
-                    );
-                  })}
+              {/* 2. Formule d'abonnement & Mode de tarification */}
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+                    <Sparkles className="h-4 w-4 shrink-0 text-brand-700" />
+                    <span>Choisissez votre formule & rythme *</span>
+                  </label>
+                  {visibleCycles.length > 0 ? (
+                    <div className="inline-flex rounded-xl border border-slate-200 bg-porcelain-50 p-1 text-[11px] font-bold">
+                      {visibleCycles.map((cycle) => (
+                        <button
+                          key={cycle}
+                          type="button"
+                          onClick={() => setForm({ ...form, billingCycle: cycle })}
+                          className={`rounded-lg px-2.5 py-1 transition ${
+                            activeCycle === cycle
+                              ? 'bg-forest-900 text-limeglow-400 shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {SUBSCRIPTION_BILLING_CYCLE_LABELS[cycle]}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
+
+                {plansLoading ? (
+                  <div className="rounded-2xl border border-slate-200 bg-porcelain-50 p-5 text-center text-xs text-slate-500">
+                    Chargement des offres et tarifs en direct…
+                  </div>
+                ) : plansErr ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
+                    <span>{plansErr}</span>
+                    <button
+                      type="button"
+                      onClick={() => void loadPlans()}
+                      className="rounded-lg bg-white px-3 py-1 font-bold text-rose-800 shadow-2xs"
+                    >
+                      Réessayer
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                    {plans.map((p) => {
+                      const active = (selectedPlan?.code || form.planCode) === p.code;
+                      const cycleAvailableForPlan =
+                        activeCycle === 'MONTHLY'
+                          ? p.allowMonthly
+                          : activeCycle === 'YEARLY'
+                            ? p.allowYearly
+                            : p.allowDirectSale;
+                      const planPrice = priceForCycle(p, activeCycle);
+                      return (
+                        <button
+                          key={p.code}
+                          type="button"
+                          disabled={!cycleAvailableForPlan}
+                          onClick={() => setForm({ ...form, planCode: p.code })}
+                          className={`relative flex flex-col justify-between rounded-2xl border p-3.5 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                            active
+                              ? 'border-forest-900 bg-forest-900 text-white shadow-md'
+                              : 'border-slate-200 bg-porcelain-50 text-slate-800 hover:border-brand-400'
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {p.badge ? (
+                              <span className="inline-block w-fit rounded-full bg-limeglow-400 px-2 py-0.5 text-[9px] font-black uppercase text-forest-950">
+                                {p.badge}
+                              </span>
+                            ) : null}
+                            {p.trialDays > 0 ? (
+                              <span
+                                className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                                  active
+                                    ? 'bg-white/15 text-limeglow-300'
+                                    : 'bg-emerald-100 text-emerald-800'
+                                }`}
+                              >
+                                {p.trialDays}j gratuits
+                              </span>
+                            ) : null}
+                          </div>
+                          <div>
+                            <p className="mt-1 text-xs font-extrabold">{p.name}</p>
+                            <p
+                              className={`mt-1 text-base font-black tabular ${
+                                active ? 'text-limeglow-400' : 'text-slate-900'
+                              }`}
+                            >
+                              {formatXof(planPrice)}
+                              <span className="text-[10px] font-normal opacity-80">
+                                {' '}
+                                {SUBSCRIPTION_BILLING_CYCLE_SUFFIX[activeCycle]}
+                              </span>
+                            </p>
+                            <ul
+                              className={`mt-2 space-y-1 text-[10px] ${
+                                active ? 'text-emerald-100/90' : 'text-slate-600'
+                              }`}
+                            >
+                              {p.features.map((f) => (
+                                <li key={f}>• {f}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {trialDays > 0 ? (
+                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-emerald-300 bg-emerald-50/80 p-3.5 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={form.startFreeTrial}
+                      onChange={(e) => setForm({ ...form, startFreeTrial: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-forest-900"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-center gap-1.5 font-extrabold text-emerald-950">
+                        <Gift className="h-4 w-4 text-emerald-700" />
+                        <span>Activer mon essai gratuit de {trialDays} jours (2 semaines)</span>
+                        <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[10px] font-bold text-white">
+                          0 FCFA aujourd’hui
+                        </span>
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-emerald-900/80">
+                        Testez toute la plateforme gratuitement pendant {trialDays} jours avant de régler votre formule ({formatXof(activePriceXof)} {SUBSCRIPTION_BILLING_CYCLE_SUFFIX[activeCycle]}).
+                      </p>
+                    </div>
+                  </label>
+                ) : null}
               </div>
 
               {/* 3. Mode de règlement de l'abonnement */}
@@ -718,7 +864,9 @@ export default function RegisterMerchantPage() {
                 <label className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
                   <CreditCard className="h-4 w-4 shrink-0 text-brand-700" />
                   <span>
-                    Mode de règlement de l’abonnement ({formatXof(selectedPlan.priceXof)}) *
+                    {isTrialApplied
+                      ? `Mode de règlement souhaité après l’essai (${formatXof(activePriceXof)} ${SUBSCRIPTION_BILLING_CYCLE_SUFFIX[activeCycle]})`
+                      : `Mode de règlement de l’abonnement (${formatXof(activePriceXof)} ${SUBSCRIPTION_BILLING_CYCLE_SUFFIX[activeCycle]}) *`}
                   </span>
                 </label>
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
@@ -872,7 +1020,11 @@ export default function RegisterMerchantPage() {
                   <p className="truncate">
                     • Formule :{' '}
                     <strong>
-                      {selectedPlan.title} ({formatXof(selectedPlan.priceXof)}/mois)
+                      {selectedPlan ? selectedPlan.name : form.planCode} (
+                      {isTrialApplied
+                        ? `Essai ${trialDays}j gratuit, puis `
+                        : ''}
+                      {formatXof(activePriceXof)} {SUBSCRIPTION_BILLING_CYCLE_SUFFIX[activeCycle]})
                     </strong>
                   </p>
                   <p className="truncate">

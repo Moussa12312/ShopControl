@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Crown,
   ExternalLink,
+  FileSearch,
   Laptop,
   LifeBuoy,
   MessageSquarePlus,
@@ -30,7 +31,10 @@ import {
   PlatformModuleKey,
   SHOP_TYPE_SHORT_LABELS,
   ShopType,
+  SUBSCRIPTION_BILLING_CYCLE_LABELS,
+  SUBSCRIPTION_BILLING_CYCLE_SUFFIX,
   SUBSCRIPTION_PLAN_LABELS,
+  SubscriptionBillingCycle,
   SubscriptionPlan,
   SUPPORT_TICKET_STATUS_LABELS,
   SupportTicketStatus,
@@ -93,10 +97,13 @@ interface SessionRow {
 interface SubscriptionPayload {
   subscription: {
     planCode: SubscriptionPlan;
+    billingCycle?: SubscriptionBillingCycle;
+    priceXof?: number;
     monthlyPriceXof: number;
     maxShops: number;
     maxAgentsPerShop: number;
     enabledModules: PlatformModuleKey[];
+    trialEndsAt?: string | null;
     currentPeriodEnd: string;
   };
   payments: Array<{
@@ -899,16 +906,42 @@ export default function OwnerSettingsPage() {
                         Mon abonnement ShopControl
                       </h2>
                     </div>
-                    <span className="rounded-full bg-forest-900 px-3 py-1 text-xs font-bold text-limeglow-400">
-                      {SUBSCRIPTION_PLAN_LABELS[subData.subscription.planCode]}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {subData.subscription.trialEndsAt &&
+                      new Date(subData.subscription.trialEndsAt).getTime() > Date.now() ? (
+                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-extrabold text-emerald-800">
+                          Essai gratuit jusqu’au{' '}
+                          {new Date(subData.subscription.trialEndsAt).toLocaleDateString('fr-FR')}
+                        </span>
+                      ) : null}
+                      <span className="rounded-full bg-forest-900 px-3 py-1 text-xs font-bold text-limeglow-400">
+                        {SUBSCRIPTION_PLAN_LABELS[subData.subscription.planCode]}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     <div className="rounded-2xl bg-porcelain-50 p-3">
-                      <p className="text-[11px] text-slate-500">Tarif mensuel</p>
+                      <p className="text-[11px] text-slate-500">
+                        Tarif (
+                        {
+                          SUBSCRIPTION_BILLING_CYCLE_LABELS[
+                            subData.subscription.billingCycle || 'MONTHLY'
+                          ]
+                        }
+                        )
+                      </p>
                       <p className="text-base font-extrabold text-slate-900 tabular">
-                        {formatXof(subData.subscription.monthlyPriceXof)}
+                        {formatXof(
+                          subData.subscription.priceXof ?? subData.subscription.monthlyPriceXof,
+                        )}{' '}
+                        <span className="text-[11px] font-semibold text-slate-500">
+                          {
+                            SUBSCRIPTION_BILLING_CYCLE_SUFFIX[
+                              subData.subscription.billingCycle || 'MONTHLY'
+                            ]
+                          }
+                        </span>
                       </p>
                     </div>
                     <div className="rounded-2xl bg-porcelain-50 p-3">
@@ -1097,6 +1130,24 @@ export default function OwnerSettingsPage() {
                   Activer le 2FA maintenant
                 </Link>
               ) : null}
+
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-porcelain-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-1.5 text-sm font-extrabold text-slate-900">
+                      <FileSearch className="h-4 w-4 text-brand-700" />
+                      Journal d’audit & anti-fraude
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-600">
+                      Consultez l’historique détaillé des actions, remises, annulations et modifications de stock.
+                    </p>
+                  </div>
+                  <Link href="/owner/audit" className="sc-btn-ghost shrink-0 text-xs">
+                    Consulter
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              </div>
 
               <div className="mt-6 border-t border-slate-100 pt-5">
                 <h3 className="text-sm font-extrabold text-slate-900">

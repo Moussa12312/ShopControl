@@ -7,7 +7,7 @@ import {
   TENANT_STATUSES,
 } from './enums';
 import { PERMISSION_KEYS } from './permissions';
-import { SUBSCRIPTION_PLANS } from './platform.enums';
+import { SUBSCRIPTION_BILLING_CYCLES, SUBSCRIPTION_PLANS } from './platform.enums';
 import { deliveryConfigSchema, receiptSettingsSchema } from './platform.schemas';
 import { businessProfileSchema, SHOP_TYPES } from './shop-profiles';
 
@@ -142,6 +142,8 @@ export const registerMerchantSchema = z.object({
     .default(['CASH', 'ORANGE_MONEY', 'WAVE']),
   // Formule & Mode de paiement de l'abonnement
   planCode: z.enum(SUBSCRIPTION_PLANS).default('PRO'),
+  billingCycle: z.enum(SUBSCRIPTION_BILLING_CYCLES).default('MONTHLY'),
+  startFreeTrial: z.boolean().default(true),
   subscriptionPaymentMethod: z.enum(SUBSCRIPTION_PAYMENT_METHODS).default('ORANGE_MONEY'),
   subscriptionPaymentReference: z.string().trim().max(120).optional(),
   deviceName: z.string().trim().max(100).optional(),

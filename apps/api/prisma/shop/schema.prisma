@@ -285,12 +285,13 @@ model ProductCostHistory {
 }
 
 model Supplier {
-  id            String   @id @default(uuid()) @db.Uuid
-  name          String   @db.VarChar(120)
-  phone         String?  @db.VarChar(30)
-  email         String?  @db.VarChar(160)
-  address       String?  @db.VarChar(255)
-  notes         String?  @db.VarChar(500)
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String   @db.VarChar(120)
+  phone            String?  @db.VarChar(30)
+  email            String?  @db.VarChar(160)
+  address          String?  @db.VarChar(255)
+  suppliedProducts String?  @map("supplied_products") @db.VarChar(400)
+  notes            String?  @db.VarChar(500)
   isActive      Boolean  @default(true) @map("is_active")
   importBatchId String?  @map("import_batch_id") @db.Uuid
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

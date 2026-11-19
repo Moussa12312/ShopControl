@@ -3,6 +3,7 @@ import {
   FULFILLMENT_MODES,
   ONLINE_ORDER_STATUSES,
   PLATFORM_MODULES,
+  SUBSCRIPTION_BILLING_CYCLES,
   SUBSCRIPTION_PLANS,
   SUPPORT_TICKET_STATUSES,
 } from './platform.enums';
@@ -230,8 +231,31 @@ export const assignConversationSchema = z.object({
 });
 
 // --- Lot 7 : Administration Plateforme ---
+export const updatePlatformPlanConfigSchema = z
+  .object({
+    name: z.string().trim().min(2, 'Nom d’offre requis.').max(80),
+    tagline: z.string().trim().max(200).default(''),
+    badge: z.string().trim().max(40).nullable().optional(),
+    monthlyPriceXof: xofInt,
+    yearlyPriceXof: xofInt,
+    directSalePriceXof: xofInt,
+    allowMonthly: z.boolean().default(true),
+    allowYearly: z.boolean().default(true),
+    allowDirectSale: z.boolean().default(true),
+    trialDays: z.number().int().min(0).max(90).default(14),
+    maxShops: z.number().int().min(1).max(200),
+    maxAgentsPerShop: z.number().int().min(1).max(200),
+    features: z.array(z.string().trim().min(1).max(160)).max(15).default([]),
+    isActive: z.boolean().default(true),
+  })
+  .refine((d) => d.allowMonthly || d.allowYearly || d.allowDirectSale, {
+    message: 'Activez au moins un mode de tarification (Mois, Année ou Vente directe).',
+  });
+
 export const upsertSubscriptionSchema = z.object({
   planCode: z.enum(SUBSCRIPTION_PLANS),
+  billingCycle: z.enum(SUBSCRIPTION_BILLING_CYCLES).default('MONTHLY'),
+  priceXof: xofInt.optional(),
   monthlyPriceXof: xofInt,
   maxShops: z.number().int().min(1).max(100),
   maxAgentsPerShop: z.number().int().min(1).max(100),

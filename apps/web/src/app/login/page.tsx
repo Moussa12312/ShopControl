@@ -101,7 +101,7 @@ export default function LoginPage() {
       <div className="obsidian-hero flex flex-col justify-between px-4 py-5 text-white sm:px-8 sm:py-7 lg:col-span-5 lg:min-h-screen lg:px-12 lg:py-12">
         <div>
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3 hover:opacity-90">
               <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-forest-700 text-sm font-black text-white shadow-sm ring-1 ring-white/20 sm:h-11 sm:w-11">
                 SC
               </span>
@@ -111,7 +111,7 @@ export default function LoginPage() {
                   Gestion de Boutique & Vitrine QR
                 </p>
               </div>
-            </div>
+            </Link>
             <Link
               href="/register"
               className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-limeglow-400 transition hover:bg-white/20 lg:hidden"

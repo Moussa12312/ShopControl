@@ -8,7 +8,9 @@ import {
   LifeBuoy,
   Megaphone,
   Plus,
+  Save,
   Send,
+  Sliders,
 } from 'lucide-react';
 import {
   DEFAULT_PAYMENT_METHODS,
@@ -17,8 +19,12 @@ import {
   PLATFORM_MODULE_LABELS,
   PLATFORM_MODULES,
   PlatformModuleKey,
+  SUBSCRIPTION_BILLING_CYCLE_LABELS,
+  SUBSCRIPTION_BILLING_CYCLE_SUFFIX,
+  SUBSCRIPTION_BILLING_CYCLES,
   SUBSCRIPTION_PLAN_LABELS,
   SUBSCRIPTION_PLANS,
+  SubscriptionBillingCycle,
   SubscriptionPlan,
   SUPPORT_TICKET_STATUS_LABELS,
   SUPPORT_TICKET_STATUSES,
@@ -33,17 +39,43 @@ import { apiFetch, ApiError } from '@/lib/api-client';
 import { AppShell } from '@/components/layout/AppShell';
 import { EmptyState, ErrorState, LoadingSkeleton, StatusBadge } from '@/components/ui/StateViews';
 
-interface SubscriptionRow {
-  id: string;
-  merchantId: string;
-  merchantName: string;
-  merchantStatus: string;
-  planCode: SubscriptionPlan;
+interface PlatformPlanConfigRow {
+  code: string;
+  name: string;
+  tagline: string;
+  badge: string | null;
   monthlyPriceXof: number;
+  yearlyPriceXof: number;
+  directSalePriceXof: number;
+  allowMonthly: boolean;
+  allowYearly: boolean;
+  allowDirectSale: boolean;
+  trialDays: number;
   maxShops: number;
   maxAgentsPerShop: number;
-  enabledModules: PlatformModuleKey[];
-  currentPeriodEnd: string;
+  features: string[];
+  isActive: boolean;
+  sortOrder: number;
+}
+
+interface SubscriptionRow {
+  merchantId: string;
+  merchantName: string;
+  status: string;
+  shopsCount: number;
+  paymentsCount: number;
+  subscription: {
+    id: string;
+    planCode: SubscriptionPlan;
+    billingCycle?: SubscriptionBillingCycle;
+    priceXof?: number;
+    monthlyPriceXof: number;
+    maxShops: number;
+    maxAgentsPerShop: number;
+    enabledModules: PlatformModuleKey[];
+    trialEndsAt?: string | null;
+    currentPeriodEnd: string;
+  };
 }
 
 interface PlatformPaymentRow {
@@ -84,7 +116,11 @@ interface MerchantOpt {
 }
 
 export default function AdminPlatformPage() {
-  const [tab, setTab] = useState<'subs' | 'payments' | 'tickets' | 'announcements'>('subs');
+  const [tab, setTab] = useState<'plans' | 'subs' | 'payments' | 'tickets' | 'announcements'>('plans');
+  const [plans, setPlans] = useState<PlatformPlanConfigRow[]>([]);
+  const [planDrafts, setPlanDrafts] = useState<
+    Record<string, PlatformPlanConfigRow & { featuresText: string }>
+  >({});
   const [subs, setSubs] = useState<SubscriptionRow[]>([]);
   const [payments, setPayments] = useState<PlatformPaymentRow[]>([]);
   const [tickets, setTickets] = useState<SupportTicketRow[]>([]);
@@ -99,6 +135,8 @@ export default function AdminPlatformPage() {
   const [editingSub, setEditingSub] = useState<SubscriptionRow | null>(null);
   const [subForm, setSubForm] = useState({
     planCode: 'PRO' as SubscriptionPlan,
+    billingCycle: 'MONTHLY' as SubscriptionBillingCycle,
+    priceXof: 25000,
     monthlyPriceXof: 25000,
     maxShops: 5,
     maxAgentsPerShop: 10,
@@ -130,13 +168,23 @@ export default function AdminPlatformPage() {
     setLoading(true);
     setError(null);
     try {
-      const [s, p, t, a, m] = await Promise.all([
+      const [pl, s, p, t, a, m] = await Promise.all([
+        apiFetch<PlatformPlanConfigRow[]>('/admin/plans'),
         apiFetch<SubscriptionRow[]>('/admin/subscriptions'),
         apiFetch<PlatformPaymentRow[]>('/admin/platform-payments'),
         apiFetch<SupportTicketRow[]>('/support/tickets'),
         apiFetch<AnnouncementRow[]>('/admin/announcements'),
         apiFetch<MerchantOpt[]>('/admin/merchants'),
       ]);
+      setPlans(pl);
+      const drafts: Record<string, PlatformPlanConfigRow & { featuresText: string }> = {};
+      for (const item of pl) {
+        drafts[item.code] = {
+          ...item,
+          featuresText: (item.features || []).join('\n'),
+        };
+      }
+      setPlanDrafts(drafts);
       setSubs(s);
       setPayments(p);
       setTickets(t);
@@ -153,6 +201,45 @@ export default function AdminPlatformPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const handleSavePlanConfig = async (code: string) => {
+    const draft = planDrafts[code];
+    if (!draft) return;
+    setBusy(true);
+    setMsg(null);
+    setError(null);
+    try {
+      const features = draft.featuresText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+      await apiFetch(`/admin/plans/${code}`, {
+        method: 'PUT',
+        body: {
+          name: draft.name,
+          tagline: draft.tagline,
+          badge: draft.badge?.trim() || null,
+          monthlyPriceXof: Math.max(0, Math.round(Number(draft.monthlyPriceXof) || 0)),
+          yearlyPriceXof: Math.max(0, Math.round(Number(draft.yearlyPriceXof) || 0)),
+          directSalePriceXof: Math.max(0, Math.round(Number(draft.directSalePriceXof) || 0)),
+          allowMonthly: Boolean(draft.allowMonthly),
+          allowYearly: Boolean(draft.allowYearly),
+          allowDirectSale: Boolean(draft.allowDirectSale),
+          trialDays: Math.max(0, Math.min(90, Math.round(Number(draft.trialDays) || 0))),
+          maxShops: Math.max(1, Math.round(Number(draft.maxShops) || 1)),
+          maxAgentsPerShop: Math.max(1, Math.round(Number(draft.maxAgentsPerShop) || 1)),
+          features,
+          isActive: Boolean(draft.isActive),
+        },
+      });
+      setMsg(`Tarif de la formule « ${draft.name} » enregistré et appliqué en direct.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Impossible d’enregistrer cette formule.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleSaveSub = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,6 +342,7 @@ export default function AdminPlatformPage() {
         <div className="grid w-full grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-forest-800/80 p-1 text-xs font-semibold sm:inline-flex sm:w-auto sm:flex-wrap sm:rounded-full sm:p-0.5">
           {(
             [
+              { id: 'plans', label: 'Tarifs & Offres', icon: Sliders },
               { id: 'subs', label: 'Abonnements', icon: Crown },
               { id: 'payments', label: 'Paiements', icon: CreditCard },
               { id: 'tickets', label: `Support (${tickets.filter((t) => t.status === 'OPEN').length})`, icon: LifeBuoy },
@@ -292,50 +380,283 @@ export default function AdminPlatformPage() {
 
         {loading ? (
           <LoadingSkeleton rows={5} />
+        ) : tab === 'plans' ? (
+          <div className="space-y-4">
+            <div className="sc-card p-4 text-xs text-slate-600">
+              Configurez ici vos offres publiques et tarifs affichés sur la page d’accueil (/) et la page d’inscription (/register) : facturation <strong>Par mois</strong>, <strong>Par année</strong>, ou <strong>Vente directe</strong> (licence unique).
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              {plans.map((pl) => {
+                const draft = planDrafts[pl.code];
+                if (!draft) return null;
+                const updateDraft = (patch: Partial<PlatformPlanConfigRow & { featuresText: string }>) =>
+                  setPlanDrafts((prev) => ({
+                    ...prev,
+                    [pl.code]: { ...prev[pl.code], ...patch },
+                  }));
+                return (
+                  <div key={pl.code} className="sc-card flex flex-col justify-between space-y-3 p-4 sm:p-5">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                        <div>
+                          <span className="rounded-md bg-forest-900 px-2 py-0.5 font-mono text-[10px] font-bold text-limeglow-400">
+                            {pl.code}
+                          </span>
+                          <h2 className="mt-1 text-base font-extrabold text-slate-900">{draft.name}</h2>
+                        </div>
+                        <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={draft.isActive}
+                            onChange={(e) => updateDraft({ isActive: e.target.checked })}
+                            className="h-4 w-4 accent-brand-700"
+                          />
+                          Visible
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600">
+                            Nom affiché
+                          </label>
+                          <input
+                            value={draft.name}
+                            onChange={(e) => updateDraft({ name: e.target.value })}
+                            className="sc-input mt-0.5 py-1.5 text-xs font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600">
+                            Badge (optionnel)
+                          </label>
+                          <input
+                            value={draft.badge || ''}
+                            onChange={(e) => updateDraft({ badge: e.target.value })}
+                            placeholder="Ex. Recommandé"
+                            className="sc-input mt-0.5 py-1.5 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600">
+                          Accroche
+                        </label>
+                        <input
+                          value={draft.tagline}
+                          onChange={(e) => updateDraft({ tagline: e.target.value })}
+                          className="sc-input mt-0.5 py-1.5 text-xs"
+                        />
+                      </div>
+
+                      {/* Tarification Par mois / Par année / Vente directe */}
+                      <div className="space-y-2 rounded-2xl border border-slate-200 bg-porcelain-50 p-3">
+                        <p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-600">
+                          Modes & Tarifs (XOF)
+                        </p>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                            <input
+                              type="checkbox"
+                              checked={draft.allowMonthly}
+                              onChange={(e) => updateDraft({ allowMonthly: e.target.checked })}
+                              className="h-4 w-4 accent-brand-700"
+                            />
+                            Par mois
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            disabled={!draft.allowMonthly}
+                            value={draft.monthlyPriceXof}
+                            onChange={(e) =>
+                              updateDraft({ monthlyPriceXof: Number(e.target.value) })
+                            }
+                            className="sc-input w-32 py-1 text-right text-xs font-bold tabular disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                            <input
+                              type="checkbox"
+                              checked={draft.allowYearly}
+                              onChange={(e) => updateDraft({ allowYearly: e.target.checked })}
+                              className="h-4 w-4 accent-brand-700"
+                            />
+                            Par année
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            disabled={!draft.allowYearly}
+                            value={draft.yearlyPriceXof}
+                            onChange={(e) =>
+                              updateDraft({ yearlyPriceXof: Number(e.target.value) })
+                            }
+                            className="sc-input w-32 py-1 text-right text-xs font-bold tabular disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                            <input
+                              type="checkbox"
+                              checked={draft.allowDirectSale}
+                              onChange={(e) => updateDraft({ allowDirectSale: e.target.checked })}
+                              className="h-4 w-4 accent-brand-700"
+                            />
+                            Vente directe
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            disabled={!draft.allowDirectSale}
+                            value={draft.directSalePriceXof}
+                            onChange={(e) =>
+                              updateDraft({ directSalePriceXof: Number(e.target.value) })
+                            }
+                            className="sc-input w-32 py-1 text-right text-xs font-bold tabular disabled:opacity-50"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-600">
+                            Essai (jours)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={90}
+                            value={draft.trialDays}
+                            onChange={(e) => updateDraft({ trialDays: Number(e.target.value) })}
+                            className="sc-input mt-0.5 py-1 text-xs font-bold tabular"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-600">
+                            Max boutiques
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={draft.maxShops}
+                            onChange={(e) => updateDraft({ maxShops: Number(e.target.value) })}
+                            className="sc-input mt-0.5 py-1 text-xs font-bold tabular"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-600">
+                            Agents / btq
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={draft.maxAgentsPerShop}
+                            onChange={(e) =>
+                              updateDraft({ maxAgentsPerShop: Number(e.target.value) })
+                            }
+                            className="sc-input mt-0.5 py-1 text-xs font-bold tabular"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600">
+                          Avantages (1 ligne = 1 point)
+                        </label>
+                        <textarea
+                          rows={4}
+                          value={draft.featuresText}
+                          onChange={(e) => updateDraft({ featuresText: e.target.value })}
+                          className="sc-input mt-0.5 py-1.5 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleSavePlanConfig(pl.code)}
+                      className="sc-btn-primary w-full text-xs"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      Enregistrer ce tarif
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         ) : tab === 'subs' ? (
           <div className="grid gap-4 md:grid-cols-2">
-            {subs.map((s) => (
-              <div key={s.id} className="sc-card flex flex-col justify-between p-5">
-                <div>
-                  <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-base font-extrabold text-slate-900">{s.merchantName}</h2>
-                    <StatusBadge status={s.merchantStatus} />
+            {subs.map((row) => {
+              const sub = row.subscription;
+              const cycle = sub.billingCycle || 'MONTHLY';
+              const shownPrice = sub.priceXof ?? sub.monthlyPriceXof;
+              const isTrialActive =
+                Boolean(sub.trialEndsAt) && new Date(sub.trialEndsAt!).getTime() > Date.now();
+              return (
+                <div key={row.merchantId} className="sc-card flex flex-col justify-between p-5">
+                  <div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h2 className="text-base font-extrabold text-slate-900">{row.merchantName}</h2>
+                      <div className="flex items-center gap-1.5">
+                        {isTrialActive ? (
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                            Essai jusqu’au{' '}
+                            {new Date(sub.trialEndsAt!).toLocaleDateString('fr-FR')}
+                          </span>
+                        ) : null}
+                        <StatusBadge status={row.status} />
+                      </div>
+                    </div>
+                    <p className="mt-1 text-xs font-bold text-brand-700">
+                      {SUBSCRIPTION_PLAN_LABELS[sub.planCode]} ·{' '}
+                      {SUBSCRIPTION_BILLING_CYCLE_LABELS[cycle]} · {formatXof(shownPrice)}{' '}
+                      {SUBSCRIPTION_BILLING_CYCLE_SUFFIX[cycle]}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Boutiques : {row.shopsCount} / max {sub.maxShops} · {sub.maxAgentsPerShop}{' '}
+                      agent(s)/boutique
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {(sub.enabledModules || []).map((m) => (
+                        <span
+                          key={m}
+                          className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[10px] font-bold text-brand-800"
+                        >
+                          {PLATFORM_MODULE_LABELS[m] || m}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <p className="mt-1 text-xs font-bold text-brand-700">
-                    {SUBSCRIPTION_PLAN_LABELS[s.planCode]} · {formatXof(s.monthlyPriceXof)}/mois
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    Quotas : max {s.maxShops} boutique(s) · {s.maxAgentsPerShop} agent(s)/boutique
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {s.enabledModules.map((m) => (
-                      <span
-                        key={m}
-                        className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[10px] font-bold text-brand-800"
-                      >
-                        {PLATFORM_MODULE_LABELS[m] || m}
-                      </span>
-                    ))}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingSub(row);
+                      setSubForm({
+                        planCode: sub.planCode,
+                        billingCycle: cycle,
+                        priceXof: shownPrice,
+                        monthlyPriceXof: sub.monthlyPriceXof,
+                        maxShops: sub.maxShops,
+                        maxAgentsPerShop: sub.maxAgentsPerShop,
+                        enabledModules: sub.enabledModules || [...PLATFORM_MODULES],
+                      });
+                    }}
+                    className="sc-btn-ghost mt-4 w-full text-xs"
+                  >
+                    Configurer plan & modules
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingSub(s);
-                    setSubForm({
-                      planCode: s.planCode,
-                      monthlyPriceXof: s.monthlyPriceXof,
-                      maxShops: s.maxShops,
-                      maxAgentsPerShop: s.maxAgentsPerShop,
-                      enabledModules: s.enabledModules,
-                    });
-                  }}
-                  className="sc-btn-ghost mt-4 w-full text-xs"
-                >
-                  Configurer plan & modules
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : tab === 'payments' ? (
           <div className="grid gap-5 lg:grid-cols-12">
@@ -592,9 +913,25 @@ export default function AdminPlatformPage() {
                   <label className="block text-xs font-semibold text-slate-700">Offre</label>
                   <select
                     value={subForm.planCode}
-                    onChange={(e) =>
-                      setSubForm({ ...subForm, planCode: e.target.value as SubscriptionPlan })
-                    }
+                    onChange={(e) => {
+                      const nextPlan = e.target.value as SubscriptionPlan;
+                      const found = plans.find((p) => p.code === nextPlan);
+                      const nextPrice = found
+                        ? subForm.billingCycle === 'YEARLY'
+                          ? found.yearlyPriceXof
+                          : subForm.billingCycle === 'DIRECT_SALE'
+                            ? found.directSalePriceXof
+                            : found.monthlyPriceXof
+                        : subForm.priceXof;
+                      setSubForm({
+                        ...subForm,
+                        planCode: nextPlan,
+                        priceXof: nextPrice,
+                        monthlyPriceXof: found?.monthlyPriceXof ?? subForm.monthlyPriceXof,
+                        maxShops: found?.maxShops ?? subForm.maxShops,
+                        maxAgentsPerShop: found?.maxAgentsPerShop ?? subForm.maxAgentsPerShop,
+                      });
+                    }}
                     className="sc-input mt-1"
                   >
                     {SUBSCRIPTION_PLANS.map((p) => (
@@ -605,14 +942,53 @@ export default function AdminPlatformPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700">Prix / mois (XOF)</label>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Mode de tarification
+                  </label>
+                  <select
+                    value={subForm.billingCycle}
+                    onChange={(e) => {
+                      const nextCycle = e.target.value as SubscriptionBillingCycle;
+                      const found = plans.find((p) => p.code === subForm.planCode);
+                      const nextPrice = found
+                        ? nextCycle === 'YEARLY'
+                          ? found.yearlyPriceXof
+                          : nextCycle === 'DIRECT_SALE'
+                            ? found.directSalePriceXof
+                            : found.monthlyPriceXof
+                        : subForm.priceXof;
+                      setSubForm({
+                        ...subForm,
+                        billingCycle: nextCycle,
+                        priceXof: nextPrice,
+                      });
+                    }}
+                    className="sc-input mt-1"
+                  >
+                    {SUBSCRIPTION_BILLING_CYCLES.map((c) => (
+                      <option key={c} value={c}>
+                        {SUBSCRIPTION_BILLING_CYCLE_LABELS[c]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Tarif appliqué ({SUBSCRIPTION_BILLING_CYCLE_LABELS[subForm.billingCycle]}, XOF)
+                  </label>
                   <input
                     type="number"
                     min={0}
-                    value={subForm.monthlyPriceXof}
-                    onChange={(e) =>
-                      setSubForm({ ...subForm, monthlyPriceXof: Number(e.target.value) })
-                    }
+                    value={subForm.priceXof}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setSubForm({
+                        ...subForm,
+                        priceXof: val,
+                        monthlyPriceXof:
+                          subForm.billingCycle === 'MONTHLY' ? val : subForm.monthlyPriceXof,
+                      });
+                    }}
                     className="sc-input mt-1 tabular"
                   />
                 </div>

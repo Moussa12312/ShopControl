@@ -35,7 +35,7 @@ export const productVariantInputSchema = z.object({
 
 export const createProductSchema = z.object({
   name: z.string().trim().min(2, 'Le nom du produit est requis.').max(140),
-  sku: z.string().trim().min(1, 'La référence / SKU est requise.').max(64),
+  sku: z.string().trim().max(64).optional().or(z.literal('')),
   barcode: z.string().trim().max(64).optional().or(z.literal('')),
   description: z.string().trim().max(2000).optional(),
   categoryId: z.string().uuid().nullable().optional(),
@@ -111,6 +111,7 @@ export const createSupplierSchema = z.object({
   phone: z.string().trim().max(30).optional(),
   email: z.string().trim().email('E-mail invalide.').optional().or(z.literal('')),
   address: z.string().trim().max(255).optional(),
+  suppliedProducts: z.string().trim().max(400).optional().or(z.literal('')),
   notes: z.string().trim().max(500).optional(),
 });
 

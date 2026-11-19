@@ -38,15 +38,12 @@ import {
   UserCheck,
   Users,
   Wallet,
-  Wifi,
-  WifiOff,
   Wrench,
   X,
 } from 'lucide-react';
 import { PermissionKey, USER_ROLE_LABELS, UserRole } from '@shopcontrol/shared';
 import { apiFetch } from '@/lib/api-client';
 import { OwnerWorkspaceMode, useAuth } from '@/components/providers/AuthProvider';
-import { useNetworkStatus } from '@/components/providers/NetworkStatusProvider';
 import { AccessDeniedState, LoadingSkeleton } from '@/components/ui/StateViews';
 
 interface NavItem {
@@ -84,7 +81,6 @@ const OWNER_SUPERVISION_NAV: NavItem[] = [
   { href: '/owner/agents', label: 'Équipe & Agents', shortLabel: 'Agents', group: 'Organisation', icon: Users },
   { href: '/owner/operators', label: 'Opérateurs', group: 'Organisation', icon: UserCheck },
   { href: '/messaging', label: 'Messagerie', shortLabel: 'Messages', group: 'Communication', icon: MessageSquare, inMobileDock: true },
-  { href: '/owner/audit', label: 'Journal d’audit', shortLabel: 'Audit', group: 'Sécurité', icon: FileSearch },
 ];
 
 const OWNER_MANAGEMENT_NAV: NavItem[] = [
@@ -98,7 +94,6 @@ const OWNER_MANAGEMENT_NAV: NavItem[] = [
   { href: '/commerce/purchases', label: 'Achats', group: 'Gestion', icon: Truck },
   { href: '/commerce/expenses', label: 'Dépenses', group: 'Gestion', icon: Wallet },
   { href: '/commerce/transfers', label: 'Transferts', group: 'Gestion', icon: ArrowLeftRight },
-  { href: '/commerce/import', label: 'Import CSV', group: 'Gestion', icon: Upload },
   { href: '/messaging', label: 'Messagerie', shortLabel: 'Messages', group: 'Communication', icon: MessageSquare },
 ];
 
@@ -157,11 +152,11 @@ export function AppShell({
     setSupportGrantId,
     logout,
   } = useAuth();
-  const { isOnline, apiReachable } = useNetworkStatus();
 
-  // Sidebar fermé par défaut sur desktop pour un espace aéré et épuré
+  // Sidebar fermé par défaut sur desktop et rétractable sur mobile
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileCollapsed, setMobileCollapsed] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -171,6 +166,7 @@ export function AppShell({
 
   const notifRef = useRef<HTMLDivElement | null>(null);
   const profileRef = useRef<HTMLDivElement | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
 
   // Fermeture des menus déroulants au clic extérieur
   useEffect(() => {
@@ -319,18 +315,26 @@ export function AppShell({
   const pageTitle =
     pathname === '/owner/settings'
       ? 'Paramètres & Boutique'
-      : pathname === '/agent/profile'
-        ? 'Mon profil'
-        : pathname === '/setup-2fa'
-          ? 'Sécurité 2FA'
-          : currentNavItem?.label || brandTitle;
+      : pathname === '/owner/audit'
+        ? 'Journal d’audit'
+        : pathname === '/commerce/import'
+          ? 'Import CSV'
+          : pathname === '/agent/profile'
+            ? 'Mon profil'
+            : pathname === '/setup-2fa'
+              ? 'Sécurité 2FA'
+              : currentNavItem?.label || brandTitle;
 
   const CurrentIcon =
     pathname === '/owner/settings'
       ? Settings
-      : pathname === '/agent/profile'
-        ? User
-        : currentNavItem?.icon || LayoutDashboard;
+      : pathname === '/owner/audit'
+        ? FileSearch
+        : pathname === '/commerce/import'
+          ? Upload
+          : pathname === '/agent/profile'
+            ? User
+            : currentNavItem?.icon || LayoutDashboard;
 
   const initials = user.fullName
     .split(' ')
@@ -391,12 +395,13 @@ export function AppShell({
     router.replace('/login');
   };
 
+  const showLabels = mobileOpen ? !mobileCollapsed : expanded;
   const sidebarWidthClass = expanded ? 'lg:w-[216px]' : 'lg:w-[64px]';
   const contentOffsetClass = expanded ? 'lg:pl-[216px]' : 'lg:pl-[64px]';
   const headerLeftClass = expanded ? 'lg:left-[216px]' : 'lg:left-[64px]';
 
   return (
-    <div className="min-h-screen w-full overflow-x-clip bg-porcelain-100">
+    <div className="min-h-screen w-full overflow-x-clip overscroll-none bg-porcelain-100">
       {/* Overlay mobile drawer */}
       {mobileOpen ? (
         <div
@@ -405,20 +410,37 @@ export function AppShell({
         />
       ) : null}
 
-      {/* Sidebar FIXE, mince et fermé par défaut sur desktop — sans profil ni déconnexion */}
+      {/* Sidebar FIXE, rétractable sur desktop ET sur mobile — sans profil ni déconnexion */}
       <aside
         aria-label="Navigation principale"
-        className={`no-print fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-white/[0.07] bg-forest-950 text-slate-200 transition-all duration-200 ${sidebarWidthClass} ${
-          mobileOpen ? 'w-64 translate-x-0 shadow-2xl' : 'w-64 -translate-x-full lg:translate-x-0'
+        onTouchStart={(e) => {
+          touchStartXRef.current = e.touches[0]?.clientX ?? null;
+        }}
+        onTouchEnd={(e) => {
+          if (touchStartXRef.current === null) return;
+          const endX = e.changedTouches[0]?.clientX ?? touchStartXRef.current;
+          if (endX - touchStartXRef.current < -48) {
+            setMobileOpen(false);
+          }
+          touchStartXRef.current = null;
+        }}
+        className={`no-print overscroll-none fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-white/[0.07] bg-forest-950 text-slate-200 transition-all duration-200 ${sidebarWidthClass} ${
+          mobileOpen
+            ? `${mobileCollapsed ? 'w-[68px]' : 'w-64'} translate-x-0 shadow-2xl`
+            : 'w-64 -translate-x-full lg:translate-x-0'
         }`}
       >
         {/* Marque dynamique : Logo + Nom de la boutique */}
-        <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/[0.08] px-3">
+        <div
+          className={`flex h-14 shrink-0 items-center border-b border-white/[0.08] ${
+            !showLabels ? 'justify-center px-2' : 'justify-between px-3'
+          }`}
+        >
           <Link
             href={navItems[0]?.href || '/'}
             onClick={() => setMobileOpen(false)}
             className={`flex min-w-0 items-center gap-2.5 overflow-hidden ${
-              !expanded && !mobileOpen ? 'mx-auto' : ''
+              !showLabels ? 'mx-auto' : ''
             }`}
             title={brandTitle}
           >
@@ -434,7 +456,7 @@ export function AppShell({
                 {brandMonogram}
               </span>
             )}
-            {expanded || mobileOpen ? (
+            {showLabels ? (
               <div className="min-w-0">
                 <p className="truncate text-[13px] font-bold tracking-tight text-white">
                   {brandTitle}
@@ -443,18 +465,20 @@ export function AppShell({
               </div>
             ) : null}
           </Link>
-          <button
-            type="button"
-            onClick={() => setMobileOpen(false)}
-            aria-label="Fermer le menu"
-            className="rounded-lg p-1.5 text-emerald-200/70 hover:bg-white/10 hover:text-white lg:hidden"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          {mobileOpen && !mobileCollapsed ? (
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Fermer le menu"
+              className="rounded-lg p-1.5 text-emerald-200/70 hover:bg-white/10 hover:text-white lg:hidden"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
 
         {/* Sélecteur Supervision / Gestion dans le tiroir mobile pour OWNER */}
-        {isOwnerLike && mobileOpen ? (
+        {isOwnerLike && mobileOpen && !mobileCollapsed ? (
           <div className="shrink-0 border-b border-white/[0.07] p-2.5 lg:hidden">
             <div className="grid grid-cols-2 gap-1 rounded-xl bg-forest-900 p-1 text-[11px] font-semibold">
               <button
@@ -489,7 +513,7 @@ export function AppShell({
         <nav className="flex-1 space-y-2.5 overflow-y-auto px-2.5 py-3">
           {groupedNav.map((section) => (
             <div key={section.group} className="space-y-0.5">
-              {expanded || mobileOpen ? (
+              {showLabels ? (
                 <p className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-200/40">
                   {section.group}
                 </p>
@@ -502,15 +526,15 @@ export function AppShell({
                     key={item.href}
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
-                    title={!expanded && !mobileOpen ? item.label : undefined}
+                    title={!showLabels ? item.label : undefined}
                     className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[12.5px] font-medium transition-all ${
                       active
                         ? 'bg-white font-semibold text-forest-950 shadow-xs'
                         : 'text-[#8aa8a2] hover:bg-white/[0.08] hover:text-white'
-                    } ${!expanded && !mobileOpen ? 'justify-center px-0' : ''}`}
+                    } ${!showLabels ? 'justify-center px-0' : ''}`}
                   >
                     <Icon className={`h-[17px] w-[17px] shrink-0 ${active ? 'text-brand-700' : ''}`} />
-                    {expanded || mobileOpen ? <span className="truncate">{item.label}</span> : null}
+                    {showLabels ? <span className="truncate">{item.label}</span> : null}
                   </Link>
                 );
               })}
@@ -518,14 +542,45 @@ export function AppShell({
           ))}
         </nav>
 
-        {/* Bouton discret d'ouverture/repli desktop uniquement (aucun profil ni déconnexion ici) */}
-        <div className="hidden shrink-0 border-t border-white/[0.07] p-2.5 lg:block">
+        {/* Bouton d'ouverture/repli desktop ET mobile */}
+        <div className="shrink-0 space-y-1 border-t border-white/[0.07] p-2.5">
+          <button
+            type="button"
+            onClick={() => setMobileCollapsed((v) => !v)}
+            aria-label={mobileCollapsed ? 'Déplier le menu mobile' : 'Réduire le menu mobile'}
+            title={mobileCollapsed ? 'Déplier' : 'Réduire'}
+            className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-[#8aa8a2] transition hover:bg-white/10 hover:text-white lg:hidden ${
+              mobileCollapsed ? 'justify-center px-0' : ''
+            }`}
+          >
+            {mobileCollapsed ? (
+              <ChevronRight className="h-4 w-4 shrink-0" />
+            ) : (
+              <>
+                <ChevronLeft className="h-4 w-4 shrink-0" />
+                <span>Réduire</span>
+              </>
+            )}
+          </button>
+
+          {mobileCollapsed ? (
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Fermer le menu"
+              title="Fermer le menu"
+              className="flex w-full items-center justify-center rounded-xl py-2 text-xs font-medium text-emerald-200/75 transition hover:bg-white/10 hover:text-white lg:hidden"
+            >
+              <X className="h-4 w-4 shrink-0" />
+            </button>
+          ) : null}
+
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
             aria-label={expanded ? 'Replier le menu' : 'Ouvrir le menu'}
             title={expanded ? 'Replier' : 'Déplier le menu'}
-            className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-[#8aa8a2] transition hover:bg-white/10 hover:text-white ${
+            className={`hidden w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-[#8aa8a2] transition hover:bg-white/10 hover:text-white lg:flex ${
               !expanded ? 'justify-center px-0' : ''
             }`}
           >
@@ -549,7 +604,10 @@ export function AppShell({
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
-            onClick={() => setMobileOpen(true)}
+            onClick={() => {
+              setMobileCollapsed(false);
+              setMobileOpen(true);
+            }}
             aria-label="Ouvrir la navigation"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/15 lg:hidden"
           >
@@ -632,30 +690,6 @@ export function AppShell({
               </select>
             </div>
           ) : null}
-
-          {/* Indicateur réseau discret */}
-          <span
-            role="status"
-            aria-live="polite"
-            title={isOnline && apiReachable ? 'En ligne' : 'Hors ligne'}
-            className={`inline-flex h-8 w-8 items-center justify-center rounded-full sm:w-auto sm:gap-1 sm:px-2.5 sm:text-[11px] sm:font-semibold ${
-              isOnline && apiReachable
-                ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/25'
-                : 'bg-amber-400/20 text-amber-200 ring-1 ring-amber-300/30'
-            }`}
-          >
-            {isOnline && apiReachable ? (
-              <>
-                <Wifi className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">En ligne</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">Hors ligne</span>
-              </>
-            )}
-          </span>
 
           {/* Notifications */}
           <div className="relative" ref={notifRef}>
@@ -947,7 +981,7 @@ export function AppShell({
           </div>
 
         {/* Zone principale scrollable */}
-        <main className="w-full min-w-0 flex-1 overflow-x-clip p-3 pb-24 sm:p-5 sm:pb-24 lg:p-6 lg:pb-8">
+        <main className="w-full min-w-0 flex-1 overflow-x-clip overscroll-none p-3 pb-24 sm:p-5 sm:pb-24 lg:p-6 lg:pb-8">
           {children}
 
           {/* Signature entreprise en indice en bas de page */}
@@ -982,7 +1016,10 @@ export function AppShell({
           })}
           <button
             type="button"
-            onClick={() => setMobileOpen(true)}
+            onClick={() => {
+              setMobileCollapsed(false);
+              setMobileOpen(true);
+            }}
             className="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 hover:text-white"
           >
             <Menu className="h-4 w-4 shrink-0" />

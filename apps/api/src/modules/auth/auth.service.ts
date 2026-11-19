@@ -21,8 +21,10 @@ import {
   RegisterMerchantInput,
   SHOP_TYPE_SHORT_LABELS,
   ShopType,
+  SUBSCRIPTION_BILLING_CYCLE_LABELS,
   SUBSCRIPTION_PAYMENT_METHOD_LABELS,
   SUBSCRIPTION_PLAN_LABELS,
+  SubscriptionBillingCycle,
   SubscriptionPlan,
   TenantStatus,
   UserRole,
@@ -54,11 +56,39 @@ export interface RequestMeta {
 
 const PLAN_PRICING: Record<
   SubscriptionPlan,
-  { monthlyPriceXof: number; maxShops: number; maxAgentsPerShop: number }
+  {
+    monthlyPriceXof: number;
+    yearlyPriceXof: number;
+    directSalePriceXof: number;
+    trialDays: number;
+    maxShops: number;
+    maxAgentsPerShop: number;
+  }
 > = {
-  STARTER: { monthlyPriceXof: 15000, maxShops: 1, maxAgentsPerShop: 3 },
-  PRO: { monthlyPriceXof: 25000, maxShops: 5, maxAgentsPerShop: 10 },
-  ENTERPRISE: { monthlyPriceXof: 50000, maxShops: 20, maxAgentsPerShop: 50 },
+  STARTER: {
+    monthlyPriceXof: 15000,
+    yearlyPriceXof: 150000,
+    directSalePriceXof: 350000,
+    trialDays: 14,
+    maxShops: 1,
+    maxAgentsPerShop: 3,
+  },
+  PRO: {
+    monthlyPriceXof: 25000,
+    yearlyPriceXof: 250000,
+    directSalePriceXof: 600000,
+    trialDays: 14,
+    maxShops: 5,
+    maxAgentsPerShop: 10,
+  },
+  ENTERPRISE: {
+    monthlyPriceXof: 50000,
+    yearlyPriceXof: 500000,
+    directSalePriceXof: 1200000,
+    trialDays: 14,
+    maxShops: 20,
+    maxAgentsPerShop: 50,
+  },
 };
 
 const ALL_SHOP_PAYMENT_METHOD_OPTIONS: PaymentMethodConfig[] = [
@@ -92,8 +122,59 @@ export class AuthService {
     const passwordHash = await argon2.hash(input.ownerPassword, { type: argon2.argon2id });
     const merchantName = (input.merchantName || input.shopName).trim();
     const planCode: SubscriptionPlan = input.planCode || 'PRO';
-    const planConfig = PLAN_PRICING[planCode] || PLAN_PRICING.PRO;
-    const nextMonth = new Date(Date.now() + 30 * 86_400_000);
+    const fallbackPlan = PLAN_PRICING[planCode] || PLAN_PRICING.PRO;
+    const dbPlan = await this.controlPrisma.platformPlanConfig.findUnique({
+      where: { code: planCode },
+    });
+
+    const planConfig = {
+      monthlyPriceXof: dbPlan?.monthlyPriceXof ?? fallbackPlan.monthlyPriceXof,
+      yearlyPriceXof: dbPlan?.yearlyPriceXof ?? fallbackPlan.yearlyPriceXof,
+      directSalePriceXof: dbPlan?.directSalePriceXof ?? fallbackPlan.directSalePriceXof,
+      allowMonthly: dbPlan ? dbPlan.allowMonthly : true,
+      allowYearly: dbPlan ? dbPlan.allowYearly : true,
+      allowDirectSale: dbPlan ? dbPlan.allowDirectSale : true,
+      trialDays: dbPlan?.trialDays ?? fallbackPlan.trialDays,
+      maxShops: dbPlan?.maxShops ?? fallbackPlan.maxShops,
+      maxAgentsPerShop: dbPlan?.maxAgentsPerShop ?? fallbackPlan.maxAgentsPerShop,
+    };
+
+    const requestedCycle: SubscriptionBillingCycle = input.billingCycle || 'MONTHLY';
+    const cycleAllowed = (c: SubscriptionBillingCycle) =>
+      c === 'MONTHLY'
+        ? planConfig.allowMonthly
+        : c === 'YEARLY'
+          ? planConfig.allowYearly
+          : planConfig.allowDirectSale;
+
+    const chosenCycle: SubscriptionBillingCycle = cycleAllowed(requestedCycle)
+      ? requestedCycle
+      : planConfig.allowMonthly
+        ? 'MONTHLY'
+        : planConfig.allowYearly
+          ? 'YEARLY'
+          : 'DIRECT_SALE';
+
+    const priceXof =
+      chosenCycle === 'YEARLY'
+        ? planConfig.yearlyPriceXof
+        : chosenCycle === 'DIRECT_SALE'
+          ? planConfig.directSalePriceXof
+          : planConfig.monthlyPriceXof;
+
+    const trialDays = Math.max(0, planConfig.trialDays ?? 14);
+    const isFreeTrial = input.startFreeTrial !== false && trialDays > 0;
+    const nowMs = Date.now();
+    const trialEndsAt = isFreeTrial ? new Date(nowMs + trialDays * 86_400_000) : null;
+    const currentPeriodEnd = trialEndsAt
+      ? trialEndsAt
+      : chosenCycle === 'DIRECT_SALE'
+        ? new Date('2099-12-31T23:59:59.000Z')
+        : chosenCycle === 'YEARLY'
+          ? new Date(nowMs + 365 * 86_400_000)
+          : new Date(nowMs + 30 * 86_400_000);
+
+    const paymentRef = input.subscriptionPaymentReference?.trim() || null;
 
     const { merchant, owner } = await this.controlPrisma.$transaction(async (tx) => {
       const m = await tx.merchant.create({
@@ -124,28 +205,35 @@ export class AuthService {
         data: {
           merchantId: m.id,
           planCode,
+          billingCycle: chosenCycle,
+          priceXof,
           monthlyPriceXof: planConfig.monthlyPriceXof,
           maxShops: planConfig.maxShops,
           maxAgentsPerShop: planConfig.maxAgentsPerShop,
           enabledModules: [...PLATFORM_MODULES] as object,
-          currentPeriodEnd: nextMonth,
+          trialEndsAt,
+          currentPeriodEnd,
           autoSuspendGraceDays: 7,
         },
       });
 
-      const now = new Date();
-      const periodLabel = now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-      await tx.platformPayment.create({
-        data: {
-          merchantId: m.id,
-          amountXof: planConfig.monthlyPriceXof,
-          paymentMethodCode: input.subscriptionPaymentMethod || 'ORANGE_MONEY',
-          reference: input.subscriptionPaymentReference?.trim() || null,
-          periodLabel: `Inscription — ${periodLabel}`,
-          notes: `Formule ${SUBSCRIPTION_PLAN_LABELS[planCode]} choisie à l’inscription (${SUBSCRIPTION_PAYMENT_METHOD_LABELS[input.subscriptionPaymentMethod || 'ORANGE_MONEY']})`,
-          recordedByUserId: u.id,
-        },
-      });
+      if (!isFreeTrial || paymentRef) {
+        const now = new Date();
+        const periodLabel = now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+        await tx.platformPayment.create({
+          data: {
+            merchantId: m.id,
+            amountXof: priceXof,
+            paymentMethodCode: input.subscriptionPaymentMethod || 'ORANGE_MONEY',
+            reference: paymentRef,
+            periodLabel: isFreeTrial
+              ? `Référence essai gratuit (${trialDays}j)`
+              : `Inscription (${SUBSCRIPTION_BILLING_CYCLE_LABELS[chosenCycle]}) — ${periodLabel}`,
+            notes: `Formule ${SUBSCRIPTION_PLAN_LABELS[planCode]} (${SUBSCRIPTION_BILLING_CYCLE_LABELS[chosenCycle]}) via ${SUBSCRIPTION_PAYMENT_METHOD_LABELS[input.subscriptionPaymentMethod || 'ORANGE_MONEY']}`,
+            recordedByUserId: u.id,
+          },
+        });
+      }
 
       return { merchant: m, owner: u };
     });
@@ -208,6 +296,9 @@ export class AuthService {
         shopType: primaryType,
         enabledShopTypes,
         planCode,
+        billingCycle: chosenCycle,
+        priceXof,
+        isFreeTrial,
         subscriptionPaymentMethod: input.subscriptionPaymentMethod,
       },
       ipAddress: meta.ipAddress,
@@ -219,6 +310,9 @@ export class AuthService {
       where: { role: 'SUPER_ADMIN', isActive: true },
       select: { id: true },
     });
+    const billingSummary = isFreeTrial
+      ? `Essai gratuit ${trialDays} jours (ensuite ${priceXof} FCFA · ${SUBSCRIPTION_BILLING_CYCLE_LABELS[chosenCycle]})`
+      : `${priceXof} FCFA · ${SUBSCRIPTION_BILLING_CYCLE_LABELS[chosenCycle]} (${SUBSCRIPTION_PAYMENT_METHOD_LABELS[input.subscriptionPaymentMethod || 'ORANGE_MONEY']})`;
     for (const admin of admins) {
       await this.notificationsService.create({
         merchantId: merchant.id,
@@ -226,7 +320,7 @@ export class AuthService {
         type: 'PLATFORM',
         priority: 'INFO',
         title: `Nouveau boutiquier inscrit : ${input.shopName.trim()}`,
-        message: `${owner.fullName} (${owner.email}) a créé la boutique « ${input.shopName.trim()} » (${enabledShopTypes.map((t) => SHOP_TYPE_SHORT_LABELS[t]).join(' + ')}) — Formule ${SUBSCRIPTION_PLAN_LABELS[planCode]} (${SUBSCRIPTION_PAYMENT_METHOD_LABELS[input.subscriptionPaymentMethod || 'ORANGE_MONEY']}).`,
+        message: `${owner.fullName} (${owner.email}) a créé la boutique « ${input.shopName.trim()} » (${enabledShopTypes.map((t) => SHOP_TYPE_SHORT_LABELS[t]).join(' + ')}) — Formule ${SUBSCRIPTION_PLAN_LABELS[planCode]} · ${billingSummary}.`,
         targetPath: '/admin/shops',
       });
     }

@@ -96,6 +96,21 @@ export const SUBSCRIPTION_PLAN_LABELS: Record<SubscriptionPlan, string> = {
   ENTERPRISE: 'Entreprise (Illimité)',
 };
 
+export const SUBSCRIPTION_BILLING_CYCLES = ['MONTHLY', 'YEARLY', 'DIRECT_SALE'] as const;
+export type SubscriptionBillingCycle = (typeof SUBSCRIPTION_BILLING_CYCLES)[number];
+
+export const SUBSCRIPTION_BILLING_CYCLE_LABELS: Record<SubscriptionBillingCycle, string> = {
+  MONTHLY: 'Par mois',
+  YEARLY: 'Par année',
+  DIRECT_SALE: 'Vente directe',
+};
+
+export const SUBSCRIPTION_BILLING_CYCLE_SUFFIX: Record<SubscriptionBillingCycle, string> = {
+  MONTHLY: '/ mois',
+  YEARLY: '/ an',
+  DIRECT_SALE: 'achat unique',
+};
+
 export const PLATFORM_MODULES = [
   'POS',
   'INVENTORY',

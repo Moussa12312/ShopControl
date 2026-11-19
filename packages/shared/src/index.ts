@@ -8,3 +8,4 @@ export * from './commerce.schemas';
 export * from './platform.enums';
 export * from './platform.schemas';
 export * from './shop-profiles';
+export * from './product-codes';

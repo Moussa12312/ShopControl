@@ -3,10 +3,17 @@
 @tailwind utilities;
 
 @layer base {
-  html,
+  html {
+    background-color: #051413;
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+  }
+
   body {
     @apply min-h-screen w-full bg-[#ebf2ef] text-slate-900 antialiased;
     overflow-x: clip;
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
     touch-action: manipulation;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
@@ -49,6 +56,7 @@
 
   main {
     overflow-wrap: anywhere;
+    overscroll-behavior: none;
   }
 
   /* Modales : jamais plus hautes que l'écran mobile (barre d'adresse comprise) */

@@ -19,16 +19,107 @@ import {
   PLATFORM_MODULES,
   recordPlatformPaymentSchema,
   replySupportTicketSchema,
+  SubscriptionBillingCycle,
+  updatePlatformPlanConfigSchema,
   updateSupportTicketStatusSchema,
   upsertSubscriptionSchema,
 } from '@shopcontrol/shared';
-import { CurrentUser, Roles } from '../../common/auth/auth.decorators';
+import { CurrentUser, Public, Roles } from '../../common/auth/auth.decorators';
 import { AuthenticatedUser, RequestWithAuth } from '../../common/auth/request-context.types';
 import { ControlPrismaService } from '../../common/database/control-prisma.service';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.module';
 import { RequestMeta } from '../auth/auth.service';
+
+const DEFAULT_PLATFORM_PLANS: Array<{
+  code: string;
+  name: string;
+  tagline: string;
+  badge: string | null;
+  monthlyPriceXof: number;
+  yearlyPriceXof: number;
+  directSalePriceXof: number;
+  allowMonthly: boolean;
+  allowYearly: boolean;
+  allowDirectSale: boolean;
+  trialDays: number;
+  maxShops: number;
+  maxAgentsPerShop: number;
+  features: string[];
+  isActive: boolean;
+  sortOrder: number;
+}> = [
+  {
+    code: 'STARTER',
+    name: 'Starter',
+    tagline: 'Idéal pour démarrer avec une boutique organisée.',
+    badge: null,
+    monthlyPriceXof: 15000,
+    yearlyPriceXof: 150000,
+    directSalePriceXof: 350000,
+    allowMonthly: true,
+    allowYearly: true,
+    allowDirectSale: true,
+    trialDays: 14,
+    maxShops: 1,
+    maxAgentsPerShop: 3,
+    features: [
+      '1 boutique avec base de données dédiée',
+      'Jusqu’à 3 comptes agents',
+      'Caisse POS rapide, Stocks & Dépenses',
+      'Vitrine QR publique & suivi commandes',
+    ],
+    isActive: true,
+    sortOrder: 0,
+  },
+  {
+    code: 'PRO',
+    name: 'Pro Multi-Boutiques',
+    tagline: 'Le choix recommandé pour les commerçants en croissance.',
+    badge: 'Recommandé',
+    monthlyPriceXof: 25000,
+    yearlyPriceXof: 250000,
+    directSalePriceXof: 600000,
+    allowMonthly: true,
+    allowYearly: true,
+    allowDirectSale: true,
+    trialDays: 14,
+    maxShops: 5,
+    maxAgentsPerShop: 10,
+    features: [
+      'Jusqu’à 5 boutiques isolées',
+      'Jusqu’à 10 agents / boutique',
+      'Transferts inter-boutiques & Bilans consolidés',
+      'Achats fournisseurs, créances clients & Messagerie',
+    ],
+    isActive: true,
+    sortOrder: 1,
+  },
+  {
+    code: 'ENTERPRISE',
+    name: 'Entreprise',
+    tagline: 'Puissance maximale pour réseaux de boutiques et grossistes.',
+    badge: null,
+    monthlyPriceXof: 50000,
+    yearlyPriceXof: 500000,
+    directSalePriceXof: 1200000,
+    allowMonthly: true,
+    allowYearly: true,
+    allowDirectSale: true,
+    trialDays: 14,
+    maxShops: 20,
+    maxAgentsPerShop: 50,
+    features: [
+      'Jusqu’à 20 boutiques',
+      'Jusqu’à 50 agents / boutique',
+      'Tous les modules inclus sans limite',
+      'Support prioritaire & accompagnement dédié',
+    ],
+    isActive: true,
+    sortOrder: 2,
+  },
+];
 
 @Injectable()
 export class PlatformService {
@@ -38,6 +129,126 @@ export class PlatformService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  private formatPlan(p: any) {
+    return {
+      code: p.code,
+      name: p.name,
+      tagline: p.tagline,
+      badge: p.badge ?? null,
+      monthlyPriceXof: p.monthlyPriceXof,
+      yearlyPriceXof: p.yearlyPriceXof,
+      directSalePriceXof: p.directSalePriceXof,
+      allowMonthly: Boolean(p.allowMonthly),
+      allowYearly: Boolean(p.allowYearly),
+      allowDirectSale: Boolean(p.allowDirectSale),
+      trialDays: p.trialDays,
+      maxShops: p.maxShops,
+      maxAgentsPerShop: p.maxAgentsPerShop,
+      features: Array.isArray(p.features) ? (p.features as string[]) : [],
+      isActive: Boolean(p.isActive),
+      sortOrder: p.sortOrder,
+      updatedAt: p.updatedAt ? p.updatedAt.toISOString() : new Date().toISOString(),
+    };
+  }
+
+  async ensureDefaultPlans(): Promise<void> {
+    const count = await this.controlPrisma.platformPlanConfig.count();
+    if (count > 0) return;
+    for (const plan of DEFAULT_PLATFORM_PLANS) {
+      await this.controlPrisma.platformPlanConfig.upsert({
+        where: { code: plan.code },
+        create: {
+          code: plan.code,
+          name: plan.name,
+          tagline: plan.tagline,
+          badge: plan.badge,
+          monthlyPriceXof: plan.monthlyPriceXof,
+          yearlyPriceXof: plan.yearlyPriceXof,
+          directSalePriceXof: plan.directSalePriceXof,
+          allowMonthly: plan.allowMonthly,
+          allowYearly: plan.allowYearly,
+          allowDirectSale: plan.allowDirectSale,
+          trialDays: plan.trialDays,
+          maxShops: plan.maxShops,
+          maxAgentsPerShop: plan.maxAgentsPerShop,
+          features: plan.features as object,
+          isActive: plan.isActive,
+          sortOrder: plan.sortOrder,
+        },
+        update: {},
+      });
+    }
+  }
+
+  async listPublicPlans() {
+    await this.ensureDefaultPlans();
+    const plans = await this.controlPrisma.platformPlanConfig.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    return plans.map((p) => this.formatPlan(p));
+  }
+
+  async listAdminPlans() {
+    await this.ensureDefaultPlans();
+    const plans = await this.controlPrisma.platformPlanConfig.findMany({
+      orderBy: { sortOrder: 'asc' },
+    });
+    return plans.map((p) => this.formatPlan(p));
+  }
+
+  async updatePlanConfig(
+    code: string,
+    input: any,
+    actor: AuthenticatedUser,
+    meta: RequestMeta,
+  ) {
+    await this.ensureDefaultPlans();
+    const existing = await this.controlPrisma.platformPlanConfig.findUnique({ where: { code } });
+    if (!existing) {
+      throw new NotFoundException(`Formule « ${code} » introuvable.`);
+    }
+
+    const updated = await this.controlPrisma.platformPlanConfig.update({
+      where: { code },
+      data: {
+        name: input.name,
+        tagline: input.tagline ?? '',
+        badge: input.badge?.trim() || null,
+        monthlyPriceXof: input.monthlyPriceXof,
+        yearlyPriceXof: input.yearlyPriceXof,
+        directSalePriceXof: input.directSalePriceXof,
+        allowMonthly: Boolean(input.allowMonthly),
+        allowYearly: Boolean(input.allowYearly),
+        allowDirectSale: Boolean(input.allowDirectSale),
+        trialDays: input.trialDays ?? 14,
+        maxShops: input.maxShops,
+        maxAgentsPerShop: input.maxAgentsPerShop,
+        features: (input.features || []) as object,
+        isActive: input.isActive !== undefined ? Boolean(input.isActive) : true,
+      },
+    });
+
+    await this.auditService.recordControl({
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: 'PLATFORM_PLAN_UPDATED',
+      entityType: 'PlatformPlanConfig',
+      entityId: code,
+      afterData: {
+        monthlyPriceXof: updated.monthlyPriceXof,
+        yearlyPriceXof: updated.yearlyPriceXof,
+        directSalePriceXof: updated.directSalePriceXof,
+        trialDays: updated.trialDays,
+      },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+
+    return this.formatPlan(updated);
+  }
+
   async getOrInitSubscription(merchantId: string) {
     let sub = await this.controlPrisma.merchantSubscription.findUnique({ where: { merchantId } });
     if (!sub) {
@@ -46,6 +257,8 @@ export class PlatformService {
         data: {
           merchantId,
           planCode: 'PRO',
+          billingCycle: 'MONTHLY',
+          priceXof: 25000,
           monthlyPriceXof: 25000,
           maxShops: 5,
           maxAgentsPerShop: 10,
@@ -59,6 +272,7 @@ export class PlatformService {
       ...sub,
       currentPeriodStart: sub.currentPeriodStart.toISOString(),
       currentPeriodEnd: sub.currentPeriodEnd.toISOString(),
+      trialEndsAt: sub.trialEndsAt?.toISOString() ?? null,
       updatedAt: sub.updatedAt.toISOString(),
     };
   }
@@ -83,6 +297,7 @@ export class PlatformService {
               ...m.subscription,
               currentPeriodStart: m.subscription.currentPeriodStart.toISOString(),
               currentPeriodEnd: m.subscription.currentPeriodEnd.toISOString(),
+              trialEndsAt: m.subscription.trialEndsAt?.toISOString() ?? null,
               updatedAt: m.subscription.updatedAt.toISOString(),
             }
           : await this.getOrInitSubscription(m.id),
@@ -91,15 +306,23 @@ export class PlatformService {
   }
 
   async upsertSubscription(merchantId: string, input: any, actor: AuthenticatedUser, meta: RequestMeta) {
+    const billingCycle: SubscriptionBillingCycle = input.billingCycle || 'MONTHLY';
+    const priceXof = input.priceXof ?? input.monthlyPriceXof;
     const periodEnd = input.currentPeriodEnd
       ? new Date(input.currentPeriodEnd)
-      : new Date(Date.now() + 30 * 86_400_000);
+      : billingCycle === 'DIRECT_SALE'
+        ? new Date('2099-12-31T23:59:59.000Z')
+        : billingCycle === 'YEARLY'
+          ? new Date(Date.now() + 365 * 86_400_000)
+          : new Date(Date.now() + 30 * 86_400_000);
 
     const sub = await this.controlPrisma.merchantSubscription.upsert({
       where: { merchantId },
       create: {
         merchantId,
         planCode: input.planCode,
+        billingCycle,
+        priceXof,
         monthlyPriceXof: input.monthlyPriceXof,
         maxShops: input.maxShops,
         maxAgentsPerShop: input.maxAgentsPerShop,
@@ -109,6 +332,8 @@ export class PlatformService {
       },
       update: {
         planCode: input.planCode,
+        billingCycle,
+        priceXof,
         monthlyPriceXof: input.monthlyPriceXof,
         maxShops: input.maxShops,
         maxAgentsPerShop: input.maxAgentsPerShop,
@@ -125,7 +350,13 @@ export class PlatformService {
       action: 'SUBSCRIPTION_UPDATED',
       entityType: 'MerchantSubscription',
       entityId: sub.id,
-      afterData: { planCode: sub.planCode, monthlyPriceXof: sub.monthlyPriceXof, maxShops: sub.maxShops },
+      afterData: {
+        planCode: sub.planCode,
+        billingCycle: sub.billingCycle,
+        priceXof: sub.priceXof,
+        monthlyPriceXof: sub.monthlyPriceXof,
+        maxShops: sub.maxShops,
+      },
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
       correlationId: meta.correlationId,
@@ -345,6 +576,36 @@ export class PlatformService {
 @Controller()
 export class PlatformController {
   constructor(private readonly platformService: PlatformService) {}
+
+  @Public()
+  @Get('public/plans')
+  @ApiOperation({ summary: 'Grille tarifaire publique configurable (Mois, Année, Vente directe)' })
+  listPublicPlans() {
+    return this.platformService.listPublicPlans();
+  }
+
+  @Get('admin/plans')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Lister les formules et tarifs configurés par le Super Admin' })
+  listAdminPlans() {
+    return this.platformService.listAdminPlans();
+  }
+
+  @Put('admin/plans/:code')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Configurer le tarif (Par mois, Par année, Vente directe) d’une offre' })
+  updatePlanConfig(
+    @Param('code') code: string,
+    @Body(new ZodValidationPipe(updatePlatformPlanConfigSchema)) body: any,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.platformService.updatePlanConfig(code, body, user, {
+      ipAddress: req.ip || null,
+      userAgent: req.header('user-agent') || null,
+      correlationId: req.correlationId || null,
+    });
+  }
 
   @Get('admin/subscriptions')
   @Roles('SUPER_ADMIN')

@@ -21,6 +21,7 @@ interface SupplierRow {
   id: string;
   name: string;
   phone: string | null;
+  suppliedProducts: string | null;
   debtBalanceXof: number;
   totalReceivedXof: number;
   totalPaidXof: number;
@@ -72,6 +73,7 @@ export default function PurchasesPage() {
   // Nouveau fournisseur
   const [supName, setSupName] = useState('');
   const [supPhone, setSupPhone] = useState('');
+  const [supProducts, setSupProducts] = useState('');
 
   // Nouvelle commande fournisseur
   const [showNewPo, setShowNewPo] = useState(false);
@@ -143,10 +145,15 @@ export default function PurchasesPage() {
       await apiFetch(`/shops/${shopId}/suppliers`, {
         method: 'POST',
         shopId,
-        body: { name: supName, phone: supPhone || undefined },
+        body: {
+          name: supName,
+          phone: supPhone || undefined,
+          suppliedProducts: supProducts.trim() || undefined,
+        },
       });
       setSupName('');
       setSupPhone('');
+      setSupProducts('');
       setMsg('Fournisseur ajouté.');
       await load();
     } catch (err) {
@@ -383,28 +390,36 @@ export default function PurchasesPage() {
           <div className="space-y-4">
             <form
               onSubmit={handleCreateSupplier}
-              className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap"
+              className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-12"
             >
               <input
                 required
                 value={supName}
                 onChange={(e) => setSupName(e.target.value)}
                 placeholder="Nom du fournisseur *"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm sm:min-w-[200px] sm:flex-1"
+                className="sc-input sm:col-span-4"
               />
               <input
                 value={supPhone}
                 onChange={(e) => setSupPhone(e.target.value)}
                 placeholder="Téléphone"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm sm:w-48"
+                className="sc-input sm:col-span-3"
               />
-              <button
-                type="submit"
-                disabled={busy}
-                className="w-full rounded-xl bg-forest-900 px-4 py-2 text-sm font-semibold text-white hover:bg-forest-800 sm:w-auto"
-              >
-                Ajouter fournisseur
-              </button>
+              <input
+                value={supProducts}
+                onChange={(e) => setSupProducts(e.target.value)}
+                placeholder="Ce qu’il fournit (ex. Riz, Sucre, Huile, Pommades…)"
+                className="sc-input sm:col-span-5"
+              />
+              <div className="sm:col-span-12 sm:flex sm:justify-end">
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="sc-btn-primary w-full sm:w-auto"
+                >
+                  Ajouter fournisseur
+                </button>
+              </div>
             </form>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -412,6 +427,11 @@ export default function PurchasesPage() {
                 <div key={s.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="font-bold text-slate-900">{s.name}</p>
                   <p className="text-xs text-slate-500">{s.phone || 'Sans téléphone'}</p>
+                  {s.suppliedProducts ? (
+                    <p className="mt-1.5 inline-block rounded-lg bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-800">
+                      Fournit : {s.suppliedProducts}
+                    </p>
+                  ) : null}
                   <p className="mt-2 text-xs text-slate-600">
                     Dette restante :{' '}
                     <strong className={s.debtBalanceXof > 0 ? 'text-amber-800' : 'text-emerald-700'}>
@@ -437,6 +457,7 @@ export default function PurchasesPage() {
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
+                    {s.suppliedProducts ? ` — ${s.suppliedProducts}` : ''}
                   </option>
                 ))}
               </select>

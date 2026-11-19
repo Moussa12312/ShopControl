@@ -75,6 +75,7 @@ export class PurchasesService {
         phone: s.phone,
         email: s.email,
         address: s.address,
+        suppliedProducts: s.suppliedProducts,
         notes: s.notes,
         isActive: s.isActive,
         totalReceivedXof,
@@ -93,6 +94,7 @@ export class PurchasesService {
         phone: input.phone || null,
         email: input.email || null,
         address: input.address || null,
+        suppliedProducts: input.suppliedProducts?.trim() || null,
         notes: input.notes || null,
       },
     });
@@ -111,6 +113,9 @@ export class PurchasesService {
         ...(input.phone !== undefined ? { phone: input.phone || null } : {}),
         ...(input.email !== undefined ? { email: input.email || null } : {}),
         ...(input.address !== undefined ? { address: input.address || null } : {}),
+        ...(input.suppliedProducts !== undefined
+          ? { suppliedProducts: input.suppliedProducts?.trim() || null }
+          : {}),
         ...(input.notes !== undefined ? { notes: input.notes || null } : {}),
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       },

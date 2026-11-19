@@ -581,7 +581,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
       : confirmed?.trackingPath || '';
 
   return (
-    <div className="min-h-screen w-full overflow-x-clip bg-porcelain-100 pb-28 sm:pb-24">
+    <div className="min-h-screen w-full overflow-x-clip overscroll-none bg-porcelain-100 pb-28 sm:pb-24">
       {/* Barre supérieure fixe & 100% responsive mobile + desktop */}
       <header className="sticky top-0 z-30 border-b border-white/10 bg-forest-950/95 text-white backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-3">

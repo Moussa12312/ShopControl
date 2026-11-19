@@ -413,18 +413,43 @@ model Message {
 // LOT 7 — ADMINISTRATION PLATEFORME (ABONNEMENTS, MODULES, PAIEMENTS, SUPPORT, ANNONCES)
 // ============================================================================
 
+model PlatformPlanConfig {
+  code               String   @id @db.VarChar(32)
+  name               String   @db.VarChar(80)
+  tagline            String   @default("") @db.VarChar(200)
+  badge              String?  @db.VarChar(40)
+  monthlyPriceXof    Int      @default(15000) @map("monthly_price_xof")
+  yearlyPriceXof     Int      @default(150000) @map("yearly_price_xof")
+  directSalePriceXof Int      @default(350000) @map("direct_sale_price_xof")
+  allowMonthly       Boolean  @default(true) @map("allow_monthly")
+  allowYearly        Boolean  @default(true) @map("allow_yearly")
+  allowDirectSale    Boolean  @default(true) @map("allow_direct_sale")
+  trialDays          Int      @default(14) @map("trial_days")
+  maxShops           Int      @default(1) @map("max_shops")
+  maxAgentsPerShop   Int      @default(3) @map("max_agents_per_shop")
+  features           Json     @default("[]")
+  isActive           Boolean  @default(true) @map("is_active")
+  sortOrder          Int      @default(0) @map("sort_order")
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("platform_plan_configs")
+}
+
 model MerchantSubscription {
-  id                   String   @id @default(uuid()) @db.Uuid
-  merchantId           String   @unique @map("merchant_id") @db.Uuid
-  planCode             String   @default("PRO") @map("plan_code") @db.VarChar(32)
-  monthlyPriceXof      Int      @default(25000) @map("monthly_price_xof")
-  maxShops             Int      @default(5) @map("max_shops")
-  maxAgentsPerShop     Int      @default(10) @map("max_agents_per_shop")
-  enabledModules       Json     @default("[\"POS\",\"INVENTORY\",\"PURCHASES\",\"MULTI_SHOP\",\"ECOMMERCE_QR\",\"MESSAGING\",\"REPORTS\"]") @map("enabled_modules")
-  currentPeriodStart   DateTime @default(now()) @map("current_period_start") @db.Timestamptz(6)
-  currentPeriodEnd     DateTime @map("current_period_end") @db.Timestamptz(6)
-  autoSuspendGraceDays Int      @default(7) @map("auto_suspend_grace_days")
-  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                   String    @id @default(uuid()) @db.Uuid
+  merchantId           String    @unique @map("merchant_id") @db.Uuid
+  planCode             String    @default("PRO") @map("plan_code") @db.VarChar(32)
+  billingCycle         String    @default("MONTHLY") @map("billing_cycle") @db.VarChar(24)
+  priceXof             Int       @default(25000) @map("price_xof")
+  monthlyPriceXof      Int       @default(25000) @map("monthly_price_xof")
+  maxShops             Int       @default(5) @map("max_shops")
+  maxAgentsPerShop     Int       @default(10) @map("max_agents_per_shop")
+  enabledModules       Json      @default("[\"POS\",\"INVENTORY\",\"PURCHASES\",\"MULTI_SHOP\",\"ECOMMERCE_QR\",\"MESSAGING\",\"REPORTS\"]") @map("enabled_modules")
+  currentPeriodStart   DateTime  @default(now()) @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd     DateTime  @map("current_period_end") @db.Timestamptz(6)
+  trialEndsAt          DateTime? @map("trial_ends_at") @db.Timestamptz(6)
+  autoSuspendGraceDays Int       @default(7) @map("auto_suspend_grace_days")
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 

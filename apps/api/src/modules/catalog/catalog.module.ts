@@ -18,6 +18,8 @@ import {
   CategorySellingMode,
   createCategorySchema,
   createProductSchema,
+  generateProductBarcodeEan13,
+  generateProductSku,
   getSuggestedCategoriesForShopTypes,
   normalizeBusinessProfile,
   normalizeCategorySellingMode,
@@ -325,13 +327,69 @@ export class CatalogService {
     operator: DeclaredOperatorContext | undefined,
     meta: RequestMeta,
   ) {
-    const client = await this.shopDbManager.getClientForShop(shopId);
-    const dup = await client.product.findUnique({ where: { sku: input.sku } });
-    if (dup) {
-      throw new ConflictException({
-        code: 'SKU_ALREADY_USED',
-        message: `La référence SKU « ${input.sku} » existe déjà dans cette boutique.`,
-      });
+    const [shop, client] = await Promise.all([
+      this.controlPrisma.shop.findUnique({
+        where: { id: shopId },
+        select: { name: true },
+      }),
+      this.shopDbManager.getClientForShop(shopId),
+    ]);
+
+    const category = input.categoryId
+      ? await client.category.findUnique({
+          where: { id: input.categoryId },
+          select: { name: true },
+        })
+      : null;
+
+    let finalSku = typeof input.sku === 'string' ? input.sku.trim() : '';
+    if (finalSku) {
+      const dup = await client.product.findUnique({ where: { sku: finalSku } });
+      if (dup) {
+        throw new ConflictException({
+          code: 'SKU_ALREADY_USED',
+          message: `La référence SKU « ${finalSku} » existe déjà dans cette boutique.`,
+        });
+      }
+    } else {
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const candidate = generateProductSku({
+          shopName: shop?.name,
+          categoryName: category?.name,
+          productName: input.name,
+          uniqueSeed: 1000 + Math.floor(Math.random() * 9000),
+        });
+        const dup = await client.product.findUnique({ where: { sku: candidate } });
+        if (!dup) {
+          finalSku = candidate;
+          break;
+        }
+      }
+      if (!finalSku) {
+        finalSku = generateProductSku({
+          shopName: shop?.name,
+          categoryName: category?.name,
+          productName: input.name,
+          uniqueSeed: `${Date.now().toString().slice(-4)}`,
+        });
+      }
+    }
+
+    let finalBarcode = typeof input.barcode === 'string' ? input.barcode.trim() : '';
+    if (!finalBarcode) {
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const candidate = generateProductBarcodeEan13({
+          shopName: shop?.name,
+          categoryName: category?.name,
+          productName: input.name,
+          uniqueSeed: `${Date.now()}-${attempt}-${Math.floor(Math.random() * 100000)}`,
+        });
+        const dup = await client.product.findFirst({ where: { barcode: candidate } });
+        if (!dup) {
+          finalBarcode = candidate;
+          break;
+        }
+      }
     }
 
     const created = await client.$transaction(async (tx) => {
@@ -339,8 +397,8 @@ export class CatalogService {
       const product = await tx.product.create({
         data: {
           name: input.name,
-          sku: input.sku,
-          barcode: input.barcode || null,
+          sku: finalSku,
+          barcode: finalBarcode || null,
           description: input.description || null,
           categoryId: input.categoryId ?? null,
           unit: input.unit || 'unité',
