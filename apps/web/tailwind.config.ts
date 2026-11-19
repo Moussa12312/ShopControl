@@ -4,6 +4,10 @@ const config: Config = {
   content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+      },
       colors: {
         brand: {
           50: '#eefaf6',
@@ -18,12 +22,12 @@ const config: Config = {
           900: '#092220',
         },
         forest: {
-          950: '#051413',
-          900: '#091f1e',
-          850: '#0d2927',
-          800: '#123330',
-          700: '#1a423e',
-          600: '#245651',
+          950: '#061514',
+          900: '#0b2220',
+          850: '#0f2c2a',
+          800: '#143633',
+          700: '#1d4743',
+          600: '#275c56',
         },
         limeglow: {
           300: '#bef264',
@@ -31,20 +35,20 @@ const config: Config = {
           500: '#84cc16',
         },
         porcelain: {
-          50: '#fafcfb',
-          100: '#f3f7f6',
-          200: '#e6eeec',
+          50: '#f7f9fb',
+          100: '#edf1f5',
+          200: '#dfe6ed',
         },
       },
       boxShadow: {
-        shell: '0 24px 60px -15px rgba(5, 20, 19, 0.25)',
-        card: '0 1px 2px rgba(9, 31, 30, 0.04), 0 6px 20px -6px rgba(9, 31, 30, 0.06)',
-        elevated: '0 14px 36px -10px rgba(5, 20, 19, 0.14)',
-        lime: '0 8px 24px -6px rgba(163, 230, 53, 0.45)',
+        shell: '0 20px 50px -15px rgba(6, 21, 20, 0.22)',
+        card: '0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px -6px rgba(15, 23, 42, 0.06)',
+        elevated: '0 12px 32px -10px rgba(15, 23, 42, 0.14)',
+        lime: '0 6px 20px -5px rgba(163, 230, 53, 0.42)',
       },
       borderRadius: {
-        '2xl': '1rem',
-        '3xl': '1.35rem',
+        '2xl': '0.95rem',
+        '3xl': '1.25rem',
       },
     },
   },

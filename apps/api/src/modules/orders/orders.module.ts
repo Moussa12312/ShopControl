@@ -1,4 +1,6 @@
 import * as crypto from 'crypto';
+import * as argon2 from 'argon2';
+import * as jwt from 'jsonwebtoken';
 import {
   BadRequestException,
   Body,
@@ -7,6 +9,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  HttpCode,
   HttpException,
   HttpStatus,
   Injectable,
@@ -16,14 +19,19 @@ import {
   Post,
   Query,
   Req,
+  Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import * as QRCode from 'qrcode';
 import {
   blockPhoneSchema,
   completeOrderToSaleSchema,
   createPublicOrderSchema,
+  customerLoginSchema,
+  customerRegisterSchema,
   DEFAULT_DELIVERY_CONFIG,
   DEFAULT_OPENING_HOURS,
   DEFAULT_PAYMENT_METHODS,
@@ -287,7 +295,7 @@ export class OrdersService {
    * - Crée une commande `NEW` SANS décrémenter le stock ni créer de CA (Critères #18 & #19)
    * - Renvoie un lien de suivi secret unique (`secretToken`)
    */
-  async createPublicOrder(slug: string, input: any, clientIp: string) {
+  async createPublicOrder(slug: string, input: any, clientIp: string, customerToken?: string) {
     // 1. Pot-de-miel anti-robot discret
     if (input.websiteHp && String(input.websiteHp).trim().length > 0) {
       throw new BadRequestException({ code: 'ORDER_REJECTED', message: 'Requête invalide.' });
@@ -450,12 +458,22 @@ export class OrdersService {
     const orderNumber = `CMD-${String(Number(seqRows[0].nextval)).padStart(6, '0')}`;
     const secretToken = crypto.randomBytes(24).toString('hex');
 
+    let linkedClientId = this.verifyCustomerToken(customerToken, shop.id);
+    if (!linkedClientId) {
+      const existingByPhone = await shopClient.client.findUnique({
+        where: { phone: cleanPhone },
+        select: { id: true },
+      });
+      linkedClientId = existingByPhone?.id ?? null;
+    }
+
     const created = await shopClient.onlineOrder.create({
       data: {
         orderNumber,
         secretToken,
         status: 'NEW',
         fulfillmentMode: input.fulfillmentMode,
+        clientId: linkedClientId,
         clientName: input.clientName.trim(),
         clientPhone: cleanPhone,
         deliveryAddress: input.fulfillmentMode === 'DELIVERY' ? input.deliveryAddress?.trim() || null : null,
@@ -473,7 +491,9 @@ export class OrdersService {
           create: {
             fromStatus: null,
             toStatus: 'NEW',
-            reason: 'Commande soumise depuis la vitrine QR sans compte',
+            reason: linkedClientId
+              ? 'Commande soumise depuis la vitrine QR (compte client)'
+              : 'Commande soumise depuis la vitrine QR sans compte',
           },
         },
       },
@@ -1285,12 +1305,323 @@ export class OrdersService {
     await client.blockedPhone.delete({ where: { id } }).catch(() => undefined);
     return { ok: true };
   }
+
+  // --- Compte client optionnel sur vitrine publique ---
+  private signCustomerToken(clientId: string, shopId: string): string {
+    const env = getEnv();
+    return jwt.sign({ sub: clientId, shopId, typ: 'shop_customer' }, env.JWT_ACCESS_SECRET, {
+      expiresIn: '30d',
+    });
+  }
+
+  private verifyCustomerToken(token: string | undefined, expectedShopId: string): string | null {
+    if (!token) return null;
+    try {
+      const env = getEnv();
+      const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as {
+        sub?: string;
+        shopId?: string;
+        typ?: string;
+      };
+      if (payload.typ !== 'shop_customer' || !payload.sub || payload.shopId !== expectedShopId) {
+        return null;
+      }
+      return payload.sub;
+    } catch {
+      return null;
+    }
+  }
+
+  async registerPublicCustomer(
+    slug: string,
+    input: { fullName: string; phone: string; email?: string; address?: string; password: string },
+  ) {
+    const resolved = await this.resolveShopBySlug(slug);
+    if (!resolved.shop) {
+      throw new NotFoundException({ code: 'SHOP_NOT_FOUND', message: 'Boutique introuvable.' });
+    }
+    const shop = resolved.shop;
+    const effectiveStatus = this.getEffectiveStatus(shop.merchant.status, shop.status);
+    if (effectiveStatus === 'SUSPENDED' || effectiveStatus === 'TERMINATED') {
+      throw new ForbiddenException({
+        code: 'SHOP_UNAVAILABLE',
+        message: 'Cette boutique est momentanément indisponible.',
+      });
+    }
+
+    const cleanPhone = normalizePhone(input.phone);
+    const cleanEmail = input.email?.trim().toLowerCase() || null;
+    const shopClient = await this.shopDbManager.getClientForShop(shop.id);
+
+    const existingByPhone = await shopClient.client.findUnique({ where: { phone: cleanPhone } });
+    if (existingByPhone?.hasAccount) {
+      throw new ConflictException({
+        code: 'CUSTOMER_ACCOUNT_EXISTS',
+        message: 'Un compte client existe déjà avec ce numéro. Connectez-vous.',
+      });
+    }
+
+    if (cleanEmail) {
+      const existingByEmail = await shopClient.client.findFirst({
+        where: { email: cleanEmail, hasAccount: true },
+      });
+      if (existingByEmail) {
+        throw new ConflictException({
+          code: 'CUSTOMER_EMAIL_EXISTS',
+          message: 'Cette adresse e-mail est déjà utilisée par un autre compte.',
+        });
+      }
+    }
+
+    const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
+    const now = new Date();
+
+    const customer = existingByPhone
+      ? await shopClient.client.update({
+          where: { id: existingByPhone.id },
+          data: {
+            fullName: input.fullName.trim(),
+            email: cleanEmail ?? existingByPhone.email,
+            address: input.address?.trim() || existingByPhone.address,
+            hasAccount: true,
+            passwordHash,
+            lastLoginAt: now,
+          },
+        })
+      : await shopClient.client.create({
+          data: {
+            fullName: input.fullName.trim(),
+            phone: cleanPhone,
+            email: cleanEmail,
+            address: input.address?.trim() || null,
+            hasAccount: true,
+            passwordHash,
+            lastLoginAt: now,
+          },
+        });
+
+    // Rattache automatiquement les commandes passées précédemment avec ce numéro
+    await shopClient.onlineOrder.updateMany({
+      where: { clientPhone: cleanPhone, clientId: null },
+      data: { clientId: customer.id },
+    });
+
+    const token = this.signCustomerToken(customer.id, shop.id);
+    return {
+      token,
+      customer: {
+        id: customer.id,
+        fullName: customer.fullName,
+        phone: customer.phone,
+        email: customer.email,
+        address: customer.address,
+      },
+    };
+  }
+
+  async loginPublicCustomer(slug: string, input: { identifier: string; password: string }) {
+    const resolved = await this.resolveShopBySlug(slug);
+    if (!resolved.shop) {
+      throw new NotFoundException({ code: 'SHOP_NOT_FOUND', message: 'Boutique introuvable.' });
+    }
+    const shop = resolved.shop;
+    const shopClient = await this.shopDbManager.getClientForShop(shop.id);
+    const raw = input.identifier.trim();
+    const isEmail = raw.includes('@');
+
+    const customer = isEmail
+      ? await shopClient.client.findFirst({
+          where: { email: raw.toLowerCase(), hasAccount: true },
+        })
+      : await shopClient.client.findFirst({
+          where: { phone: normalizePhone(raw), hasAccount: true },
+        });
+
+    if (!customer || !customer.passwordHash || customer.isBlocked) {
+      throw new UnauthorizedException({
+        code: 'CUSTOMER_INVALID_CREDENTIALS',
+        message: 'Identifiant ou mot de passe incorrect.',
+      });
+    }
+
+    const ok = await argon2.verify(customer.passwordHash, input.password);
+    if (!ok) {
+      throw new UnauthorizedException({
+        code: 'CUSTOMER_INVALID_CREDENTIALS',
+        message: 'Identifiant ou mot de passe incorrect.',
+      });
+    }
+
+    await shopClient.client.update({
+      where: { id: customer.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const token = this.signCustomerToken(customer.id, shop.id);
+    return {
+      token,
+      customer: {
+        id: customer.id,
+        fullName: customer.fullName,
+        phone: customer.phone,
+        email: customer.email,
+        address: customer.address,
+      },
+    };
+  }
+
+  async getPublicCustomerProfile(slug: string, token: string | undefined) {
+    const resolved = await this.resolveShopBySlug(slug);
+    if (!resolved.shop) {
+      return { authenticated: false as const, customer: null };
+    }
+    const shop = resolved.shop;
+    const clientId = this.verifyCustomerToken(token, shop.id);
+    if (!clientId) {
+      return { authenticated: false as const, customer: null };
+    }
+
+    const shopClient = await this.shopDbManager.getClientForShop(shop.id);
+    const customer = await shopClient.client.findUnique({
+      where: { id: clientId },
+      include: {
+        onlineOrders: {
+          orderBy: { createdAt: 'desc' },
+          take: 25,
+          include: { lines: true },
+        },
+        receivables: {
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          include: {
+            sale: { select: { saleNumber: true } },
+            payments: { orderBy: { createdAt: 'desc' } },
+          },
+        },
+      },
+    });
+
+    if (!customer || !customer.hasAccount || customer.isBlocked) {
+      return { authenticated: false as const, customer: null };
+    }
+
+    const outstandingDebtXof = customer.receivables
+      .filter((r) => r.status === 'OPEN' || r.status === 'PARTIALLY_PAID')
+      .reduce((sum, r) => sum + r.remainingAmountXof, 0);
+
+    return {
+      authenticated: true as const,
+      customer: {
+        id: customer.id,
+        fullName: customer.fullName,
+        phone: customer.phone,
+        email: customer.email,
+        address: customer.address,
+      },
+      outstandingDebtXof,
+      orders: customer.onlineOrders.map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.status,
+        fulfillmentMode: o.fulfillmentMode,
+        totalXof: o.totalXof,
+        trackingPath: `/s/${shop.slug}/track?token=${o.secretToken}`,
+        createdAt: o.createdAt.toISOString(),
+        lines: o.lines.map((l) => ({
+          id: l.id,
+          productName: l.productName,
+          selectedSize: l.selectedSize,
+          selectedColor: l.selectedColor,
+          orderedQty: l.orderedQty,
+          lineTotalXof: l.lineTotalXof,
+        })),
+      })),
+      receivables: customer.receivables.map((r) => ({
+        id: r.id,
+        status: r.status,
+        description: r.description,
+        dueDate: r.dueDate ? r.dueDate.toISOString() : null,
+        saleNumber: r.sale?.saleNumber ?? null,
+        initialAmountXof: r.initialAmountXof,
+        paidAmountXof: r.paidAmountXof,
+        remainingAmountXof: r.remainingAmountXof,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    };
+  }
 }
 
 @ApiTags('Vitrine E-commerce & Commandes (Lot 5)')
 @Controller()
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
+
+  private setCustomerCookie(res: Response, token: string) {
+    const env = getEnv();
+    res.cookie('sc_customer_token', token, {
+      httpOnly: true,
+      secure: env.COOKIE_SECURE,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 30 * 24 * 3600_000,
+    });
+  }
+
+  private clearCustomerCookie(res: Response) {
+    const env = getEnv();
+    res.clearCookie('sc_customer_token', {
+      httpOnly: true,
+      secure: env.COOKIE_SECURE,
+      sameSite: 'lax',
+      path: '/',
+    });
+  }
+
+  @Post('public/shops/:slug/auth/register')
+  @Public()
+  @ApiOperation({ summary: 'Créer un compte client optionnel sur une vitrine boutique' })
+  async registerCustomer(
+    @Param('slug') slug: string,
+    @Body(new ZodValidationPipe(customerRegisterSchema))
+    body: { fullName: string; phone: string; email?: string; address?: string; password: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.ordersService.registerPublicCustomer(slug, body);
+    this.setCustomerCookie(res, result.token);
+    return { customer: result.customer };
+  }
+
+  @Post('public/shops/:slug/auth/login')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Connexion client optionnelle sur une vitrine boutique' })
+  async loginCustomer(
+    @Param('slug') slug: string,
+    @Body(new ZodValidationPipe(customerLoginSchema))
+    body: { identifier: string; password: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.ordersService.loginPublicCustomer(slug, body);
+    this.setCustomerCookie(res, result.token);
+    return { customer: result.customer };
+  }
+
+  @Post('public/shops/:slug/auth/logout')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Déconnexion du compte client vitrine' })
+  logoutCustomer(@Res({ passthrough: true }) res: Response) {
+    this.clearCustomerCookie(res);
+    return { ok: true };
+  }
+
+  @Get('public/shops/:slug/auth/me')
+  @Public()
+  @ApiOperation({ summary: 'Profil, commandes et solde du compte client connecté sur cette vitrine' })
+  customerMe(@Param('slug') slug: string, @Req() req: RequestWithAuth) {
+    const token = req.cookies?.sc_customer_token as string | undefined;
+    return this.ordersService.getPublicCustomerProfile(slug, token);
+  }
 
   @Get('public/shops/:slug/storefront')
   @Public()
@@ -1308,7 +1639,7 @@ export class OrdersController {
 
   @Post('public/shops/:slug/orders')
   @Public()
-  @ApiOperation({ summary: 'Passer une commande client sans compte sur la vitrine (avec protection anti-abus)' })
+  @ApiOperation({ summary: 'Passer une commande client (avec ou sans compte) sur la vitrine' })
   createPublicOrder(
     @Param('slug') slug: string,
     @Body(new ZodValidationPipe(createPublicOrderSchema)) body: any,
@@ -1316,7 +1647,8 @@ export class OrdersController {
   ) {
     const ip =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
-    return this.ordersService.createPublicOrder(slug, body, ip);
+    const customerToken = req.cookies?.sc_customer_token as string | undefined;
+    return this.ordersService.createPublicOrder(slug, body, ip, customerToken);
   }
 
   @Get('public/shops/:slug/orders/track')

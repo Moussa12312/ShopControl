@@ -11,6 +11,7 @@ import {
   Send,
 } from 'lucide-react';
 import {
+  DEFAULT_PAYMENT_METHODS,
   formatDateTimeInTimezone,
   formatXof,
   PLATFORM_MODULE_LABELS,
@@ -23,6 +24,11 @@ import {
   SUPPORT_TICKET_STATUSES,
   SupportTicketStatus,
 } from '@shopcontrol/shared';
+
+const PLATFORM_PAYMENT_OPTIONS = [
+  ...DEFAULT_PAYMENT_METHODS.map((m) => ({ code: m.code, label: m.label })),
+  { code: 'BANK_TRANSFER', label: 'Virement bancaire' },
+];
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { AppShell } from '@/components/layout/AppShell';
 import { EmptyState, ErrorState, LoadingSkeleton, StatusBadge } from '@/components/ui/StateViews';
@@ -366,10 +372,11 @@ export default function AdminPlatformPage() {
                   onChange={(e) => setPayForm({ ...payForm, paymentMethodCode: e.target.value })}
                   className="sc-input"
                 >
-                  <option value="ORANGE_MONEY">Orange Money</option>
-                  <option value="WAVE">Wave</option>
-                  <option value="BANK_TRANSFER">Virement</option>
-                  <option value="CASH">Espèces</option>
+                  {PLATFORM_PAYMENT_OPTIONS.map((opt) => (
+                    <option key={opt.code} value={opt.code}>
+                      {opt.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <input

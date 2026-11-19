@@ -234,6 +234,13 @@ export default function LoginPage() {
               </div>
             </form>
           )}
+
+          <p className="mt-8 text-center text-[11px] text-slate-400">
+            Propulsé par{' '}
+            <sub className="bottom-[-0.18em] text-[10px] font-semibold tracking-wide text-slate-500">
+              Chakir’s Entreprise
+            </sub>
+          </p>
         </div>
       </div>
     </div>

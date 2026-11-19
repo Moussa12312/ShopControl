@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import {
   calculateSaleTotals,
-  DEFAULT_PAYMENT_METHODS,
   formatDateTimeInTimezone,
   formatXof,
   PaymentMethodConfig,
@@ -105,7 +104,7 @@ export default function PosPage() {
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [clients, setClients] = useState<ClientItem[]>([]);
   const [sales, setSales] = useState<SaleRow[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodConfig[]>(DEFAULT_PAYMENT_METHODS);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodConfig[]>([]);
   const [taxMode, setTaxMode] = useState<TaxMode>('NONE');
   const [taxRateBps, setTaxRateBps] = useState(0);
   const [pendingOffline, setPendingOffline] = useState<OfflineOperationItem[]>([]);
@@ -114,7 +113,7 @@ export default function PosPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discountPercent, setDiscountPercent] = useState(0);
   const [cashRoundingStep, setCashRoundingStep] = useState<0 | 5 | 25>(0);
-  const [paymentMethodCode, setPaymentMethodCode] = useState('CASH');
+  const [paymentMethodCode, setPaymentMethodCode] = useState('');
   const [amountPaidXof, setAmountPaidXof] = useState<string>('');
   const [transactionRef, setTransactionRef] = useState('');
   const [selectedClientId, setSelectedClientId] = useState('');
@@ -174,10 +173,14 @@ export default function PosPage() {
         }),
       ]);
 
-      const enabledMethods = (shopDetails.paymentMethods || DEFAULT_PAYMENT_METHODS).filter(
-        (m) => m.enabled,
+      const enabledMethods = (shopDetails.paymentMethods || []).filter((m) => m.enabled);
+      setPaymentMethods(enabledMethods);
+      setPaymentMethodCode((prev) =>
+        prev && enabledMethods.some((m) => m.code === prev) ? prev : enabledMethods[0]?.code || '',
       );
-      setPaymentMethods(enabledMethods.length ? enabledMethods : DEFAULT_PAYMENT_METHODS);
+      setRefundMethodCode((prev) =>
+        prev && enabledMethods.some((m) => m.code === prev) ? prev : enabledMethods[0]?.code || '',
+      );
       setTaxMode(shopDetails.taxMode || 'NONE');
       setTaxRateBps(shopDetails.defaultTaxRateBps || 0);
 

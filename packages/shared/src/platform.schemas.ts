@@ -185,6 +185,20 @@ export const blockPhoneSchema = z.object({
   reason: z.string().trim().max(300).optional(),
 });
 
+// --- Compte client optionnel sur vitrine publique ---
+export const customerRegisterSchema = z.object({
+  fullName: z.string().trim().min(2, 'Votre nom complet est requis.').max(120),
+  phone: z.string().trim().min(6, 'Numéro de téléphone valide requis.').max(30),
+  email: z.string().trim().email('Adresse e-mail invalide.').toLowerCase().optional().or(z.literal('')),
+  address: z.string().trim().max(255).optional().or(z.literal('')),
+  password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères.').max(128),
+});
+
+export const customerLoginSchema = z.object({
+  identifier: z.string().trim().min(4, 'Téléphone ou e-mail requis.').max(160),
+  password: z.string().min(1, 'Mot de passe requis.').max(128),
+});
+
 // --- Lot 6 : Messagerie ---
 export const createConversationSchema = z.object({
   type: z.enum(['INTERNAL_OWNER_AGENT', 'CLIENT_SHOP', 'SUPPORT_ADMIN_OWNER']),

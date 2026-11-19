@@ -17,6 +17,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   createClientSchema,
+  createManualReceivableSchema,
   DEFAULT_PAYMENT_METHODS,
   PaymentMethodConfig,
   receivablePaymentSchema,
@@ -70,12 +71,13 @@ export class ClientsService {
       include: {
         receivables: {
           where: { status: { in: ['OPEN', 'PARTIALLY_PAID'] } },
-          select: { remainingAmountXof: true },
+          select: { remainingAmountXof: true, dueDate: true },
         },
-        _count: { select: { sales: true } },
+        _count: { select: { sales: true, onlineOrders: true } },
       },
     });
 
+    const nowMs = Date.now();
     return clients.map((c) => ({
       id: c.id,
       fullName: c.fullName,
@@ -85,7 +87,13 @@ export class ClientsService {
       creditLimitXof: c.creditLimitXof,
       notes: c.notes,
       isBlocked: c.isBlocked,
+      hasAccount: c.hasAccount,
       salesCount: c._count.sales,
+      onlineOrdersCount: c._count.onlineOrders,
+      openDebtsCount: c.receivables.length,
+      overdueDebtsCount: c.receivables.filter(
+        (r) => r.dueDate && r.dueDate.getTime() < nowMs,
+      ).length,
       outstandingDebtXof: c.receivables.reduce((acc, r) => acc + r.remainingAmountXof, 0),
       createdAt: c.createdAt.toISOString(),
     }));
@@ -141,11 +149,23 @@ export class ClientsService {
     });
   }
 
-  async listReceivables(shopId: string, status?: string) {
+  async listReceivables(shopId: string, status?: string, clientId?: string) {
     const client = await this.shopDbManager.getClientForShop(shopId);
+    const where: Record<string, unknown> = {};
+    if (status === 'ALL') {
+      // Toutes (ouvertes, partielles, soldées)
+    } else if (status) {
+      where.status = status;
+    } else {
+      where.status = { in: ['OPEN', 'PARTIALLY_PAID'] };
+    }
+    if (clientId) {
+      where.clientId = clientId;
+    }
+
     const rows = await client.receivable.findMany({
-      where: status ? { status } : { status: { in: ['OPEN', 'PARTIALLY_PAID'] } },
-      orderBy: { createdAt: 'asc' },
+      where,
+      orderBy: { createdAt: 'desc' },
       include: {
         client: { select: { id: true, fullName: true, phone: true, creditLimitXof: true } },
         sale: { select: { id: true, saleNumber: true, totalXof: true, createdAt: true } },
@@ -157,27 +177,121 @@ export class ClientsService {
     return rows.map((r) => ({
       id: r.id,
       status: r.status,
+      description: r.description,
+      dueDate: r.dueDate ? r.dueDate.toISOString() : null,
+      isOverdue:
+        (r.status === 'OPEN' || r.status === 'PARTIALLY_PAID') &&
+        r.dueDate !== null &&
+        r.dueDate.getTime() < now,
       initialAmountXof: r.initialAmountXof,
       paidAmountXof: r.paidAmountXof,
       remainingAmountXof: r.remainingAmountXof,
       ageDays: Math.floor((now - r.createdAt.getTime()) / 86_400_000),
       client: r.client,
-      sale: {
-        id: r.sale.id,
-        saleNumber: r.sale.saleNumber,
-        totalXof: r.sale.totalXof,
-        createdAt: r.sale.createdAt.toISOString(),
-      },
+      sale: r.sale
+        ? {
+            id: r.sale.id,
+            saleNumber: r.sale.saleNumber,
+            totalXof: r.sale.totalXof,
+            createdAt: r.sale.createdAt.toISOString(),
+          }
+        : null,
+      declaredOperatorName: r.declaredOperatorName,
       payments: r.payments.map((p) => ({
         id: p.id,
         amountXof: p.amountXof,
         paymentMethodCode: p.paymentMethodCode,
         transactionRef: p.transactionRef,
+        notes: p.notes,
         declaredOperatorName: p.declaredOperatorName,
         createdAt: p.createdAt.toISOString(),
       })),
       createdAt: r.createdAt.toISOString(),
     }));
+  }
+
+  /**
+   * Enregistrement direct d'une dette client (dette manuelle, crédit historique ou avance marchandises).
+   */
+  async createManualReceivable(
+    shopId: string,
+    input: {
+      clientId: string;
+      amountXof: number;
+      description: string;
+      dueDate?: string | null;
+      allowCreditOverride?: boolean;
+    },
+    actor: AuthenticatedUser,
+    operator: DeclaredOperatorContext | undefined,
+    meta: RequestMeta,
+  ) {
+    const shopClient = await this.shopDbManager.getClientForShop(shopId);
+    const targetClient = await shopClient.client.findUnique({
+      where: { id: input.clientId },
+      include: {
+        receivables: {
+          where: { status: { in: ['OPEN', 'PARTIALLY_PAID'] } },
+          select: { remainingAmountXof: true },
+        },
+      },
+    });
+    if (!targetClient) {
+      throw new NotFoundException({ code: 'CLIENT_NOT_FOUND', message: 'Client introuvable.' });
+    }
+
+    const currentDebt = targetClient.receivables.reduce((acc, r) => acc + r.remainingAmountXof, 0);
+    if (
+      targetClient.creditLimitXof > 0 &&
+      currentDebt + input.amountXof > targetClient.creditLimitXof &&
+      !(input.allowCreditOverride && actor.role === 'OWNER')
+    ) {
+      throw new BadRequestException({
+        code: 'CREDIT_LIMIT_EXCEEDED',
+        message: `Plafond crédit dépassé (${currentDebt + input.amountXof} XOF > ${targetClient.creditLimitXof} XOF).`,
+      });
+    }
+
+    const created = await shopClient.receivable.create({
+      data: {
+        clientId: targetClient.id,
+        saleId: null,
+        description: input.description.trim(),
+        dueDate: input.dueDate ? new Date(input.dueDate) : null,
+        initialAmountXof: input.amountXof,
+        paidAmountXof: 0,
+        remainingAmountXof: input.amountXof,
+        status: 'OPEN',
+        actorUserId: actor.userId,
+        declaredOperatorName: operator?.firstName ?? null,
+      },
+      include: {
+        client: { select: { id: true, fullName: true, phone: true } },
+      },
+    });
+
+    await this.auditService.recordShop({
+      shopId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      declaredOperatorId: operator?.id ?? null,
+      declaredOperatorName: operator?.firstName ?? null,
+      action: 'RECEIVABLE_MANUAL_CREATED',
+      entityType: 'Receivable',
+      entityId: created.id,
+      afterData: {
+        clientId: targetClient.id,
+        clientName: targetClient.fullName,
+        amountXof: created.initialAmountXof,
+        description: created.description,
+        dueDate: created.dueDate?.toISOString() ?? null,
+      },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+
+    return created;
   }
 
   /**
@@ -265,8 +379,10 @@ export class ClientsService {
           type: 'RECEIVABLE_IN',
           amountXof: input.amountXof,
           referenceType: 'RECEIVABLE',
-          referenceId: rec.sale.saleNumber,
-          reason: `Règlement créance sur vente ${rec.sale.saleNumber}`,
+          referenceId: rec.sale?.saleNumber ?? rec.id.slice(0, 8).toUpperCase(),
+          reason: rec.sale
+            ? `Règlement créance sur vente ${rec.sale.saleNumber}`
+            : `Règlement dette client${rec.description ? ` — ${rec.description}` : ''}`,
           actorUserId: actor.userId,
           declaredOperatorId: operator?.id ?? null,
           declaredOperatorName: operator?.firstName ?? null,
@@ -299,13 +415,15 @@ export class ClientsService {
         },
       });
 
-      await tx.sale.update({
-        where: { id: rec.saleId },
-        data: {
-          paidAmountXof: rec.sale.paidAmountXof + input.amountXof,
-          dueAmountXof: Math.max(0, rec.sale.dueAmountXof - input.amountXof),
-        },
-      });
+      if (rec.saleId && rec.sale) {
+        await tx.sale.update({
+          where: { id: rec.saleId },
+          data: {
+            paidAmountXof: rec.sale.paidAmountXof + input.amountXof,
+            dueAmountXof: Math.max(0, rec.sale.dueAmountXof - input.amountXof),
+          },
+        });
+      }
 
       return created;
     });
@@ -374,10 +492,33 @@ export class ClientsController {
 
   @Get('receivables')
   @Roles('OWNER', 'AGENT')
-  @RequirePermissions('sales:read')
-  @ApiOperation({ summary: 'Lister les créances clients avec ancienneté en jours' })
-  listReceivables(@Param('shopId') shopId: string, @Query('status') status?: string) {
-    return this.clientsService.listReceivables(shopId, status);
+  @RequirePermissions('clients:read')
+  @ApiOperation({ summary: 'Lister les dettes et créances clients avec ancienneté et échéances' })
+  listReceivables(
+    @Param('shopId') shopId: string,
+    @Query('status') status?: string,
+    @Query('clientId') clientId?: string,
+  ) {
+    return this.clientsService.listReceivables(shopId, status, clientId);
+  }
+
+  @Post('receivables')
+  @Roles('OWNER', 'AGENT')
+  @RequirePermissions('clients:create')
+  @RequireOperator()
+  @ApiOperation({ summary: 'Enregistrer directement une dette client (crédit ou avance)' })
+  createReceivable(
+    @Param('shopId') shopId: string,
+    @Body(new ZodValidationPipe(createManualReceivableSchema)) body: any,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOperator() operator: DeclaredOperatorContext | undefined,
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.clientsService.createManualReceivable(shopId, body, user, operator, {
+      ipAddress: req.ip || null,
+      userAgent: req.header('user-agent') || null,
+      correlationId: req.correlationId || null,
+    });
   }
 
   @Post('receivables/:receivableId/payments')

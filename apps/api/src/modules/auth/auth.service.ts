@@ -526,6 +526,48 @@ export class AuthService {
     return { ok: true };
   }
 
+  async changePassword(
+    user: AuthenticatedUser,
+    input: { currentPassword: string; newPassword: string },
+    meta: RequestMeta,
+  ) {
+    const dbUser = await this.controlPrisma.user.findUnique({ where: { id: user.userId } });
+    if (!dbUser || !dbUser.isActive) {
+      throw new UnauthorizedException({
+        code: 'ACCOUNT_DISABLED',
+        message: 'Compte introuvable ou désactivé.',
+      });
+    }
+
+    const ok = await argon2.verify(dbUser.passwordHash, input.currentPassword);
+    if (!ok) {
+      throw new BadRequestException({
+        code: 'INVALID_CURRENT_PASSWORD',
+        message: 'Le mot de passe actuel est incorrect.',
+      });
+    }
+
+    const nextHash = await argon2.hash(input.newPassword, { type: argon2.argon2id });
+    await this.controlPrisma.user.update({
+      where: { id: user.userId },
+      data: { passwordHash: nextHash },
+    });
+
+    await this.auditService.recordControl({
+      merchantId: user.merchantId,
+      actorUserId: user.userId,
+      actorRole: user.role,
+      action: 'AUTH_PASSWORD_CHANGED',
+      entityType: 'User',
+      entityId: user.userId,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+
+    return { ok: true };
+  }
+
   private getSessionHoursForRole(role: UserRole): number {
     const env = getEnv();
     if (role === 'AGENT') return env.SESSION_TTL_AGENT_HOURS;
@@ -597,6 +639,7 @@ export class AuthService {
             shopId: s.id,
             shopName: s.name,
             slug: s.slug,
+            logoUrl: s.logoUrl ?? null,
             status: s.status as TenantStatus,
             dbStatus: s.dbStatus,
             permissions: createAllPermissions(),
@@ -608,6 +651,7 @@ export class AuthService {
               shopId: a.shopId,
               shopName: a.shop.name,
               slug: a.shop.slug,
+              logoUrl: a.shop.logoUrl ?? null,
               status: a.shop.status as TenantStatus,
               dbStatus: a.shop.dbStatus,
               permissions: normalizePermissionMap(a.permissions),

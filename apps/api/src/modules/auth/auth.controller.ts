@@ -14,6 +14,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import {
+  changePasswordSchema,
   confirmTwoFactorSchema,
   loginSchema,
   verifyTwoFactorLoginSchema,
@@ -170,6 +171,20 @@ export class AuthController {
     @Req() req: RequestWithAuth,
   ) {
     return this.authService.revokeOwnSession(user, sessionId, this.extractMeta(req));
+  }
+
+  @Post('change-password')
+  @ApiBearerAuth()
+  @AllowSuspendedWrite()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Modifier son propre mot de passe' })
+  changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(changePasswordSchema))
+    body: { currentPassword: string; newPassword: string },
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.authService.changePassword(user, body, this.extractMeta(req));
   }
 
   private extractMeta(req: RequestWithAuth) {

@@ -5,13 +5,41 @@
 @layer base {
   html,
   body {
-    @apply min-h-screen w-full bg-porcelain-100 text-slate-900 antialiased;
+    @apply min-h-screen w-full bg-[#edf1f5] text-slate-800 antialiased;
     overflow-x: clip;
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  a,
+  button,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  /* Empêche tout auto-zoom iOS / Android au focus d'un champ sur mobile */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  h1 {
+    @apply text-lg font-bold tracking-tight text-slate-900 sm:text-xl;
+  }
+
+  h2 {
+    @apply text-sm font-bold tracking-tight text-slate-900 sm:text-[15px];
+  }
+
   *:focus-visible {
-    @apply outline-none ring-2 ring-limeglow-400 ring-offset-1;
+    @apply outline-none ring-2 ring-brand-500/70 ring-offset-1;
   }
 }
 
@@ -20,37 +48,37 @@
     font-variant-numeric: tabular-nums;
   }
   .sc-card {
-    @apply rounded-2xl border border-slate-200/75 bg-white shadow-card transition-shadow;
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-card transition-shadow;
   }
   .sc-card-hover {
-    @apply rounded-2xl border border-slate-200/75 bg-white shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-elevated;
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-elevated;
   }
   .sc-dark-glass {
     @apply rounded-2xl border border-white/[0.09] bg-white/[0.05] backdrop-blur-md transition-colors hover:border-white/[0.16] hover:bg-white/[0.07];
   }
   .sc-input {
-    @apply w-full rounded-xl border border-slate-200/90 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20;
+    @apply w-full rounded-xl border border-slate-200/90 bg-white px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20;
   }
   .sc-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-forest-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-forest-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-forest-900 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:bg-forest-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50;
   }
   .sc-btn-lime {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-limeglow-400 px-4 py-2.5 text-sm font-bold text-forest-950 shadow-lime transition hover:bg-limeglow-300 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-limeglow-400 px-3.5 py-2 text-[13px] font-bold text-forest-950 shadow-lime transition hover:bg-limeglow-300 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50;
   }
   .sc-btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50;
   }
 }
 
 .lime-glow-card {
-  background: radial-gradient(circle at 82% 45%, rgba(163, 230, 53, 0.32), rgba(14, 46, 40, 0.94) 55%, rgba(5, 20, 19, 0.99) 100%);
+  background: radial-gradient(circle at 82% 45%, rgba(163, 230, 53, 0.28), rgba(14, 46, 40, 0.94) 55%, rgba(6, 21, 20, 0.99) 100%);
 }
 
 .obsidian-hero {
   background:
-    radial-gradient(760px circle at 10% -15%, rgba(20, 158, 127, 0.24), transparent 55%),
-    radial-gradient(540px circle at 92% 5%, rgba(163, 230, 53, 0.14), transparent 48%),
-    linear-gradient(180deg, #061817 0%, #091f1e 100%);
+    radial-gradient(760px circle at 10% -15%, rgba(20, 158, 127, 0.22), transparent 55%),
+    radial-gradient(540px circle at 92% 5%, rgba(163, 230, 53, 0.12), transparent 48%),
+    linear-gradient(180deg, #061514 0%, #0b2220 100%);
 }
 
 /* Scrollbar fine */

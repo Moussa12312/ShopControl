@@ -5,6 +5,8 @@ import { PermissionMap, TenantStatus, UserRole } from '@shopcontrol/shared';
 import { apiFetch } from '@/lib/api-client';
 import { getLocalTerminalMeta, saveLocalTerminalMeta } from '@/lib/local-db';
 
+export type OwnerWorkspaceMode = 'supervision' | 'management';
+
 export interface AuthUserSummary {
   id: string;
   email: string;
@@ -28,6 +30,7 @@ export interface AuthShopAccess {
   shopId: string;
   shopName: string;
   slug: string;
+  logoUrl?: string | null;
   status: TenantStatus;
   dbStatus: string;
   permissions: PermissionMap;
@@ -57,8 +60,10 @@ interface AuthContextValue {
   user: AuthUserSummary | null;
   merchant: AuthMerchantSummary | null;
   shops: AuthShopAccess[];
-  selectedShopId: string; // 'ALL' pour vue consolidée Propriétaire, sinon UUID boutique
+  selectedShopId: string;
   setSelectedShopId: (shopId: string) => void;
+  ownerMode: OwnerWorkspaceMode;
+  setOwnerMode: (mode: OwnerWorkspaceMode) => void;
   activeOperator: ActiveOperator | null;
   setActiveOperator: (op: ActiveOperator | null) => void;
   supportGrantId: string | null;
@@ -75,13 +80,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [merchant, setMerchant] = useState<AuthMerchantSummary | null>(null);
   const [shops, setShops] = useState<AuthShopAccess[]>([]);
   const [selectedShopId, setSelectedShopIdState] = useState<string>('ALL');
+  const [ownerMode, setOwnerModeState] = useState<OwnerWorkspaceMode>('supervision');
   const [activeOperator, setActiveOperatorState] = useState<ActiveOperator | null>(null);
   const [supportGrantId, setSupportGrantIdState] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('sc_owner_mode');
+      if (saved === 'management' || saved === 'supervision') {
+        setOwnerModeState(saved);
+      }
+    }
+  }, []);
 
   const setSelectedShopId = useCallback((shopId: string) => {
     setSelectedShopIdState(shopId);
     void saveLocalTerminalMeta({ selectedShopId: shopId });
   }, []);
+
+  const setOwnerMode = useCallback(
+    (mode: OwnerWorkspaceMode) => {
+      setOwnerModeState(mode);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('sc_owner_mode', mode);
+      }
+      if (mode === 'management' && selectedShopId === 'ALL' && shops.length > 0) {
+        setSelectedShopId(shops[0].shopId);
+      }
+    },
+    [selectedShopId, shops, setSelectedShopId],
+  );
 
   const setActiveOperator = useCallback((op: ActiveOperator | null) => {
     setActiveOperatorState(op);
@@ -171,6 +199,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         shops,
         selectedShopId,
         setSelectedShopId,
+        ownerMode,
+        setOwnerMode,
         activeOperator,
         setActiveOperator,
         supportGrantId,

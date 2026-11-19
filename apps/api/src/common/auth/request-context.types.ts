@@ -5,6 +5,7 @@ export interface ShopAccessSummary {
   shopId: string;
   shopName: string;
   slug: string;
+  logoUrl?: string | null;
   status: TenantStatus;
   dbStatus: string;
   permissions: PermissionMap;

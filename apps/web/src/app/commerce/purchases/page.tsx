@@ -83,8 +83,10 @@ export default function PurchasesPage() {
   const [receiveCosts, setReceiveCosts] = useState<Record<string, number>>({});
 
   // Paiement fournisseur
+  const [paymentMethods, setPaymentMethods] = useState<Array<{ code: string; label: string; enabled: boolean; affectsCashDrawer: boolean }>>([]);
   const [payTarget, setPayTarget] = useState<PurchaseOrderRow | null>(null);
   const [payAmount, setPayAmount] = useState(0);
+  const [payMethodCode, setPayMethodCode] = useState('');
   const [payFromCash, setPayFromCash] = useState(false);
 
   const load = useCallback(async () => {
@@ -95,14 +97,25 @@ export default function PurchasesPage() {
     setLoading(true);
     setError(null);
     try {
-      const [s, o, p] = await Promise.all([
+      const [s, o, p, shopMeta] = await Promise.all([
         apiFetch<SupplierRow[]>(`/shops/${shopId}/suppliers`, { shopId }),
         apiFetch<PurchaseOrderRow[]>(`/shops/${shopId}/purchases`, { shopId }),
         apiFetch<{ items: ProductOpt[] }>(`/shops/${shopId}/products?limit=200`, { shopId }),
+        apiFetch<{ paymentMethods?: Array<{ code: string; label: string; enabled: boolean; affectsCashDrawer: boolean }> }>(
+          `/shops/${shopId}`,
+          { shopId },
+        ).catch(() => null),
       ]);
       setSuppliers(s);
       setOrders(o);
       setProducts(p.items);
+      const enabledMethods = (shopMeta?.paymentMethods || []).filter((m) => m.enabled);
+      setPaymentMethods(enabledMethods);
+      if (enabledMethods[0]) {
+        setPayMethodCode((prev) =>
+          prev && enabledMethods.some((m) => m.code === prev) ? prev : enabledMethods[0].code,
+        );
+      }
       if (s[0]) setPoSupplierId((prev) => (prev && s.some((x) => x.id === prev) ? prev : s[0].id));
       if (p.items[0]) setPoProductId((prev) => (prev && p.items.some((x) => x.id === prev) ? prev : p.items[0].id));
     } catch (err) {
@@ -214,7 +227,7 @@ export default function PurchasesPage() {
         operatorId: activeOperator?.id,
         body: {
           amountXof: payAmount,
-          paymentMethodCode: payFromCash ? 'CASH' : 'BANK',
+          paymentMethodCode: payMethodCode || paymentMethods[0]?.code || 'CASH',
           paidFromCashDrawer: payFromCash,
         },
       });
@@ -556,15 +569,33 @@ export default function PurchasesPage() {
                 required
                 value={payAmount}
                 onChange={(e) => setPayAmount(Number(e.target.value) || 0)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold"
+                className="sc-input font-bold tabular"
               />
+              {paymentMethods.length > 0 ? (
+                <select
+                  value={payMethodCode}
+                  onChange={(e) => {
+                    const code = e.target.value;
+                    setPayMethodCode(code);
+                    const found = paymentMethods.find((m) => m.code === code);
+                    setPayFromCash(Boolean(found?.affectsCashDrawer));
+                  }}
+                  className="sc-input"
+                >
+                  {paymentMethods.map((m) => (
+                    <option key={m.code} value={m.code}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
               <label className="flex items-center gap-2 text-xs text-slate-700">
                 <input
                   type="checkbox"
                   checked={payFromCash}
                   onChange={(e) => setPayFromCash(e.target.checked)}
                 />
-                Décaisser depuis la session de caisse ouverte (espèces)
+                Décaisser depuis la session de caisse ouverte
               </label>
               <div className="flex justify-end gap-2">
                 <button

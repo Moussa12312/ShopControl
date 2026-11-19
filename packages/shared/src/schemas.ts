@@ -91,6 +91,11 @@ export const confirmTwoFactorSchema = z.object({
   code: z.string().trim().regex(/^\d{6}$/, 'Le code 2FA doit contenir 6 chiffres.'),
 });
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Le mot de passe actuel est requis.'),
+  newPassword: strongPasswordSchema,
+});
+
 export const createMerchantSchema = z.object({
   merchantName: z.string().trim().min(2, 'Le nom du marchand est requis.').max(120),
   legalName: z.string().trim().max(160).optional(),

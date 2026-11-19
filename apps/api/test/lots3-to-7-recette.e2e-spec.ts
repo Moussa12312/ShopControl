@@ -653,4 +653,56 @@ describe('ShopControl Lots 3 à 7 + Correctifs — Recette intégrale (Documents
       .expect(200);
     expect(ann.body.some((a: any) => a.title.includes(runId))).toBe(true);
   });
+
+  it('Dettes clients directes + Compte client optionnel sur vitrine publique', async () => {
+    // 1. Inscription d'un client optionnel sur la vitrine de shopA
+    const custPhone = `+22376${Math.floor(100000 + Math.random() * 899999)}`;
+    const regRes = await request(app.getHttpServer())
+      .post(`/api/v1/public/shops/${shopASlug}/auth/register`)
+      .send({
+        fullName: 'Aminata Diarra',
+        phone: custPhone,
+        email: `aminata.${runId}@example.com`,
+        address: 'Badalabougou',
+        password: 'Password123',
+      })
+      .expect(201);
+    expect(regRes.body.customer.fullName).toBe('Aminata Diarra');
+    const cookies = regRes.headers['set-cookie'];
+    expect(cookies).toBeDefined();
+    const customerId = regRes.body.customer.id;
+
+    // 2. La boutique enregistre une dette directe de 15 000 FCFA pour ce client
+    const debtRes = await request(app.getHttpServer())
+      .post(`/api/v1/shops/${shopAId}/receivables`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        clientId: customerId,
+        amountXof: 15000,
+        description: 'Avance tissu bazin',
+      })
+      .expect(201);
+    expect(debtRes.body.remainingAmountXof).toBe(15000);
+
+    // 3. Encaissement partiel de 5 000 FCFA sur la dette directe -> reste 10 000 FCFA
+    await request(app.getHttpServer())
+      .post(`/api/v1/shops/${shopAId}/receivables/${debtRes.body.id}/payments`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        amountXof: 5000,
+        paymentMethodCode: 'CASH',
+        notes: 'Premier versement',
+      })
+      .expect(201);
+
+    // 4. Le client connecté consulte son profil vitrine et voit son solde restant de 10 000 FCFA
+    const meRes = await request(app.getHttpServer())
+      .get(`/api/v1/public/shops/${shopASlug}/auth/me`)
+      .set('Cookie', cookies)
+      .expect(200);
+    expect(meRes.body.authenticated).toBe(true);
+    expect(meRes.body.outstandingDebtXof).toBe(10000);
+    expect(meRes.body.receivables.length).toBe(1);
+    expect(meRes.body.receivables[0].status).toBe('PARTIALLY_PAID');
+  });
 });

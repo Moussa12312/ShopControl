@@ -366,23 +366,28 @@ model SupplierPayment {
 }
 
 model Client {
-  id             String   @id @default(uuid()) @db.Uuid
-  fullName       String   @map("full_name") @db.VarChar(120)
-  phone          String   @unique @db.VarChar(30)
-  email          String?  @db.VarChar(160)
-  address        String?  @db.VarChar(255)
-  creditLimitXof Int      @default(0) @map("credit_limit_xof")
-  notes          String?  @db.VarChar(500)
-  isBlocked      Boolean  @default(false) @map("is_blocked")
-  importBatchId  String?  @map("import_batch_id") @db.Uuid
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String    @id @default(uuid()) @db.Uuid
+  fullName       String    @map("full_name") @db.VarChar(120)
+  phone          String    @unique @db.VarChar(30)
+  email          String?   @db.VarChar(160)
+  address        String?   @db.VarChar(255)
+  creditLimitXof Int       @default(0) @map("credit_limit_xof")
+  notes          String?   @db.VarChar(500)
+  isBlocked      Boolean   @default(false) @map("is_blocked")
+  hasAccount     Boolean   @default(false) @map("has_account")
+  passwordHash   String?   @map("password_hash")
+  lastLoginAt    DateTime? @map("last_login_at") @db.Timestamptz(6)
+  importBatchId  String?   @map("import_batch_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  sales       Sale[]
-  receivables Receivable[]
+  sales        Sale[]
+  receivables  Receivable[]
+  onlineOrders OnlineOrder[]
 
   @@index([isBlocked])
   @@index([importBatchId])
+  @@index([email])
   @@map("clients")
 }
 
@@ -570,22 +575,27 @@ model SaleRefund {
 }
 
 model Receivable {
-  id                 String   @id @default(uuid()) @db.Uuid
-  clientId           String   @map("client_id") @db.Uuid
-  saleId             String   @unique @map("sale_id") @db.Uuid
-  initialAmountXof   Int      @map("initial_amount_xof")
-  paidAmountXof      Int      @default(0) @map("paid_amount_xof")
-  remainingAmountXof Int      @map("remaining_amount_xof")
-  status             String   @default("OPEN") @db.VarChar(24)
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                   String    @id @default(uuid()) @db.Uuid
+  clientId             String    @map("client_id") @db.Uuid
+  saleId               String?   @unique @map("sale_id") @db.Uuid
+  description          String?   @db.VarChar(400)
+  dueDate              DateTime? @map("due_date") @db.Timestamptz(6)
+  initialAmountXof     Int       @map("initial_amount_xof")
+  paidAmountXof        Int       @default(0) @map("paid_amount_xof")
+  remainingAmountXof   Int       @map("remaining_amount_xof")
+  status               String    @default("OPEN") @db.VarChar(24)
+  actorUserId          String?   @map("actor_user_id") @db.Uuid
+  declaredOperatorName String?   @map("declared_operator_name") @db.VarChar(80)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   client   Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  sale     Sale                @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  sale     Sale?               @relation(fields: [saleId], references: [id], onDelete: Restrict)
   payments ReceivablePayment[]
 
   @@index([clientId, status])
   @@index([status, createdAt])
+  @@index([dueDate])
   @@map("receivables")
 }
 
@@ -713,6 +723,7 @@ model OnlineOrder {
   secretToken          String    @unique @map("secret_token") @db.VarChar(96)
   status               String    @default("NEW") @db.VarChar(24)
   fulfillmentMode      String    @map("fulfillment_mode") @db.VarChar(16)
+  clientId             String?   @map("client_id") @db.Uuid
   clientName           String    @map("client_name") @db.VarChar(120)
   clientPhone          String    @map("client_phone") @db.VarChar(30)
   deliveryAddress      String?   @map("delivery_address") @db.VarChar(255)
@@ -733,10 +744,12 @@ model OnlineOrder {
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  client       Client?                  @relation(fields: [clientId], references: [id], onDelete: SetNull)
   lines        OnlineOrderLine[]
   statusEvents OnlineOrderStatusEvent[]
 
   @@index([status, createdAt])
+  @@index([clientId, createdAt])
   @@index([clientPhone, createdAt])
   @@index([clientIp, createdAt])
   @@map("online_orders")

@@ -15,7 +15,6 @@ import {
   XCircle,
 } from 'lucide-react';
 import {
-  DEFAULT_PAYMENT_METHODS,
   formatDateTimeInTimezone,
   formatXof,
   FULFILLMENT_MODE_LABELS,
@@ -82,7 +81,7 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [blocked, setBlocked] = useState<BlockedPhoneRow[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodConfig[]>(DEFAULT_PAYMENT_METHODS);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -97,7 +96,7 @@ export default function OrdersPage() {
 
   // Modale conversion en vente (Remettre au client)
   const [completeTarget, setCompleteTarget] = useState<OrderRow | null>(null);
-  const [payMethod, setPayMethod] = useState('CASH');
+  const [payMethod, setPayMethod] = useState('');
   const [payAmount, setPayAmount] = useState(0);
   const [payRef, setPayRef] = useState('');
 
@@ -123,10 +122,11 @@ export default function OrdersPage() {
       ]);
       setOrders(ordRes);
       setBlocked(blkRes);
-      const enabledMethods = (shopMeta?.paymentMethods || DEFAULT_PAYMENT_METHODS).filter(
-        (m) => m.enabled,
+      const enabledMethods = (shopMeta?.paymentMethods || []).filter((m) => m.enabled);
+      setPaymentMethods(enabledMethods);
+      setPayMethod((prev) =>
+        prev && enabledMethods.some((m) => m.code === prev) ? prev : enabledMethods[0]?.code || '',
       );
-      if (enabledMethods.length > 0) setPaymentMethods(enabledMethods);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur de chargement des commandes.');
     } finally {

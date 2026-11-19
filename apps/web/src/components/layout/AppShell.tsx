@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -12,10 +12,12 @@ import {
   Boxes,
   Building2,
   CheckCheck,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Crown,
   Database,
+  Eye,
   FileSearch,
   FileText,
   LayoutDashboard,
@@ -24,9 +26,7 @@ import {
   Menu,
   MessageSquare,
   Package,
-  Plus,
   Receipt,
-  Search,
   Settings,
   ShieldCheck,
   ShoppingBag,
@@ -34,16 +34,18 @@ import {
   Store,
   Truck,
   Upload,
+  User,
   UserCheck,
   Users,
   Wallet,
   Wifi,
   WifiOff,
+  Wrench,
   X,
 } from 'lucide-react';
 import { PermissionKey, USER_ROLE_LABELS, UserRole } from '@shopcontrol/shared';
 import { apiFetch } from '@/lib/api-client';
-import { useAuth } from '@/components/providers/AuthProvider';
+import { OwnerWorkspaceMode, useAuth } from '@/components/providers/AuthProvider';
 import { useNetworkStatus } from '@/components/providers/NetworkStatusProvider';
 import { AccessDeniedState, LoadingSkeleton } from '@/components/ui/StateViews';
 
@@ -75,52 +77,54 @@ interface AnnouncementItem {
   priority: 'INFO' | 'WARNING' | 'URGENT';
 }
 
-const NAV_BY_ROLE: Record<'SUPER_ADMIN' | 'OWNER' | 'AGENT', NavItem[]> = {
-  SUPER_ADMIN: [
-    { href: '/admin', label: 'Tableau de bord', shortLabel: 'Accueil', group: 'Plateforme', icon: LayoutDashboard, inMobileDock: true },
-    { href: '/admin/merchants', label: 'Marchands', group: 'Plateforme', icon: Building2, inMobileDock: true },
-    { href: '/admin/shops', label: 'Boutiques & BDD', shortLabel: 'Boutiques', group: 'Plateforme', icon: Database, inMobileDock: true },
-    { href: '/admin/platform', label: 'Abonnements & Support', shortLabel: 'SaaS', group: 'Plateforme', icon: Crown, inMobileDock: true },
-    { href: '/messaging', label: 'Messagerie', group: 'Communication', icon: MessageSquare },
-    { href: '/admin/security', label: 'Sécurité & Audit', shortLabel: 'Sécurité', group: 'Sécurité', icon: ShieldCheck },
-  ],
-  OWNER: [
-    { href: '/owner', label: 'Vue d’ensemble', shortLabel: 'Accueil', group: 'Pilotage', icon: LayoutDashboard, inMobileDock: true },
-    { href: '/pos', label: 'Ventes / POS', shortLabel: 'POS', group: 'Opérations', icon: ShoppingCart, inMobileDock: true },
-    { href: '/commerce/orders', label: 'Commandes QR', shortLabel: 'Commandes', group: 'Opérations', icon: ShoppingBag, inMobileDock: true },
-    { href: '/commerce/documents', label: 'Tickets & Avoirs', shortLabel: 'Tickets', group: 'Opérations', icon: FileText },
-    { href: '/commerce/cash', label: 'Caisse', group: 'Opérations', icon: Banknote },
-    { href: '/commerce/products', label: 'Produits', group: 'Catalogue & Stocks', icon: Package, inMobileDock: true },
-    { href: '/commerce/stock', label: 'Stocks', group: 'Catalogue & Stocks', icon: Boxes },
-    { href: '/commerce/transfers', label: 'Transferts', group: 'Catalogue & Stocks', icon: ArrowLeftRight },
-    { href: '/commerce/purchases', label: 'Achats', group: 'Catalogue & Stocks', icon: Truck },
-    { href: '/commerce/clients', label: 'Clients & Créances', shortLabel: 'Clients', group: 'Finances & Clients', icon: Receipt },
-    { href: '/commerce/expenses', label: 'Dépenses', group: 'Finances & Clients', icon: Wallet },
-    { href: '/owner/reports', label: 'Bilans & Exports', shortLabel: 'Bilans', group: 'Finances & Clients', icon: BarChart3 },
-    { href: '/messaging', label: 'Messagerie', group: 'Communication', icon: MessageSquare },
-    { href: '/owner/shops', label: 'Boutiques & QR', shortLabel: 'Boutiques', group: 'Entreprise', icon: Store },
-    { href: '/owner/agents', label: 'Agents', group: 'Entreprise', icon: Users },
-    { href: '/owner/operators', label: 'Opérateurs', group: 'Entreprise', icon: UserCheck },
-    { href: '/commerce/import', label: 'Import CSV', group: 'Entreprise', icon: Upload },
-    { href: '/owner/audit', label: 'Journal d’audit', shortLabel: 'Audit', group: 'Entreprise', icon: FileSearch },
-    { href: '/owner/settings', label: 'Paramètres & Logo', shortLabel: 'Paramètres', group: 'Entreprise', icon: Settings },
-  ],
-  AGENT: [
-    { href: '/agent', label: 'Accueil boutique', shortLabel: 'Accueil', group: 'Comptoir', icon: Store, inMobileDock: true },
-    { href: '/pos', label: 'Ventes / POS', shortLabel: 'POS', group: 'Comptoir', icon: ShoppingCart, requiredPerm: 'sales:read', inMobileDock: true },
-    { href: '/commerce/orders', label: 'Commandes QR', shortLabel: 'Commandes', group: 'Comptoir', icon: ShoppingBag, requiredPerm: 'orders:read', inMobileDock: true },
-    { href: '/commerce/documents', label: 'Tickets & Avoirs', shortLabel: 'Tickets', group: 'Comptoir', icon: FileText, requiredPerm: 'sales:read' },
-    { href: '/commerce/cash', label: 'Caisse', group: 'Comptoir', icon: Banknote, requiredPerm: 'cash:read', inMobileDock: true },
-    { href: '/commerce/products', label: 'Produits', group: 'Gestion', icon: Package, requiredPerm: 'products:read' },
-    { href: '/commerce/stock', label: 'Stocks', group: 'Gestion', icon: Boxes, requiredPerm: 'stock:read' },
-    { href: '/commerce/transfers', label: 'Transferts', group: 'Gestion', icon: ArrowLeftRight, requiredPerm: 'stock:read' },
-    { href: '/commerce/purchases', label: 'Achats', group: 'Gestion', icon: Truck, requiredPerm: 'purchases:read' },
-    { href: '/commerce/clients', label: 'Clients', group: 'Gestion', icon: Receipt, requiredPerm: 'clients:read' },
-    { href: '/commerce/expenses', label: 'Dépenses', group: 'Gestion', icon: Wallet, requiredPerm: 'expenses:create' },
-    { href: '/messaging', label: 'Messagerie', group: 'Communication', icon: MessageSquare },
-    { href: '/agent/profile', label: 'Mon profil', group: 'Compte', icon: UserCheck },
-  ],
-};
+const OWNER_SUPERVISION_NAV: NavItem[] = [
+  { href: '/owner', label: 'Tableau de bord', shortLabel: 'Accueil', group: 'Pilotage', icon: LayoutDashboard, inMobileDock: true },
+  { href: '/owner/shops', label: 'Boutiques & QR', shortLabel: 'Boutiques', group: 'Pilotage', icon: Store, inMobileDock: true },
+  { href: '/owner/reports', label: 'Bilans & Exports', shortLabel: 'Bilans', group: 'Pilotage', icon: BarChart3, inMobileDock: true },
+  { href: '/owner/agents', label: 'Équipe & Agents', shortLabel: 'Agents', group: 'Organisation', icon: Users },
+  { href: '/owner/operators', label: 'Opérateurs', group: 'Organisation', icon: UserCheck },
+  { href: '/messaging', label: 'Messagerie', shortLabel: 'Messages', group: 'Communication', icon: MessageSquare, inMobileDock: true },
+  { href: '/owner/audit', label: 'Journal d’audit', shortLabel: 'Audit', group: 'Sécurité', icon: FileSearch },
+];
+
+const OWNER_MANAGEMENT_NAV: NavItem[] = [
+  { href: '/pos', label: 'Ventes / POS', shortLabel: 'POS', group: 'Comptoir', icon: ShoppingCart, inMobileDock: true },
+  { href: '/commerce/orders', label: 'Commandes QR', shortLabel: 'Commandes', group: 'Comptoir', icon: ShoppingBag, inMobileDock: true },
+  { href: '/commerce/cash', label: 'Caisse', group: 'Comptoir', icon: Banknote, inMobileDock: true },
+  { href: '/commerce/documents', label: 'Tickets & Avoirs', shortLabel: 'Tickets', group: 'Comptoir', icon: FileText },
+  { href: '/commerce/products', label: 'Produits', group: 'Catalogue', icon: Package, inMobileDock: true },
+  { href: '/commerce/stock', label: 'Stocks', group: 'Catalogue', icon: Boxes },
+  { href: '/commerce/clients', label: 'Clients & Dettes', shortLabel: 'Clients', group: 'Gestion', icon: Receipt },
+  { href: '/commerce/purchases', label: 'Achats', group: 'Gestion', icon: Truck },
+  { href: '/commerce/expenses', label: 'Dépenses', group: 'Gestion', icon: Wallet },
+  { href: '/commerce/transfers', label: 'Transferts', group: 'Gestion', icon: ArrowLeftRight },
+  { href: '/commerce/import', label: 'Import CSV', group: 'Gestion', icon: Upload },
+  { href: '/messaging', label: 'Messagerie', shortLabel: 'Messages', group: 'Communication', icon: MessageSquare },
+];
+
+const ADMIN_NAV: NavItem[] = [
+  { href: '/admin', label: 'Tableau de bord', shortLabel: 'Accueil', group: 'Plateforme', icon: LayoutDashboard, inMobileDock: true },
+  { href: '/admin/merchants', label: 'Marchands', group: 'Plateforme', icon: Building2, inMobileDock: true },
+  { href: '/admin/shops', label: 'Boutiques & BDD', shortLabel: 'Boutiques', group: 'Plateforme', icon: Database, inMobileDock: true },
+  { href: '/admin/platform', label: 'Abonnements & Support', shortLabel: 'SaaS', group: 'Plateforme', icon: Crown, inMobileDock: true },
+  { href: '/messaging', label: 'Messagerie', group: 'Communication', icon: MessageSquare },
+  { href: '/admin/security', label: 'Sécurité & Audit', shortLabel: 'Sécurité', group: 'Sécurité', icon: ShieldCheck },
+];
+
+const AGENT_NAV: NavItem[] = [
+  { href: '/agent', label: 'Accueil boutique', shortLabel: 'Accueil', group: 'Comptoir', icon: Store, inMobileDock: true },
+  { href: '/pos', label: 'Ventes / POS', shortLabel: 'POS', group: 'Comptoir', icon: ShoppingCart, requiredPerm: 'sales:read', inMobileDock: true },
+  { href: '/commerce/orders', label: 'Commandes QR', shortLabel: 'Commandes', group: 'Comptoir', icon: ShoppingBag, requiredPerm: 'orders:read', inMobileDock: true },
+  { href: '/commerce/cash', label: 'Caisse', group: 'Comptoir', icon: Banknote, requiredPerm: 'cash:read', inMobileDock: true },
+  { href: '/commerce/documents', label: 'Tickets & Avoirs', shortLabel: 'Tickets', group: 'Comptoir', icon: FileText, requiredPerm: 'sales:read' },
+  { href: '/commerce/products', label: 'Produits', group: 'Gestion', icon: Package, requiredPerm: 'products:read' },
+  { href: '/commerce/stock', label: 'Stocks', group: 'Gestion', icon: Boxes, requiredPerm: 'stock:read' },
+  { href: '/commerce/clients', label: 'Clients & Dettes', shortLabel: 'Clients', group: 'Gestion', icon: Receipt, requiredPerm: 'clients:read' },
+  { href: '/commerce/purchases', label: 'Achats', group: 'Gestion', icon: Truck, requiredPerm: 'purchases:read' },
+  { href: '/commerce/expenses', label: 'Dépenses', group: 'Gestion', icon: Wallet, requiredPerm: 'expenses:create' },
+  { href: '/commerce/transfers', label: 'Transferts', group: 'Gestion', icon: ArrowLeftRight, requiredPerm: 'stock:read' },
+  { href: '/messaging', label: 'Messagerie', group: 'Communication', icon: MessageSquare },
+];
 
 export function AppShell({
   allowedRoles,
@@ -140,6 +144,8 @@ export function AppShell({
     shops,
     selectedShopId,
     setSelectedShopId,
+    ownerMode,
+    setOwnerMode,
     activeOperator,
     supportGrantId,
     setSupportGrantId,
@@ -147,14 +153,32 @@ export function AppShell({
   } = useAuth();
   const { isOnline, apiReachable } = useNetworkStatus();
 
-  const [expanded, setExpanded] = useState(true);
+  // Sidebar fermé par défaut sur desktop pour un espace aéré et épuré
+  const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
   const [dismissedAnn, setDismissedAnn] = useState<string[]>([]);
-  const [quickJump, setQuickJump] = useState('');
+
+  const notifRef = useRef<HTMLDivElement | null>(null);
+  const profileRef = useRef<HTMLDivElement | null>(null);
+
+  // Fermeture des menus déroulants au clic extérieur
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
 
   const loadNotifications = useCallback(async () => {
     if (!user) return;
@@ -188,7 +212,7 @@ export function AppShell({
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full bg-porcelain-100 p-6">
+      <div className="min-h-screen w-full bg-[#edf1f5] p-4 sm:p-6">
         <LoadingSkeleton rows={6} />
       </div>
     );
@@ -202,7 +226,7 @@ export function AppShell({
 
   if (!effectiveAllowed) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-porcelain-100 p-6">
+      <div className="flex min-h-screen w-full items-center justify-center bg-[#edf1f5] p-6">
         <AccessDeniedState />
       </div>
     );
@@ -213,11 +237,23 @@ export function AppShell({
       ? 'OWNER'
       : (user.role as 'SUPER_ADMIN' | 'OWNER' | 'AGENT');
 
+  const isOwnerLike = navRole === 'OWNER';
   const agentPerms = user.role === 'AGENT' ? shops[0]?.permissions : null;
-  const navItems = (NAV_BY_ROLE[navRole] || []).filter((item) => {
+
+  const rawNav =
+    navRole === 'SUPER_ADMIN'
+      ? ADMIN_NAV
+      : navRole === 'AGENT'
+        ? AGENT_NAV
+        : ownerMode === 'management'
+          ? OWNER_MANAGEMENT_NAV
+          : OWNER_SUPERVISION_NAV;
+
+  const navItems = rawNav.filter((item) => {
     if (!item.requiredPerm || user.role !== 'AGENT') return true;
     return Boolean(agentPerms?.[item.requiredPerm]);
   });
+
   const mobileDockItems = navItems.filter((i) => i.inMobileDock).slice(0, 4);
 
   const groupedNav = navItems.reduce<Array<{ group: string; items: NavItem[] }>>((acc, item) => {
@@ -228,22 +264,67 @@ export function AppShell({
   }, []);
 
   const activeShop = shops.find((s) => s.shopId === selectedShopId);
+  // Marque dynamique dans le sidebar : logo & nom de la boutique active (ou première boutique / entreprise)
+  const brandShop = activeShop || shops[0] || null;
+  const brandTitle =
+    user.role === 'SUPER_ADMIN' && !supportGrantId
+      ? 'Administration'
+      : activeShop
+        ? activeShop.shopName
+        : shops.length === 1
+          ? shops[0].shopName
+          : merchant?.name || 'Espace Boutique';
+  const brandSubtitle =
+    user.role === 'SUPER_ADMIN' && !supportGrantId
+      ? 'Plateforme'
+      : activeShop && merchant?.name && activeShop.shopName !== merchant.name
+        ? merchant.name
+        : USER_ROLE_LABELS[user.role];
+  const brandLogoUrl = brandShop?.logoUrl || null;
+  const brandMonogram = brandTitle
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('') || 'B';
+
   const isSuspended =
     merchant?.status === 'SUSPENDED' ||
     merchant?.status === 'TERMINATED' ||
     activeShop?.status === 'SUSPENDED';
   const isPastDue = merchant?.status === 'PAST_DUE';
-
   const visibleAnnouncements = announcements.filter((a) => !dismissedAnn.includes(a.id));
 
+  const allPossibleNav = [
+    ...OWNER_SUPERVISION_NAV,
+    ...OWNER_MANAGEMENT_NAV,
+    ...ADMIN_NAV,
+    ...AGENT_NAV,
+  ];
   const isNavActive = (href: string) =>
     pathname === href ||
     (href !== '/admin' && href !== '/owner' && href !== '/agent' && pathname.startsWith(href));
 
-  const currentNavItem = navItems.find((i) => isNavActive(i.href)) || navItems[0];
-  const CurrentIcon = currentNavItem?.icon || LayoutDashboard;
+  const currentNavItem =
+    navItems.find((i) => isNavActive(i.href)) ||
+    allPossibleNav.find((i) => isNavActive(i.href)) ||
+    null;
 
-  const quickActionHref = navRole === 'SUPER_ADMIN' ? '/admin/merchants' : '/pos';
+  const pageTitle =
+    pathname === '/owner/settings'
+      ? 'Paramètres & Boutique'
+      : pathname === '/agent/profile'
+        ? 'Mon profil'
+        : pathname === '/setup-2fa'
+          ? 'Sécurité 2FA'
+          : currentNavItem?.label || brandTitle;
+
+  const CurrentIcon =
+    pathname === '/owner/settings'
+      ? Settings
+      : pathname === '/agent/profile'
+        ? User
+        : currentNavItem?.icon || LayoutDashboard;
 
   const initials = user.fullName
     .split(' ')
@@ -251,6 +332,34 @@ export function AppShell({
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase())
     .join('');
+
+  const profileHref =
+    user.role === 'AGENT'
+      ? '/agent/profile'
+      : user.role === 'SUPER_ADMIN' && !supportGrantId
+        ? '/admin/security'
+        : '/owner/settings';
+
+  const settingsHref =
+    user.role === 'AGENT'
+      ? '/agent/profile'
+      : user.role === 'SUPER_ADMIN' && !supportGrantId
+        ? '/admin/platform'
+        : '/owner/settings';
+
+  const handleSwitchOwnerMode = (nextMode: OwnerWorkspaceMode) => {
+    setOwnerMode(nextMode);
+    setMobileOpen(false);
+    if (nextMode === 'management') {
+      if (pathname === '/owner' || pathname.startsWith('/owner/')) {
+        router.push('/pos');
+      }
+    } else {
+      if (pathname === '/pos' || pathname.startsWith('/commerce/')) {
+        router.push('/owner');
+      }
+    }
+  };
 
   const handleMarkRead = async (notif: NotificationItem) => {
     if (!notif.isRead) {
@@ -271,59 +380,60 @@ export function AppShell({
   };
 
   const handleLogout = async () => {
+    setProfileOpen(false);
     await logout();
     router.replace('/login');
   };
 
-  const handleQuickJumpSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = quickJump.trim().toLowerCase();
-    if (!q) return;
-    const match = navItems.find(
-      (i) => i.label.toLowerCase().includes(q) || (i.shortLabel || '').toLowerCase().includes(q),
-    );
-    if (match) {
-      router.push(match.href);
-      setQuickJump('');
-    }
-  };
-
-  const sidebarWidthClass = expanded ? 'lg:w-60' : 'lg:w-[72px]';
-  const contentOffsetClass = expanded ? 'lg:pl-60' : 'lg:pl-[72px]';
-  const headerLeftClass = expanded ? 'lg:left-60' : 'lg:left-[72px]';
+  const sidebarWidthClass = expanded ? 'lg:w-[216px]' : 'lg:w-[64px]';
+  const contentOffsetClass = expanded ? 'lg:pl-[216px]' : 'lg:pl-[64px]';
+  const headerLeftClass = expanded ? 'lg:left-[216px]' : 'lg:left-[64px]';
 
   return (
-    <div className="min-h-screen w-full bg-porcelain-100">
+    <div className="min-h-screen w-full overflow-x-clip bg-[#edf1f5]">
       {/* Overlay mobile drawer */}
       {mobileOpen ? (
         <div
-          className="fixed inset-0 z-40 bg-forest-950/65 backdrop-blur-xs lg:hidden"
+          className="fixed inset-0 z-40 bg-forest-950/60 backdrop-blur-xs lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       ) : null}
 
-      {/* Sidebar FIXE plein hauteur (100dvh) — ne défile JAMAIS avec la page */}
+      {/* Sidebar FIXE, mince et fermé par défaut sur desktop — sans profil ni déconnexion */}
       <aside
         aria-label="Navigation principale"
-        className={`no-print fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-white/[0.08] bg-forest-950 text-slate-200 transition-all duration-200 ${sidebarWidthClass} ${
-          mobileOpen ? 'w-72 translate-x-0 shadow-2xl' : 'w-72 -translate-x-full lg:translate-x-0'
+        className={`no-print fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-white/[0.07] bg-forest-950 text-slate-200 transition-all duration-200 ${sidebarWidthClass} ${
+          mobileOpen ? 'w-64 translate-x-0 shadow-2xl' : 'w-64 -translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/[0.08] px-3.5">
+        {/* Marque dynamique : Logo + Nom de la boutique */}
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/[0.08] px-3">
           <Link
             href={navItems[0]?.href || '/'}
-            className="flex items-center gap-2.5 overflow-hidden"
-            title="ShopControl"
+            onClick={() => setMobileOpen(false)}
+            className={`flex min-w-0 items-center gap-2.5 overflow-hidden ${
+              !expanded && !mobileOpen ? 'mx-auto' : ''
+            }`}
+            title={brandTitle}
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-forest-700 font-black tracking-tight text-white shadow-sm ring-1 ring-white/20">
-              SC
-            </span>
+            {brandLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={brandLogoUrl}
+                alt={brandTitle}
+                className="h-9 w-9 shrink-0 rounded-xl border border-white/15 bg-white object-contain p-0.5"
+              />
+            ) : (
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-forest-700 text-xs font-extrabold tracking-tight text-white ring-1 ring-white/15">
+                {brandMonogram}
+              </span>
+            )}
             {expanded || mobileOpen ? (
-              <div className="truncate">
-                <p className="truncate text-sm font-extrabold tracking-tight text-white">ShopControl</p>
-                <p className="truncate text-[11px] text-emerald-200/70">
-                  {merchant?.name || USER_ROLE_LABELS[user.role]}
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-bold tracking-tight text-white">
+                  {brandTitle}
                 </p>
+                <p className="truncate text-[10px] text-emerald-200/65">{brandSubtitle}</p>
               </div>
             ) : null}
           </Link>
@@ -331,37 +441,50 @@ export function AppShell({
             type="button"
             onClick={() => setMobileOpen(false)}
             aria-label="Fermer le menu"
-            className="rounded-xl p-1.5 text-emerald-200/70 hover:bg-white/10 hover:text-white lg:hidden"
+            className="rounded-lg p-1.5 text-emerald-200/70 hover:bg-white/10 hover:text-white lg:hidden"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* CTA rapide vert lime */}
-        <div className="shrink-0 px-3 pb-2 pt-3">
-          <Link
-            href={quickActionHref}
-            onClick={() => setMobileOpen(false)}
-            title={navRole === 'SUPER_ADMIN' ? 'Nouveau marchand' : 'Nouvelle vente POS'}
-            className={`flex items-center justify-center gap-2 rounded-2xl bg-limeglow-400 py-2.5 text-xs font-extrabold text-forest-950 shadow-lime transition hover:bg-limeglow-300 ${
-              expanded || mobileOpen ? 'px-3' : 'px-0'
-            }`}
-          >
-            <Plus className="h-4 w-4 shrink-0 stroke-[2.6]" />
-            {expanded || mobileOpen ? (
-              <span className="truncate">
-                {navRole === 'SUPER_ADMIN' ? 'Nouveau marchand' : 'Nouvelle vente POS'}
-              </span>
-            ) : null}
-          </Link>
-        </div>
+        {/* Sélecteur Supervision / Gestion dans le tiroir mobile pour OWNER */}
+        {isOwnerLike && mobileOpen ? (
+          <div className="shrink-0 border-b border-white/[0.07] p-2.5 lg:hidden">
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-forest-900 p-1 text-[11px] font-semibold">
+              <button
+                type="button"
+                onClick={() => handleSwitchOwnerMode('supervision')}
+                className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition ${
+                  ownerMode === 'supervision'
+                    ? 'bg-limeglow-400 text-forest-950 font-bold'
+                    : 'text-emerald-200/75 hover:text-white'
+                }`}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                Supervision
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchOwnerMode('management')}
+                className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition ${
+                  ownerMode === 'management'
+                    ? 'bg-limeglow-400 text-forest-950 font-bold'
+                    : 'text-emerald-200/75 hover:text-white'
+                }`}
+              >
+                <Wrench className="h-3.5 w-3.5" />
+                Gestion
+              </button>
+            </div>
+          </div>
+        ) : null}
 
-        {/* Menu principal scrollable indépendamment à l'intérieur du sidebar fixe */}
-        <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-2">
+        {/* Navigation épurée */}
+        <nav className="flex-1 space-y-2.5 overflow-y-auto px-2.5 py-3">
           {groupedNav.map((section) => (
             <div key={section.group} className="space-y-0.5">
               {expanded || mobileOpen ? (
-                <p className="px-2.5 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-emerald-200/45">
+                <p className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-200/40">
                   {section.group}
                 </p>
               ) : null}
@@ -374,13 +497,13 @@ export function AppShell({
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
                     title={!expanded && !mobileOpen ? item.label : undefined}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-all ${
+                    className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[12.5px] font-medium transition-all ${
                       active
-                        ? 'bg-white font-semibold text-forest-950 shadow-sm'
+                        ? 'bg-white font-semibold text-forest-950 shadow-xs'
                         : 'text-[#8aa8a2] hover:bg-white/[0.08] hover:text-white'
                     } ${!expanded && !mobileOpen ? 'justify-center px-0' : ''}`}
                   >
-                    <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-brand-700' : ''}`} />
+                    <Icon className={`h-[17px] w-[17px] shrink-0 ${active ? 'text-brand-700' : ''}`} />
                     {expanded || mobileOpen ? <span className="truncate">{item.label}</span> : null}
                   </Link>
                 );
@@ -389,13 +512,14 @@ export function AppShell({
           ))}
         </nav>
 
-        {/* Pied fixe du sidebar */}
-        <div className="shrink-0 space-y-1.5 border-t border-white/[0.08] p-3">
+        {/* Bouton discret d'ouverture/repli desktop uniquement (aucun profil ni déconnexion ici) */}
+        <div className="hidden shrink-0 border-t border-white/[0.07] p-2.5 lg:block">
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            aria-label={expanded ? 'Replier le menu' : 'Déplier le menu'}
-            className={`hidden w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium text-[#8aa8a2] hover:bg-white/10 hover:text-white lg:flex ${
+            aria-label={expanded ? 'Replier le menu' : 'Ouvrir le menu'}
+            title={expanded ? 'Replier' : 'Déplier le menu'}
+            className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-[#8aa8a2] transition hover:bg-white/10 hover:text-white ${
               !expanded ? 'justify-center px-0' : ''
             }`}
           >
@@ -408,90 +532,77 @@ export function AppShell({
               <ChevronRight className="h-4 w-4 shrink-0" />
             )}
           </button>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            title={!expanded && !mobileOpen ? 'Déconnexion' : undefined}
-            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium text-[#8aa8a2] hover:bg-rose-500/20 hover:text-rose-200 ${
-              !expanded && !mobileOpen ? 'justify-center px-0' : ''
-            }`}
-          >
-            <LogOut className="h-4 w-4 shrink-0" />
-            {expanded || mobileOpen ? <span>Déconnexion</span> : null}
-          </button>
-
-          <div
-            className={`flex items-center gap-2.5 pt-1 ${
-              !expanded && !mobileOpen ? 'justify-center' : 'px-1'
-            }`}
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-forest-700 text-xs font-bold text-emerald-100 ring-2 ring-limeglow-400/50">
-              {initials || 'SC'}
-            </span>
-            {expanded || mobileOpen ? (
-              <div className="min-w-0">
-                <p className="truncate text-xs font-semibold text-white">{user.fullName}</p>
-                <p className="truncate text-[10px] text-emerald-200/70">
-                  {USER_ROLE_LABELS[user.role]}
-                </p>
-              </div>
-            ) : null}
-          </div>
         </div>
       </aside>
 
-      {/* Header FIXE en haut — sans AUCUNE répétition des liens du sidebar */}
+      {/* Header FIXE épuré avec sélecteur Supervision/Gestion & Profil cliquable */}
       <header
-        className={`no-print fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-white/[0.08] bg-forest-950/95 px-3 text-white backdrop-blur-md transition-all duration-200 sm:px-5 lg:px-6 ${headerLeftClass}`}
+        className={`no-print fixed left-0 right-0 top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-slate-200/80 bg-white/95 px-3 text-slate-900 backdrop-blur-md transition-all duration-200 sm:px-5 ${headerLeftClass}`}
       >
-        {/* Gauche : Hamburger mobile + Contexte / Titre de la page active */}
-        <div className="flex min-w-0 items-center gap-2.5">
+        {/* Gauche : Hamburger mobile + Titre page active */}
+        <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Ouvrir la navigation"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/15 lg:hidden"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 lg:hidden"
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-4 w-4" />
           </button>
 
-          <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-limeglow-400 sm:flex">
+          <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 sm:flex">
             <CurrentIcon className="h-4 w-4" />
           </span>
 
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="truncate text-sm font-extrabold tracking-tight text-white">
-                {currentNavItem?.label || 'ShopControl'}
-              </p>
-              {currentNavItem?.group ? (
-                <span className="hidden rounded-full bg-white/[0.07] px-2 py-0.5 text-[10px] font-semibold text-emerald-200/80 md:inline-block">
-                  {currentNavItem.group}
-                </span>
-              ) : null}
-            </div>
-            <p className="hidden truncate text-[11px] text-emerald-200/60 sm:block">
-              {merchant?.name || 'Plateforme ShopControl'}
-              {activeShop ? ` · ${activeShop.shopName}` : selectedShopId === 'ALL' && user.role === 'OWNER' ? ' · Vue consolidée' : ''}
+            <p className="truncate text-[13px] font-bold tracking-tight text-slate-900 sm:text-sm">
+              {pageTitle}
+            </p>
+            <p className="hidden truncate text-[11px] text-slate-500 md:block">
+              {brandTitle}
+              {user.role === 'AGENT' && activeOperator ? ` · Op. ${activeOperator.firstName}` : ''}
             </p>
           </div>
         </div>
 
-        {/* Droite : Accès rapide page, Sélecteur boutique, Statut réseau, Notifications */}
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-          <form onSubmit={handleQuickJumpSubmit} className="relative hidden md:block">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-[#7d9c97]" />
-            <input
-              type="search"
-              value={quickJump}
-              onChange={(e) => setQuickJump(e.target.value)}
-              placeholder="Aller à une page…"
-              className="w-44 rounded-full border border-white/10 bg-forest-800/80 py-1.5 pl-8 pr-3 text-xs text-white placeholder-[#7d9c97] transition focus:w-56 focus:border-limeglow-400"
-            />
-          </form>
+        {/* Droite : Mode Supervision/Gestion (OWNER), Boutique, Réseau, Notifications, Profil */}
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          {/* Sélecteur Mode Supervision / Mode Gestion pour Propriétaire */}
+          {isOwnerLike ? (
+            <div
+              role="group"
+              aria-label="Mode de travail propriétaire"
+              className="hidden items-center rounded-full border border-slate-200 bg-[#edf1f5] p-0.5 text-[11px] font-semibold md:inline-flex"
+            >
+              <button
+                type="button"
+                onClick={() => handleSwitchOwnerMode('supervision')}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition ${
+                  ownerMode === 'supervision'
+                    ? 'bg-forest-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Eye className="h-3 w-3" />
+                <span>Supervision</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchOwnerMode('management')}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition ${
+                  ownerMode === 'management'
+                    ? 'bg-forest-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Wrench className="h-3 w-3" />
+                <span>Gestion</span>
+              </button>
+            </div>
+          ) : null}
 
-          {(user.role === 'OWNER' || (user.role === 'SUPER_ADMIN' && supportGrantId)) && (
+          {/* Sélecteur de boutique (OWNER) */}
+          {isOwnerLike && shops.length > 0 ? (
             <div className="flex items-center">
               <label htmlFor="shop-selector" className="sr-only">
                 Sélectionner une boutique
@@ -500,38 +611,29 @@ export function AppShell({
                 id="shop-selector"
                 value={selectedShopId}
                 onChange={(e) => setSelectedShopId(e.target.value)}
-                className="max-w-[145px] truncate rounded-full border border-white/15 bg-forest-800/90 px-2.5 py-1.5 text-xs font-semibold text-white hover:border-limeglow-400/60 sm:max-w-[210px] sm:px-3.5"
+                className="max-w-[115px] truncate rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:border-brand-400 sm:max-w-[175px] sm:px-3"
               >
-                <option value="ALL" className="bg-forest-900 text-white">
-                  Toutes (Consolidé)
-                </option>
+                {ownerMode === 'supervision' ? (
+                  <option value="ALL">Toutes (Consolidé)</option>
+                ) : null}
                 {shops.map((s) => (
-                  <option key={s.shopId} value={s.shopId} className="bg-forest-900 text-white">
+                  <option key={s.shopId} value={s.shopId}>
                     {s.shopName} {s.status !== 'ACTIVE' ? `(${s.status})` : ''}
                   </option>
                 ))}
               </select>
             </div>
-          )}
-
-          {user.role === 'AGENT' && shops[0] ? (
-            <span className="hidden items-center gap-1 rounded-full bg-forest-800 px-3 py-1.5 text-xs font-semibold text-emerald-100 ring-1 ring-white/10 sm:inline-flex">
-              <Store className="h-3.5 w-3.5 text-limeglow-400" />
-              <span className="max-w-[120px] truncate">{shops[0].shopName}</span>
-              {activeOperator ? (
-                <span className="text-limeglow-400">· {activeOperator.firstName}</span>
-              ) : null}
-            </span>
           ) : null}
 
-          <div
+          {/* Indicateur réseau discret */}
+          <span
             role="status"
             aria-live="polite"
             title={isOnline && apiReachable ? 'En ligne' : 'Hors ligne'}
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-1.5 text-[11px] font-semibold sm:px-2.5 ${
+            className={`inline-flex h-8 w-8 items-center justify-center rounded-full sm:w-auto sm:gap-1 sm:px-2.5 sm:text-[11px] sm:font-semibold ${
               isOnline && apiReachable
-                ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/25'
-                : 'bg-amber-400/20 text-amber-200 ring-1 ring-amber-300/30'
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-amber-50 text-amber-700'
             }`}
           >
             {isOnline && apiReachable ? (
@@ -545,41 +647,45 @@ export function AppShell({
                 <span className="hidden xl:inline">Hors ligne</span>
               </>
             )}
-          </div>
+          </span>
 
-          <div className="relative">
+          {/* Notifications */}
+          <div className="relative" ref={notifRef}>
             <button
               type="button"
-              onClick={() => setNotifOpen((o) => !o)}
+              onClick={() => {
+                setNotifOpen((o) => !o);
+                setProfileOpen(false);
+              }}
               aria-label="Centre de notifications"
-              className="relative flex h-9 w-9 items-center justify-center rounded-full bg-forest-800 text-emerald-100 ring-1 ring-white/10 hover:bg-forest-700"
+              className="relative flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100"
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 ? (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-forest-950">
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               ) : null}
             </button>
 
             {notifOpen ? (
-              <div className="fixed inset-x-3 top-[68px] z-50 rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96">
+              <div className="fixed inset-x-3 top-[60px] z-50 rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80">
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                  <h3 className="text-sm font-bold text-slate-900">
+                  <h3 className="text-xs font-bold text-slate-900">
                     Notifications {unreadCount > 0 ? `(${unreadCount})` : ''}
                   </h3>
                   {unreadCount > 0 ? (
                     <button
                       type="button"
                       onClick={handleMarkAllRead}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-700 hover:underline"
                     >
                       <CheckCheck className="h-3.5 w-3.5" />
                       Tout lire
                     </button>
                   ) : null}
                 </div>
-                <div className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
+                <div className="max-h-72 divide-y divide-slate-100 overflow-y-auto">
                   {notifications.length === 0 ? (
                     <p className="p-6 text-center text-xs text-slate-500">
                       Aucune notification pour le moment.
@@ -590,7 +696,7 @@ export function AppShell({
                         key={n.id}
                         type="button"
                         onClick={() => handleMarkRead(n)}
-                        className={`block w-full px-4 py-3 text-left transition hover:bg-slate-50 ${
+                        className={`block w-full px-4 py-2.5 text-left transition hover:bg-slate-50 ${
                           !n.isRead ? 'bg-brand-50/50' : ''
                         }`}
                       >
@@ -610,7 +716,7 @@ export function AppShell({
                             <span className="h-2 w-2 shrink-0 rounded-full bg-brand-600" />
                           ) : null}
                         </div>
-                        <p className="mt-0.5 line-clamp-2 text-xs text-slate-600">{n.message}</p>
+                        <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-600">{n.message}</p>
                       </button>
                     ))
                   )}
@@ -618,19 +724,124 @@ export function AppShell({
               </div>
             ) : null}
           </div>
+
+          {/* Menu Profil cliquable dans le Header (Profil, Paramètres, Déconnexion) */}
+          <div className="relative" ref={profileRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setProfileOpen((o) => !o);
+                setNotifOpen(false);
+              }}
+              aria-label="Menu profil utilisateur"
+              aria-expanded={profileOpen}
+              className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 py-1 pl-1 pr-2 text-left transition hover:border-brand-300 hover:bg-white"
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-forest-900 text-[11px] font-bold text-limeglow-300">
+                {initials || 'U'}
+              </span>
+              <span className="hidden max-w-[100px] truncate text-xs font-semibold text-slate-800 sm:inline">
+                {user.fullName.split(' ')[0]}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            </button>
+
+            {profileOpen ? (
+              <div className="fixed inset-x-3 top-[60px] z-50 rounded-2xl border border-slate-200 bg-white p-1.5 text-slate-900 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-60">
+                <div className="border-b border-slate-100 px-3 py-2.5">
+                  <p className="truncate text-xs font-bold text-slate-900">{user.fullName}</p>
+                  <p className="truncate text-[11px] text-slate-500">{user.email}</p>
+                  <span className="mt-1 inline-block rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold text-brand-800">
+                    {USER_ROLE_LABELS[user.role]}
+                  </span>
+                </div>
+
+                {/* Switch rapide mobile Supervision / Gestion dans le menu profil également */}
+                {isOwnerLike ? (
+                  <div className="border-b border-slate-100 p-2 md:hidden">
+                    <p className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Mode d’affichage
+                    </p>
+                    <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-0.5 text-[11px] font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          handleSwitchOwnerMode('supervision');
+                        }}
+                        className={`rounded-lg py-1.5 ${
+                          ownerMode === 'supervision'
+                            ? 'bg-forest-900 text-white'
+                            : 'text-slate-600'
+                        }`}
+                      >
+                        Supervision
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          handleSwitchOwnerMode('management');
+                        }}
+                        className={`rounded-lg py-1.5 ${
+                          ownerMode === 'management'
+                            ? 'bg-forest-900 text-white'
+                            : 'text-slate-600'
+                        }`}
+                      >
+                        Gestion
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="py-1">
+                  <Link
+                    href={profileHref}
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                  >
+                    <User className="h-4 w-4 text-slate-400" />
+                    <span>Mon profil</span>
+                  </Link>
+                  <Link
+                    href={settingsHref}
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                  >
+                    <Settings className="h-4 w-4 text-slate-400" />
+                    <span>Paramètres</span>
+                  </Link>
+                </div>
+
+                <div className="border-t border-slate-100 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Déconnexion</span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
 
-      {/* Contenu principal décalé sous le header fixe (pt-16) et à droite du sidebar fixe */}
-      <div className={`flex min-h-screen flex-col pt-16 transition-all duration-200 ${contentOffsetClass}`}>
-        {/* Bandeaux d'alertes + Hero éventuel */}
+      {/* Contenu principal décalé sous le header fixe (pt-14) et à droite du sidebar fixe */}
+      <div
+        className={`flex min-h-screen min-w-0 flex-col pt-14 transition-all duration-200 ${contentOffsetClass}`}
+      >
+        {/* Bandeaux d'alertes uniquement si nécessaire */}
         {visibleAnnouncements.length > 0 ||
         user.mustSetupTwoFactor ||
         supportGrantId ||
         isSuspended ||
         isPastDue ||
         hero ? (
-          <div className="no-print obsidian-hero text-white">
+          <div className="no-print">
             {visibleAnnouncements.slice(0, 1).map((ann) => (
               <div
                 key={ann.id}
@@ -639,7 +850,7 @@ export function AppShell({
                     ? 'bg-rose-600 text-white'
                     : ann.priority === 'WARNING'
                       ? 'bg-amber-400 text-forest-950'
-                      : 'bg-brand-700/90 text-white'
+                      : 'bg-brand-700 text-white'
                 }`}
               >
                 <div className="flex min-w-0 items-center gap-2">
@@ -708,17 +919,29 @@ export function AppShell({
               </div>
             ) : null}
 
-            {hero ? <div className="px-4 pb-6 pt-5 sm:px-5 lg:px-6">{hero}</div> : null}
+            {hero ? (
+              <div className="obsidian-hero px-4 pb-5 pt-4 text-white sm:px-5 lg:px-6">{hero}</div>
+            ) : null}
           </div>
         ) : null}
 
         {/* Zone principale scrollable */}
-        <main className="w-full flex-1 p-3 pb-24 sm:p-5 sm:pb-24 lg:p-6 lg:pb-8">{children}</main>
+        <main className="w-full min-w-0 flex-1 overflow-x-clip p-3 pb-24 sm:p-5 sm:pb-24 lg:p-6 lg:pb-8">
+          {children}
+
+          {/* Signature entreprise en indice en bas de page */}
+          <footer className="no-print mt-10 border-t border-slate-200/70 pt-3 text-center text-[11px] text-slate-400">
+            <span>Propulsé par </span>
+            <sub className="bottom-[-0.18em] text-[10px] font-semibold tracking-wide text-slate-500">
+              Chakir’s Entreprise
+            </sub>
+          </footer>
+        </main>
 
         {/* Dock mobile natif fixé en bas (< lg) */}
         <nav
           aria-label="Navigation rapide mobile"
-          className="no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950/95 px-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 text-[10px] font-semibold text-[#8aa8a2] backdrop-blur-md lg:hidden"
+          className="no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-slate-200/90 bg-white/95 px-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 text-[10px] font-semibold text-slate-500 backdrop-blur-md lg:hidden"
         >
           {mobileDockItems.map((item) => {
             const Icon = item.icon;
@@ -727,8 +950,8 @@ export function AppShell({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1.5 py-1 transition ${
-                  active ? 'bg-white text-forest-950' : 'hover:text-white'
+                className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 transition ${
+                  active ? 'bg-forest-900 text-white' : 'hover:text-slate-900'
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -739,10 +962,10 @@ export function AppShell({
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1.5 py-1 hover:text-white"
+            className="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 hover:text-slate-900"
           >
             <Menu className="h-4 w-4 shrink-0" />
-            <span>Plus</span>
+            <span>Menu</span>
           </button>
         </nav>
       </div>

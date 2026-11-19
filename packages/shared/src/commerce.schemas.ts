@@ -143,6 +143,14 @@ export const updateClientSchema = createClientSchema.partial().extend({
   isBlocked: z.boolean().optional(),
 });
 
+export const createManualReceivableSchema = z.object({
+  clientId: z.string().uuid('Client requis.'),
+  amountXof: z.number().int().min(1, 'Le montant de la dette doit être positif.'),
+  description: z.string().trim().min(2, 'Précisez le motif ou libellé de la dette.').max(400),
+  dueDate: z.string().datetime().nullable().optional(),
+  allowCreditOverride: z.boolean().default(false),
+});
+
 export const receivablePaymentSchema = z.object({
   amountXof: z.number().int().min(1, 'Le montant encaissé doit être positif.'),
   paymentMethodCode: z.string().trim().min(2).max(32),

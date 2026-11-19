@@ -7,7 +7,9 @@ import {
   CheckCircle2,
   Clock,
   Copy,
+  ExternalLink,
   Eye,
+  LogOut,
   MapPin,
   MessageCircle,
   Minus,
@@ -15,6 +17,7 @@ import {
   Palette,
   Phone,
   Plus,
+  Receipt,
   Ruler,
   Search,
   Send,
@@ -22,9 +25,16 @@ import {
   Store,
   Trash2,
   Truck,
+  User,
   X,
 } from 'lucide-react';
-import { formatDateTimeInTimezone, formatXof, FulfillmentMode } from '@shopcontrol/shared';
+import {
+  formatDateTimeInTimezone,
+  formatXof,
+  FulfillmentMode,
+  ONLINE_ORDER_STATUS_LABELS,
+  OnlineOrderStatus,
+} from '@shopcontrol/shared';
 import { apiFetch, ApiError } from '@/lib/api-client';
 
 const COLOR_HEX_MAP: Record<string, string> = {
@@ -112,6 +122,46 @@ interface OrderConfirmation {
   outOfHoursMessage: string | null;
 }
 
+interface CustomerProfileData {
+  authenticated: boolean;
+  customer: {
+    id: string;
+    fullName: string;
+    phone: string;
+    email: string | null;
+    address: string | null;
+  } | null;
+  outstandingDebtXof?: number;
+  orders?: Array<{
+    id: string;
+    orderNumber: string;
+    status: OnlineOrderStatus;
+    fulfillmentMode: string;
+    totalXof: number;
+    trackingPath: string;
+    createdAt: string;
+    lines: Array<{
+      id: string;
+      productName: string;
+      selectedSize: string | null;
+      selectedColor: string | null;
+      orderedQty: number;
+      lineTotalXof: number;
+    }>;
+  }>;
+  receivables?: Array<{
+    id: string;
+    status: string;
+    description: string | null;
+    dueDate: string | null;
+    saleNumber: string | null;
+    initialAmountXof: number;
+    paidAmountXof: number;
+    remainingAmountXof: number;
+    createdAt: string;
+  }>;
+}
+
 export function StorefrontClient({ initialData }: { initialData: StorefrontData }) {
   const { shop, categories, products, isOpenNow } = initialData;
   const deliveryCfg = shop.deliveryConfig;
@@ -154,6 +204,97 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   const [chatBusy, setChatBusy] = useState(false);
   const [chatErr, setChatErr] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
+
+  // Compte client optionnel
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
+  const [customerData, setCustomerData] = useState<CustomerProfileData | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authErr, setAuthErr] = useState<string | null>(null);
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [regForm, setRegForm] = useState({
+    fullName: '',
+    phone: '',
+    email: '',
+    address: '',
+    password: '',
+  });
+
+  const loadCustomerProfile = async () => {
+    try {
+      const data = await apiFetch<CustomerProfileData>(`/public/shops/${shop.slug}/auth/me`, {
+        requiresOnline: false,
+      });
+      setCustomerData(data);
+      if (data.authenticated && data.customer) {
+        setClientName((prev) => prev || data.customer!.fullName);
+        setClientPhone((prev) => prev || data.customer!.phone);
+        setDeliveryAddress((prev) => prev || data.customer!.address || '');
+        setChatName((prev) => prev || data.customer!.fullName);
+        setChatPhone((prev) => prev || data.customer!.phone);
+      }
+    } catch {
+      // ignore offline
+    }
+  };
+
+  useEffect(() => {
+    void loadCustomerProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shop.slug]);
+
+  const handleCustomerLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthBusy(true);
+    setAuthErr(null);
+    try {
+      await apiFetch(`/public/shops/${shop.slug}/auth/login`, {
+        method: 'POST',
+        body: { identifier: loginIdentifier, password: loginPassword },
+      });
+      setLoginPassword('');
+      await loadCustomerProfile();
+    } catch (err) {
+      setAuthErr(err instanceof ApiError ? err.message : 'Connexion impossible.');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleCustomerRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthBusy(true);
+    setAuthErr(null);
+    try {
+      await apiFetch(`/public/shops/${shop.slug}/auth/register`, {
+        method: 'POST',
+        body: {
+          fullName: regForm.fullName,
+          phone: regForm.phone,
+          email: regForm.email || undefined,
+          address: regForm.address || undefined,
+          password: regForm.password,
+        },
+      });
+      setRegForm({ fullName: '', phone: '', email: '', address: '', password: '' });
+      await loadCustomerProfile();
+    } catch (err) {
+      setAuthErr(err instanceof ApiError ? err.message : 'Création de compte impossible.');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleCustomerLogout = async () => {
+    setAuthBusy(true);
+    try {
+      await apiFetch(`/public/shops/${shop.slug}/auth/logout`, { method: 'POST' });
+      setCustomerData({ authenticated: false, customer: null });
+    } finally {
+      setAuthBusy(false);
+    }
+  };
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem(`sc_chat_${shop.slug}`) : null;
@@ -291,6 +432,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
       });
       setConfirmed(res);
       setCart([]);
+      void loadCustomerProfile();
     } catch (err) {
       setOrderErr(err instanceof ApiError ? err.message : 'Impossible d’enregistrer votre commande.');
     } finally {
@@ -385,15 +527,32 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <Link
               href={`/s/${shop.slug}/track`}
-              className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-white/15 sm:px-3.5 sm:text-xs"
+              className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-white/15 sm:px-3 sm:text-xs"
             >
               Suivi
             </Link>
             <button
               type="button"
+              onClick={() => {
+                setAuthErr(null);
+                setAccountOpen(true);
+                void loadCustomerProfile();
+              }}
+              aria-label="Mon compte client"
+              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-white/15 sm:px-3 sm:text-xs"
+            >
+              <User className="h-3.5 w-3.5 text-limeglow-400" />
+              <span className="max-w-[72px] truncate">
+                {customerData?.authenticated && customerData.customer
+                  ? customerData.customer.fullName.split(' ')[0]
+                  : 'Compte'}
+              </span>
+            </button>
+            <button
+              type="button"
               onClick={() => setChatOpen(true)}
               aria-label="Contacter la boutique"
-              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-white/15 sm:px-3.5 sm:text-xs"
+              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-white/15 sm:px-3 sm:text-xs"
             >
               <MessageCircle className="h-3.5 w-3.5 text-limeglow-400" />
               <span className="hidden sm:inline">Message</span>
@@ -1229,6 +1388,306 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
           </div>
         </div>
       ) : null}
+      {/* Modale Compte Client Optionnel (Connexion / Inscription / Mes commandes & solde) */}
+      {accountOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-forest-950/65 p-0 backdrop-blur-xs sm:items-center sm:p-4"
+          onClick={() => setAccountOpen(false)}
+        >
+          <div
+            className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:max-w-lg sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 bg-forest-950 px-5 py-3.5 text-white">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-limeglow-400" />
+                <div>
+                  <h2 className="text-sm font-bold text-white">
+                    {customerData?.authenticated && customerData.customer
+                      ? `Mon compte · ${customerData.customer.fullName}`
+                      : 'Compte client (optionnel)'}
+                  </h2>
+                  <p className="text-[11px] text-emerald-200/70">{shop.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAccountOpen(false)}
+                className="rounded-xl p-1.5 text-emerald-200 hover:bg-white/10"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              {customerData?.authenticated && customerData.customer ? (
+                <>
+                  {/* Coordonnées client */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#f7f9fb] p-3.5 text-xs">
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900">{customerData.customer.fullName}</p>
+                      <p className="text-slate-500">
+                        {customerData.customer.phone}
+                        {customerData.customer.email ? ` · ${customerData.customer.email}` : ''}
+                      </p>
+                      {customerData.customer.address ? (
+                        <p className="text-slate-500">{customerData.customer.address}</p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={authBusy}
+                      onClick={handleCustomerLogout}
+                      className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                      Déconnexion
+                    </button>
+                  </div>
+
+                  {/* Solde / Dettes éventuelles auprès de la boutique */}
+                  {(customerData.outstandingDebtXof ?? 0) > 0 ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1.5 font-bold text-amber-950">
+                          <Receipt className="h-4 w-4 text-amber-700" />
+                          Solde crédit en cours
+                        </span>
+                        <span className="font-extrabold text-rose-700 tabular">
+                          {formatXof(customerData.outstandingDebtXof ?? 0)}
+                        </span>
+                      </div>
+                      {customerData.receivables && customerData.receivables.length > 0 ? (
+                        <div className="mt-2 space-y-1 text-[11px] text-amber-900/90">
+                          {customerData.receivables
+                            .filter((r) => r.status !== 'PAID')
+                            .map((r) => (
+                              <div key={r.id} className="flex items-center justify-between gap-2">
+                                <span className="truncate">
+                                  {r.saleNumber || r.description || 'Crédit boutique'}
+                                </span>
+                                <span className="shrink-0 font-bold tabular">
+                                  {formatXof(r.remainingAmountXof)}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {/* Historique des commandes */}
+                  <div className="space-y-2.5">
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Mes commandes ({customerData.orders?.length ?? 0})
+                    </h3>
+                    {!customerData.orders || customerData.orders.length === 0 ? (
+                      <p className="rounded-2xl border border-dashed border-slate-200 p-5 text-center text-xs text-slate-500">
+                        Vous n’avez pas encore passé de commande avec ce compte.
+                      </p>
+                    ) : (
+                      customerData.orders.map((ord) => (
+                        <div
+                          key={ord.id}
+                          className="rounded-2xl border border-slate-200 bg-white p-3.5 text-xs"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-mono font-bold text-slate-900">
+                              {ord.orderNumber}
+                            </span>
+                            <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[10px] font-bold text-brand-800">
+                              {ONLINE_ORDER_STATUS_LABELS[ord.status] || ord.status}
+                            </span>
+                          </div>
+                          <div className="mt-2 space-y-1 text-[11px] text-slate-600">
+                            {ord.lines.map((l) => (
+                              <p key={l.id}>
+                                {l.orderedQty}× {l.productName}
+                                {l.selectedSize ? ` · T.${l.selectedSize}` : ''}
+                                {l.selectedColor ? ` · ${l.selectedColor}` : ''}
+                              </p>
+                            ))}
+                          </div>
+                          <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
+                            <span className="font-extrabold text-slate-900 tabular">
+                              {formatXof(ord.totalXof)}
+                            </span>
+                            <Link
+                              href={ord.trackingPath}
+                              onClick={() => setAccountOpen(false)}
+                              className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline"
+                            >
+                              Suivre
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="rounded-xl bg-[#f7f9fb] p-3 text-xs text-slate-600">
+                    La création de compte est <strong>entièrement facultative</strong> : elle vous
+                    permet de retrouver vos commandes, suivre votre solde et pré-remplir vos
+                    coordonnées plus rapidement.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthTab('login');
+                        setAuthErr(null);
+                      }}
+                      className={`rounded-lg py-1.5 transition ${
+                        authTab === 'login' ? 'bg-forest-900 text-white' : 'text-slate-600'
+                      }`}
+                    >
+                      Se connecter
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthTab('register');
+                        setAuthErr(null);
+                      }}
+                      className={`rounded-lg py-1.5 transition ${
+                        authTab === 'register' ? 'bg-forest-900 text-white' : 'text-slate-600'
+                      }`}
+                    >
+                      Créer un compte
+                    </button>
+                  </div>
+
+                  {authErr ? (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+                      {authErr}
+                    </div>
+                  ) : null}
+
+                  {authTab === 'login' ? (
+                    <form onSubmit={handleCustomerLogin} className="space-y-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-700">
+                          Téléphone ou e-mail *
+                        </label>
+                        <input
+                          required
+                          value={loginIdentifier}
+                          onChange={(e) => setLoginIdentifier(e.target.value)}
+                          placeholder="+223 70 00 00 00"
+                          className="sc-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-700">
+                          Mot de passe *
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          className="sc-input"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={authBusy}
+                        className="sc-btn-primary w-full text-xs"
+                      >
+                        {authBusy ? 'Connexion…' : 'Me connecter'}
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleCustomerRegister} className="space-y-2.5">
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-700">
+                          Nom complet *
+                        </label>
+                        <input
+                          required
+                          value={regForm.fullName}
+                          onChange={(e) => setRegForm({ ...regForm, fullName: e.target.value })}
+                          placeholder="Votre nom et prénom"
+                          className="sc-input"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-slate-700">
+                            Téléphone *
+                          </label>
+                          <input
+                            required
+                            value={regForm.phone}
+                            onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
+                            placeholder="+223 70 00 00 00"
+                            className="sc-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-slate-700">
+                            E-mail (optionnel)
+                          </label>
+                          <input
+                            type="email"
+                            value={regForm.email}
+                            onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
+                            placeholder="nom@exemple.com"
+                            className="sc-input"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-700">
+                          Adresse / Quartier (optionnel)
+                        </label>
+                        <input
+                          value={regForm.address}
+                          onChange={(e) => setRegForm({ ...regForm, address: e.target.value })}
+                          placeholder="Pour pré-remplir vos livraisons"
+                          className="sc-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-700">
+                          Mot de passe (min. 6 caractères) *
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          minLength={6}
+                          value={regForm.password}
+                          onChange={(e) => setRegForm({ ...regForm, password: e.target.value })}
+                          className="sc-input"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={authBusy}
+                        className="sc-btn-primary w-full text-xs"
+                      >
+                        {authBusy ? 'Création…' : 'Créer mon compte client'}
+                      </button>
+                    </form>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Signature en indice Chakir's Entreprise */}
+      <footer className="border-t border-slate-200/70 bg-white/70 px-4 py-4 text-center text-[11px] text-slate-400">
+        <span>{shop.name} · Propulsé par </span>
+        <sub className="bottom-[-0.18em] text-[10px] font-semibold tracking-wide text-slate-500">
+          Chakir’s Entreprise
+        </sub>
+      </footer>
     </div>
   );
 }

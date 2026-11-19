@@ -256,16 +256,16 @@ export default function CashPage() {
                 </button>
               </form>
             ) : (
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Banknote className="h-5 w-5 text-emerald-600" />
-                      <h2 className="text-base font-bold text-slate-900">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
+                <div className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Banknote className="h-5 w-5 shrink-0 text-emerald-600" />
+                      <h2 className="truncate text-sm font-bold text-slate-900 sm:text-base">
                         Session ouverte — {current.register.name}
                       </h2>
                     </div>
-                    <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                    <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
                       OUVERTE
                     </span>
                   </div>
@@ -363,19 +363,19 @@ export default function CashPage() {
                   </form>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                  <h3 className="mb-3 text-base font-bold text-slate-900">
+                <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                  <h3 className="mb-3 text-sm font-bold text-slate-900 sm:text-base">
                     Mouvements de la session en cours ({current.movements.length})
                   </h3>
                   <div className="max-h-96 divide-y divide-slate-100 overflow-y-auto text-xs">
                     {current.movements.map((m) => (
                       <div key={m.id} className="flex items-center justify-between gap-2 py-2.5">
-                        <div>
-                          <p className="font-semibold text-slate-800">{m.type}</p>
-                          <p className="text-slate-500">{m.reason || '—'}</p>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-slate-800">{m.type}</p>
+                          <p className="truncate text-slate-500">{m.reason || '—'}</p>
                         </div>
                         <span
-                          className={`font-mono font-bold ${
+                          className={`shrink-0 font-mono font-bold tabular ${
                             m.signedAmountXof >= 0 ? 'text-emerald-700' : 'text-red-600'
                           }`}
                         >
@@ -420,23 +420,23 @@ export default function CashPage() {
                           {s.status === 'OPEN' ? 'OUVERTE' : 'CLÔTURÉE'}
                         </span>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-2.5 text-center">
-                        <div>
+                      <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-slate-50 p-2 text-center tabular">
+                        <div className="min-w-0">
                           <p className="text-[10px] text-slate-400">Théorique</p>
-                          <p className="font-mono font-bold text-slate-900">
+                          <p className="truncate font-mono text-[11px] font-bold text-slate-900">
                             {formatXof(s.theoreticalAmountXof)}
                           </p>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-[10px] text-slate-400">Compté</p>
-                          <p className="font-mono font-semibold text-slate-700">
+                          <p className="truncate font-mono text-[11px] font-semibold text-slate-700">
                             {s.countedAmountXof !== null ? formatXof(s.countedAmountXof) : '—'}
                           </p>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-[10px] text-slate-400">Écart</p>
                           <p
-                            className={`font-mono font-bold ${
+                            className={`truncate font-mono text-[11px] font-bold ${
                               s.discrepancyXof === null
                                 ? 'text-slate-400'
                                 : s.discrepancyXof === 0
