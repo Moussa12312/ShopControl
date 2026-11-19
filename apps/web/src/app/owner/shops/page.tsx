@@ -2,11 +2,23 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Database, ExternalLink, Pencil, Plus, QrCode, Settings } from 'lucide-react';
 import {
+  CheckCircle2,
+  Database,
+  ExternalLink,
+  Layers,
+  Pencil,
+  Plus,
+  QrCode,
+  Send,
+  Settings,
+} from 'lucide-react';
+import {
+  BusinessProfileConfig,
   DEFAULT_CURRENCY,
   DEFAULT_DAILY_REPORT_TIME,
   DEFAULT_TIMEZONE,
+  normalizeBusinessProfile,
   normalizeShopType,
   SHOP_TYPE_DESCRIPTIONS,
   SHOP_TYPE_LABELS,
@@ -33,6 +45,7 @@ interface ShopRow {
   name: string;
   slug: string;
   shopType?: ShopType;
+  businessProfile?: BusinessProfileConfig | null;
   logoUrl?: string | null;
   status: string;
   dbName: string;
@@ -56,16 +69,19 @@ export default function OwnerShopsPage() {
   const [shops, setShops] = useState<ShopRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingShop, setEditingShop] = useState<ShopRow | null>(null);
   const [qrShop, setQrShop] = useState<ShopRow | null>(null);
+  const [requestTypeShop, setRequestTypeShop] = useState<ShopRow | null>(null);
+  const [requestedShopType, setRequestedShopType] = useState<ShopType>('FASHION');
+  const [requestMessage, setRequestMessage] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
     slug: '',
-    shopType: 'GENERAL' as ShopType,
     logoUrl: null as string | null,
     phone: '',
     address: '',
@@ -100,7 +116,6 @@ export default function OwnerShopsPage() {
     setForm({
       name: '',
       slug: '',
-      shopType: 'GENERAL',
       logoUrl: null,
       phone: '',
       address: '',
@@ -120,7 +135,6 @@ export default function OwnerShopsPage() {
     setForm({
       name: shop.name,
       slug: shop.slug,
-      shopType: normalizeShopType(shop.shopType),
       logoUrl: shop.logoUrl || null,
       phone: shop.phone || '',
       address: shop.address || '',
@@ -134,6 +148,42 @@ export default function OwnerShopsPage() {
     setModalOpen(true);
   };
 
+  const openRequestTypeModal = (shop: ShopRow) => {
+    const bp = normalizeBusinessProfile(shop.shopType, shop.businessProfile);
+    const activeTypes = bp.enabledShopTypes || [normalizeShopType(shop.shopType)];
+    const candidate = SHOP_TYPES.find((t) => !activeTypes.includes(t)) || 'FASHION';
+    setRequestTypeShop(shop);
+    setRequestedShopType(candidate);
+    setRequestMessage('');
+    setFormError(null);
+  };
+
+  const handleRequestShopType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!requestTypeShop) return;
+    setBusy(true);
+    setFormError(null);
+    try {
+      const res = await apiFetch<{ ticketNumber: string; message: string }>(
+        `/shops/${requestTypeShop.id}/request-shop-type`,
+        {
+          method: 'POST',
+          shopId: requestTypeShop.id,
+          body: {
+            requestedShopType,
+            message: requestMessage.trim() || undefined,
+          },
+        },
+      );
+      setInfoMsg(res.message);
+      setRequestTypeShop(null);
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : 'Envoi de la demande impossible.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -142,7 +192,6 @@ export default function OwnerShopsPage() {
       const payload = {
         name: form.name,
         ...(form.slug.trim() ? { slug: form.slug.trim() } : {}),
-        shopType: form.shopType,
         logoUrl: form.logoUrl,
         phone: form.phone.trim() || undefined,
         address: form.address.trim() || undefined,
@@ -187,6 +236,21 @@ export default function OwnerShopsPage() {
       }
     >
       <div className="space-y-5">
+        {infoMsg ? (
+          <div className="flex items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-900">
+            <span className="inline-flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              {infoMsg}
+            </span>
+            <button
+              type="button"
+              onClick={() => setInfoMsg(null)}
+              className="text-emerald-700 hover:underline"
+            >
+              Fermer
+            </button>
+          </div>
+        ) : null}
 
         {loading ? (
           <LoadingSkeleton rows={4} />
@@ -228,12 +292,20 @@ export default function OwnerShopsPage() {
                           {shop.name.slice(0, 2).toUpperCase()}
                         </span>
                       )}
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
+                       <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <h2 className="truncate text-lg font-extrabold text-slate-900">{shop.name}</h2>
-                          <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[11px] font-bold text-brand-800">
-                            {SHOP_TYPE_SHORT_LABELS[normalizeShopType(shop.shopType)]}
-                          </span>
+                          {(
+                            normalizeBusinessProfile(shop.shopType, shop.businessProfile)
+                              .enabledShopTypes || [normalizeShopType(shop.shopType)]
+                          ).map((st) => (
+                            <span
+                              key={st}
+                              className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[11px] font-bold text-brand-800"
+                            >
+                              {SHOP_TYPE_SHORT_LABELS[st]}
+                            </span>
+                          ))}
                         </div>
                         <Link
                           href={`/s/${shop.slug}`}
@@ -291,6 +363,15 @@ export default function OwnerShopsPage() {
                       <>
                         <button
                           type="button"
+                          onClick={() => openRequestTypeModal(shop)}
+                          className="inline-flex items-center gap-1 rounded-xl border border-brand-200 bg-brand-50 px-2.5 py-1.5 font-bold text-brand-800 hover:bg-brand-100"
+                          title="Demander au Super Admin d’activer un nouveau type / rayon sur cette boutique"
+                        >
+                          <Layers className="h-3.5 w-3.5" />
+                          + Type / Rayon
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => openEdit(shop)}
                           className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-100"
                         >
@@ -338,40 +419,6 @@ export default function OwnerShopsPage() {
                   onChange={(url) => setForm((f) => ({ ...f, logoUrl: url }))}
                 />
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-800">
-                    Type de boutique / Secteur d’activité *
-                  </label>
-                  <p className="text-[11px] text-slate-500">
-                    Adapte automatiquement le formulaire produit, le comptoir POS et l’affichage de la vitrine QR.
-                  </p>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    {SHOP_TYPES.map((t) => {
-                      const active = form.shopType === t;
-                      return (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => setForm({ ...form, shopType: t })}
-                          className={`rounded-xl border p-2.5 text-left transition ${
-                            active
-                              ? 'border-forest-900 bg-forest-900 text-white shadow-xs'
-                              : 'border-slate-200 bg-slate-50 text-slate-800 hover:border-brand-400'
-                          }`}
-                        >
-                          <p className="text-xs font-extrabold">{SHOP_TYPE_LABELS[t]}</p>
-                          <p
-                            className={`mt-0.5 line-clamp-2 text-[10px] leading-snug ${
-                              active ? 'text-emerald-100/85' : 'text-slate-500'
-                            }`}
-                          >
-                            {SHOP_TYPE_DESCRIPTIONS[t]}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-medium text-slate-700">
@@ -497,6 +544,107 @@ export default function OwnerShopsPage() {
                     className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
                   >
                     {busy ? 'Enregistrement…' : editingShop ? 'Enregistrer' : 'Créer & provisionner BDD'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
+
+        {requestTypeShop ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+              <h2 className="text-lg font-extrabold text-slate-900">
+                Demander l’ajout d’un nouveau type / rayon — {requestTypeShop.name}
+              </h2>
+              <p className="mt-1 text-xs text-slate-600">
+                Le Super Admin activera ce nouveau secteur sur votre boutique et débloquera
+                automatiquement ses catégories et modes de vente dédiés.
+              </p>
+
+              {formError ? (
+                <div className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">
+                  {formError}
+                </div>
+              ) : null}
+
+              <form onSubmit={handleRequestShopType} className="mt-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800">
+                    Quel nouveau type / rayon souhaitez-vous vendre dans cette boutique ? *
+                  </label>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {SHOP_TYPES.map((t) => {
+                      const currentTypes =
+                        normalizeBusinessProfile(
+                          requestTypeShop.shopType,
+                          requestTypeShop.businessProfile,
+                        ).enabledShopTypes || [normalizeShopType(requestTypeShop.shopType)];
+                      const alreadyActive = currentTypes.includes(t);
+                      const selected = requestedShopType === t;
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          disabled={alreadyActive}
+                          onClick={() => setRequestedShopType(t)}
+                          className={`rounded-xl border p-2.5 text-left transition ${
+                            alreadyActive
+                              ? 'cursor-not-allowed border-emerald-200 bg-emerald-50/60 text-emerald-800 opacity-75'
+                              : selected
+                                ? 'border-forest-900 bg-forest-900 text-white shadow-xs'
+                                : 'border-slate-200 bg-slate-50 text-slate-800 hover:border-brand-400'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="text-xs font-extrabold">{SHOP_TYPE_SHORT_LABELS[t]}</p>
+                            {alreadyActive ? (
+                              <span className="rounded-full bg-emerald-200 px-1.5 py-0.5 text-[9px] font-black text-emerald-950">
+                                Déjà actif
+                              </span>
+                            ) : null}
+                          </div>
+                          <p
+                            className={`mt-0.5 line-clamp-2 text-[10px] leading-snug ${
+                              selected && !alreadyActive ? 'text-emerald-100/85' : 'text-slate-500'
+                            }`}
+                          >
+                            {SHOP_TYPE_DESCRIPTIONS[t]}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Précisions pour le Super Admin (optionnel)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={requestMessage}
+                    onChange={(e) => setRequestMessage(e.target.value)}
+                    placeholder="Ex. Je vends actuellement des cosmétiques et je souhaite ajouter un rayon vêtements & chaussures dans ma boutique…"
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setRequestTypeShop(null)}
+                    className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-xs font-bold text-white hover:bg-brand-800 disabled:opacity-50"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    {busy ? 'Envoi…' : 'Envoyer la demande au Super Admin'}
                   </button>
                 </div>
               </form>

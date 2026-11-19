@@ -17,8 +17,14 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import * as argon2 from 'argon2';
 import {
+  adminCreateShopSchema,
+  adminUpdateShopTypesSchema,
   createMerchantSchema,
   createSupportAccessSchema,
+  normalizeBusinessProfile,
+  normalizeShopType,
+  SHOP_TYPE_SHORT_LABELS,
+  ShopType,
   TenantStatus,
   TENANT_STATUS_LABELS,
   updateTenantStatusSchema,
@@ -189,6 +195,8 @@ export class AdminService {
       ownerPassword: string;
       initialShopName?: string;
       initialShopSlug?: string;
+      initialShopType?: ShopType;
+      initialShopTypes?: ShopType[];
     },
     actor: AuthenticatedUser,
     meta: RequestMeta,
@@ -251,11 +259,22 @@ export class AdminService {
 
     let initialShop: unknown = null;
     if (input.initialShopName?.trim()) {
+      const primaryType =
+        input.initialShopType ||
+        (input.initialShopTypes && input.initialShopTypes[0]) ||
+        'GENERAL';
+      const enabledTypes =
+        input.initialShopTypes && input.initialShopTypes.length > 0
+          ? Array.from(new Set<ShopType>([primaryType, ...input.initialShopTypes]))
+          : [primaryType];
+
       initialShop = await this.shopsService.createShopForMerchant(
         merchant.id,
         {
           name: input.initialShopName.trim(),
           slug: input.initialShopSlug,
+          shopType: primaryType,
+          businessProfile: { enabledShopTypes: enabledTypes },
           currency: merchant.currency,
           timezone: merchant.defaultTimezone,
         },
@@ -359,21 +378,153 @@ export class AdminService {
     ]);
 
     return {
-      items: shops.map((s) => ({
-        id: s.id,
-        name: s.name,
-        slug: s.slug,
-        status: s.status,
-        statusReason: s.statusReason,
-        dbName: s.dbName,
-        dbStatus: s.dbStatus,
-        dbSchemaVersion: s.dbSchemaVersion,
-        merchant: s.merchant,
-        createdAt: s.createdAt.toISOString(),
-      })),
+      items: shops.map((s) => {
+        const shopType = normalizeShopType(s.shopType);
+        return {
+          id: s.id,
+          name: s.name,
+          slug: s.slug,
+          shopType,
+          businessProfile: normalizeBusinessProfile(shopType, s.businessProfile),
+          status: s.status,
+          statusReason: s.statusReason,
+          dbName: s.dbName,
+          dbStatus: s.dbStatus,
+          dbSchemaVersion: s.dbSchemaVersion,
+          merchant: s.merchant,
+          createdAt: s.createdAt.toISOString(),
+        };
+      }),
       total,
       page,
       limit,
+    };
+  }
+
+  async createShopByAdmin(
+    input: {
+      merchantId: string;
+      name: string;
+      slug?: string;
+      shopType: ShopType;
+      enabledShopTypes?: ShopType[];
+    },
+    actor: AuthenticatedUser,
+    meta: RequestMeta,
+  ) {
+    const enabledTypes =
+      input.enabledShopTypes && input.enabledShopTypes.length > 0
+        ? Array.from(new Set<ShopType>([input.shopType, ...input.enabledShopTypes]))
+        : [input.shopType];
+
+    return this.shopsService.createShopForMerchant(
+      input.merchantId,
+      {
+        name: input.name.trim(),
+        slug: input.slug,
+        shopType: input.shopType,
+        businessProfile: { enabledShopTypes: enabledTypes },
+      },
+      { userId: actor.userId, role: 'SUPER_ADMIN' },
+      meta,
+    );
+  }
+
+  async updateShopTypesByAdmin(
+    shopId: string,
+    input: {
+      shopType: ShopType;
+      enabledShopTypes?: ShopType[];
+      seedCategories?: boolean;
+    },
+    actor: AuthenticatedUser,
+    meta: RequestMeta,
+  ) {
+    const existing = await this.controlPrisma.shop.findUnique({ where: { id: shopId } });
+    if (!existing) {
+      throw new NotFoundException({ code: 'SHOP_NOT_FOUND', message: 'Boutique introuvable.' });
+    }
+
+    const primaryType = normalizeShopType(input.shopType);
+    const enabledTypes =
+      input.enabledShopTypes && input.enabledShopTypes.length > 0
+        ? Array.from(new Set<ShopType>([primaryType, ...input.enabledShopTypes]))
+        : [primaryType];
+
+    const nextProfile = normalizeBusinessProfile(primaryType, {
+      enabledShopTypes: enabledTypes,
+    });
+
+    const updated = await this.controlPrisma.shop.update({
+      where: { id: shopId },
+      data: {
+        shopType: primaryType,
+        businessProfile: nextProfile as object,
+      },
+    });
+
+    let seededCategoriesCount = 0;
+    if (updated.dbStatus === 'READY') {
+      await this.shopDbManager.syncShopLocalConfig({
+        id: updated.id,
+        merchantId: updated.merchantId,
+        name: updated.name,
+        slug: updated.slug,
+        dbName: updated.dbName,
+        shopType: primaryType,
+        businessProfile: nextProfile,
+        currency: updated.currency,
+        timezone: updated.timezone,
+        dailyReportTime: updated.dailyReportTime,
+        taxMode: updated.taxMode,
+        defaultTaxRateBps: updated.defaultTaxRateBps,
+        requireOperatorPin: updated.requireOperatorPin,
+        paymentMethods: updated.paymentMethods,
+        openingHours: updated.openingHours,
+      });
+
+      if (input.seedCategories !== false) {
+        seededCategoriesCount = await this.shopDbManager.seedCategoriesForShopTypes(
+          updated.id,
+          enabledTypes,
+        );
+      }
+    }
+
+    await this.auditService.recordControl({
+      merchantId: existing.merchantId,
+      shopId,
+      actorUserId: actor.userId,
+      actorRole: 'SUPER_ADMIN',
+      action: 'SHOP_TYPES_UPDATED_BY_ADMIN',
+      entityType: 'Shop',
+      entityId: shopId,
+      beforeData: { shopType: existing.shopType },
+      afterData: {
+        shopType: primaryType,
+        enabledShopTypes: enabledTypes,
+        seededCategoriesCount,
+      },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+
+    const labels = enabledTypes.map((t) => SHOP_TYPE_SHORT_LABELS[t]).join(', ');
+    await this.notificationsService.notifyMerchantOwners(existing.merchantId, {
+      shopId,
+      type: 'PLATFORM',
+      priority: 'INFO',
+      title: `Type(s) de boutique mis à jour : ${existing.name}`,
+      message: `Le Super Admin a activé le(s) rayon(s) « ${labels} » sur votre boutique ${existing.name}. Les catégories correspondantes sont disponibles dans Produits.`,
+      targetPath: '/commerce/products',
+    });
+
+    return {
+      ...updated,
+      shopType: primaryType,
+      businessProfile: nextProfile,
+      seededCategoriesCount,
     };
   }
 
@@ -669,6 +820,35 @@ export class AdminController {
       status,
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 25,
+    });
+  }
+
+  @Post('shops')
+  @ApiOperation({ summary: 'Créer une nouvelle boutique pour un marchand avec son type métier (Super Admin)' })
+  createShopByAdmin(
+    @Body(new ZodValidationPipe(adminCreateShopSchema)) body: any,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.adminService.createShopByAdmin(body, user, {
+      ipAddress: req.ip || null,
+      userAgent: req.header('user-agent') || null,
+      correlationId: req.correlationId || null,
+    });
+  }
+
+  @Patch('shops/:shopId/types')
+  @ApiOperation({ summary: 'Définir ou ajouter des types métiers (Cosmétique, Mode, Rue, Quincaillerie…) sur une boutique (Super Admin)' })
+  updateShopTypes(
+    @Param('shopId') shopId: string,
+    @Body(new ZodValidationPipe(adminUpdateShopTypesSchema)) body: any,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.adminService.updateShopTypesByAdmin(shopId, body, user, {
+      ipAddress: req.ip || null,
+      userAgent: req.header('user-agent') || null,
+      correlationId: req.correlationId || null,
     });
   }
 

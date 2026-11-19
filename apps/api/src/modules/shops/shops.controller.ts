@@ -10,7 +10,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { createShopSchema, updateShopSchema } from '@shopcontrol/shared';
+import {
+  createShopSchema,
+  requestShopTypeExpansionSchema,
+  updateShopSchema,
+} from '@shopcontrol/shared';
 import { CurrentUser, Public, Roles } from '../../common/auth/auth.decorators';
 import { AuthenticatedUser, RequestWithAuth } from '../../common/auth/request-context.types';
 import { ShopScopeGuard } from '../../common/guards/shop-scope.guard';
@@ -95,5 +99,23 @@ export class ShopsController {
   @ApiOperation({ summary: 'Synthèse réelle d’une boutique depuis sa base de données dédiée' })
   overview(@Param('shopId') shopId: string) {
     return this.shopsService.getShopOverview(shopId);
+  }
+
+  @Post('shops/:shopId/request-shop-type')
+  @ApiBearerAuth()
+  @Roles('OWNER')
+  @UseGuards(ShopScopeGuard)
+  @ApiOperation({ summary: 'Demander au Super Admin l’ajout d’un nouveau type de boutique / rayon' })
+  requestShopTypeExpansion(
+    @Param('shopId') shopId: string,
+    @Body(new ZodValidationPipe(requestShopTypeExpansionSchema)) body: any,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.shopsService.requestShopTypeExpansion(shopId, body, user, {
+      ipAddress: req.ip || null,
+      userAgent: req.header('user-agent') || null,
+      correlationId: req.correlationId || null,
+    });
   }
 }

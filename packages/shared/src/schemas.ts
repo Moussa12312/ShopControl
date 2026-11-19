@@ -7,6 +7,8 @@ import {
   TENANT_STATUSES,
 } from './enums';
 import { PERMISSION_KEYS } from './permissions';
+import { deliveryConfigSchema, receiptSettingsSchema } from './platform.schemas';
+import { businessProfileSchema, SHOP_TYPES } from './shop-profiles';
 
 const strongPasswordSchema = z
   .string()
@@ -109,6 +111,27 @@ export const createMerchantSchema = z.object({
   ownerPassword: strongPasswordSchema,
   initialShopName: z.string().trim().min(2).max(120).optional(),
   initialShopSlug: slugSchema.optional(),
+  initialShopType: z.enum(SHOP_TYPES).optional(),
+  initialShopTypes: z.array(z.enum(SHOP_TYPES)).optional(),
+});
+
+export const adminCreateShopSchema = z.object({
+  merchantId: z.string().uuid('Marchand requis.'),
+  name: z.string().trim().min(2, 'Le nom de la boutique est requis.').max(120),
+  slug: slugSchema.optional(),
+  shopType: z.enum(SHOP_TYPES).default('GENERAL'),
+  enabledShopTypes: z.array(z.enum(SHOP_TYPES)).optional(),
+});
+
+export const adminUpdateShopTypesSchema = z.object({
+  shopType: z.enum(SHOP_TYPES),
+  enabledShopTypes: z.array(z.enum(SHOP_TYPES)).min(1).optional(),
+  seedCategories: z.boolean().default(true),
+});
+
+export const requestShopTypeExpansionSchema = z.object({
+  requestedShopType: z.enum(SHOP_TYPES),
+  message: z.string().trim().max(400).optional(),
 });
 
 export const updateTenantStatusSchema = z.object({
@@ -131,9 +154,6 @@ export const updateMerchantSchema = z.object({
   email: z.string().trim().email().toLowerCase().optional(),
   defaultTimezone: z.string().trim().min(3).max(60).optional(),
 });
-
-import { deliveryConfigSchema, receiptSettingsSchema } from './platform.schemas';
-import { businessProfileSchema, SHOP_TYPES } from './shop-profiles';
 
 export const createShopSchema = z.object({
   name: z.string().trim().min(2, 'Le nom de la boutique est requis.').max(120),

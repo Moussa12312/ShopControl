@@ -16,6 +16,8 @@ import {
   DEFAULT_TIMEZONE,
   normalizeBusinessProfile,
   normalizeShopType,
+  SHOP_TYPE_LABELS,
+  SHOP_TYPE_SHORT_LABELS,
   ShopType,
   slugifyShopName,
   TaxMode,
@@ -24,6 +26,7 @@ import {
 import { ControlPrismaService } from '../../common/database/control-prisma.service';
 import { ShopDatabaseManagerService } from '../../common/database/shop-database-manager.service';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.module';
 import { AuthenticatedUser } from '../../common/auth/request-context.types';
 import { RequestMeta } from '../auth/auth.service';
 
@@ -56,6 +59,7 @@ export class ShopsService {
     private readonly controlPrisma: ControlPrismaService,
     private readonly shopDbManager: ShopDatabaseManagerService,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async ensureUniqueSlug(desired: string): Promise<string> {
@@ -429,21 +433,21 @@ export class ShopsService {
             : {}),
           ...(input.deliveryConfig !== undefined
             ? {
-                deliveryConfig: {
-                  ...DEFAULT_DELIVERY_CONFIG,
-                  ...((existing.deliveryConfig as object) || {}),
-                  ...(input.deliveryConfig as object),
-                } as object,
-              }
+              deliveryConfig: {
+                ...DEFAULT_DELIVERY_CONFIG,
+                ...((existing.deliveryConfig as object) || {}),
+                ...(input.deliveryConfig as object),
+              } as object,
+            }
             : {}),
           ...(input.receiptSettings !== undefined
             ? {
-                receiptSettings: {
-                  ...DEFAULT_RECEIPT_SETTINGS,
-                  ...((existing.receiptSettings as object) || {}),
-                  ...(input.receiptSettings as object),
-                } as object,
-              }
+              receiptSettings: {
+                ...DEFAULT_RECEIPT_SETTINGS,
+                ...((existing.receiptSettings as object) || {}),
+                ...(input.receiptSettings as object),
+              } as object,
+            }
             : {}),
         },
       });
@@ -472,6 +476,17 @@ export class ShopsService {
         paymentMethods: updated.paymentMethods,
         openingHours: updated.openingHours,
       });
+
+      if (shopTypeChanged || input.businessProfile?.enabledShopTypes) {
+        await this.shopDbManager
+          .seedCategoriesForShopTypes(
+            updated.id,
+            normalizedUpdatedProfile.enabledShopTypes?.length
+              ? normalizedUpdatedProfile.enabledShopTypes
+              : [normalizeShopType(updated.shopType)],
+          )
+          .catch(() => undefined);
+      }
     }
 
     await this.auditService.recordControl({
@@ -503,6 +518,95 @@ export class ShopsService {
       ...updated,
       shopType: normalizeShopType(updated.shopType),
       businessProfile: normalizedUpdatedProfile,
+    };
+  }
+
+  /**
+   * Demande du Propriétaire au Super Admin pour ajouter un nouveau type de boutique / rayon
+   * (ex: une boutique de Cosmétique qui souhaite maintenant vendre des Vêtements).
+   */
+  async requestShopTypeExpansion(
+    shopId: string,
+    input: { requestedShopType: ShopType; message?: string },
+    user: AuthenticatedUser,
+    meta: RequestMeta,
+  ) {
+    const shop = await this.controlPrisma.shop.findUnique({
+      where: { id: shopId },
+      include: { merchant: { select: { id: true, name: true } } },
+    });
+    if (!shop) {
+      throw new NotFoundException({ code: 'SHOP_NOT_FOUND', message: 'Boutique introuvable.' });
+    }
+
+    const reqType = normalizeShopType(input.requestedShopType);
+    const typeLabel = SHOP_TYPE_LABELS[reqType];
+    const shortLabel = SHOP_TYPE_SHORT_LABELS[reqType];
+    const ticketNum = `TYP-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    const bodyText = `Le propriétaire (${user.fullName}) demande l’activation du type de boutique « ${typeLabel} » (${reqType}) sur la boutique « ${shop.name} » (/s/${shop.slug}).${
+      input.message?.trim() ? `\n\nMessage du propriétaire : ${input.message.trim()}` : ''
+    }`;
+
+    const ticket = await this.controlPrisma.supportTicket.create({
+      data: {
+        ticketNumber: ticketNum,
+        merchantId: shop.merchantId,
+        createdByUserId: user.userId,
+        subject: `[Ajout Type Boutique] ${shop.name} → + ${shortLabel}`,
+        priority: 'WARNING',
+        status: 'OPEN',
+        messages: {
+          create: {
+            senderUserId: user.userId,
+            senderRole: user.role,
+            senderName: user.fullName,
+            body: bodyText,
+          },
+        },
+      },
+    });
+
+    // Notifie tous les Super Admins
+    const superAdmins = await this.controlPrisma.user.findMany({
+      where: { role: 'SUPER_ADMIN', isActive: true },
+      select: { id: true },
+    });
+    for (const sa of superAdmins) {
+      await this.notificationsService.create({
+        merchantId: shop.merchantId,
+        shopId: shop.id,
+        recipientUserId: sa.id,
+        type: 'PLATFORM',
+        priority: 'WARNING',
+        title: `Demande d’ajout de type : ${shop.name} (+ ${shortLabel})`,
+        message: `${user.fullName} souhaite activer le type « ${shortLabel} » sur la boutique ${shop.name}.`,
+        targetPath: '/admin/shops',
+      });
+    }
+
+    await this.auditService.recordControl({
+      merchantId: shop.merchantId,
+      shopId: shop.id,
+      actorUserId: user.userId,
+      actorRole: user.role,
+      action: 'SHOP_TYPE_EXPANSION_REQUESTED',
+      entityType: 'Shop',
+      entityId: shop.id,
+      afterData: {
+        requestedShopType: reqType,
+        ticketNumber: ticket.ticketNumber,
+      },
+      reason: input.message || null,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+
+    return {
+      ok: true,
+      ticketNumber: ticket.ticketNumber,
+      requestedShopType: reqType,
+      message: `Votre demande d’ajout du rayon « ${shortLabel} » a été transmise au Super Admin.`,
     };
   }
 

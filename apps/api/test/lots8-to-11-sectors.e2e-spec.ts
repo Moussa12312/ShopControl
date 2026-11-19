@@ -67,6 +67,7 @@ describe('ShopControl Lots 8 à 11 — Profils Métiers Multi-Secteurs, Gros/Dé
         ownerEmail: `owner-sectors-${runId}@shop.ml`,
         ownerPassword: 'Owner!Password2026',
         initialShopName: `Mode Bamako ${runId}`,
+        initialShopType: 'COSMETICS',
       })
       .expect(201);
 
@@ -88,31 +89,91 @@ describe('ShopControl Lots 8 à 11 — Profils Métiers Multi-Secteurs, Gros/Dé
     }
     if (merchantId) {
       const controlPrisma = app.get(ControlPrismaService);
-      await controlPrisma.merchant.delete({ where: { id: merchantId } }).catch(() => undefined);
+      await controlPrisma.userShopAccess
+        .deleteMany({ where: { shop: { merchantId } } })
+        .catch(() => undefined);
+      await controlPrisma.notification
+        .deleteMany({ where: { merchantId } })
+        .catch(() => undefined);
+      await controlPrisma.supportTicketMessage
+        .deleteMany({ where: { ticket: { merchantId } } })
+        .catch(() => undefined);
+      await controlPrisma.supportTicket
+        .deleteMany({ where: { merchantId } })
+        .catch(() => undefined);
+      await controlPrisma.shopSlugRedirect
+        .deleteMany({ where: { shop: { merchantId } } })
+        .catch(() => undefined);
+      await controlPrisma.shop
+        .deleteMany({ where: { merchantId } })
+        .catch(() => undefined);
+      await controlPrisma.userSession
+        .deleteMany({ where: { user: { merchantId } } })
+        .catch(() => undefined);
+      await controlPrisma.user
+        .deleteMany({ where: { merchantId } })
+        .catch(() => undefined);
+      await controlPrisma.merchantSubscription
+        .deleteMany({ where: { merchantId } })
+        .catch(() => undefined);
+      await controlPrisma.merchant
+        .delete({ where: { id: merchantId } })
+        .catch(() => undefined);
     }
     await app?.close();
   }, 60000);
 
-  it('[Lot 8] configure une boutique Mode (FASHION), crée une boutique Quartier (GROCERY) et une boutique Électronique (ELECTRONICS) avec presets et catégories suggérées', async () => {
-    // 1. Passer la première boutique en FASHION
-    const patchFashion = await request(app.getHttpServer())
-      .patch(`/api/v1/shops/${fashionShopId}`)
+  it('[Lot 8] le Super Admin crée une boutique Cosmétique avec ses catégories pré-typées, le propriétaire demande l’ajout du type Mode (FASHION), et le Super Admin active les deux types', async () => {
+    // 1. Vérifier que la boutique initiale créée en COSMETICS a déjà ses catégories Cosmétiques pré-créées avec sellingMode
+    const initialCats = await request(app.getHttpServer())
+      .get(`/api/v1/shops/${fashionShopId}/categories`)
       .set('Authorization', `Bearer ${ownerToken}`)
-      .send({ shopType: 'FASHION' })
+      .expect(200);
+    expect(initialCats.body.length).toBeGreaterThanOrEqual(4);
+    expect(initialCats.body.some((c: any) => c.sellingMode === 'COSMETIC_CARE')).toBe(true);
+
+    // 2. Le propriétaire demande au Super Admin d'ajouter le rayon Vêtements / Mode (FASHION)
+    const reqExpansion = await request(app.getHttpServer())
+      .post(`/api/v1/shops/${fashionShopId}/request-shop-type`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        requestedShopType: 'FASHION',
+        message: 'Je souhaite vendre des vêtements en plus des cosmétiques.',
+      })
+      .expect(201);
+    expect(reqExpansion.body.requestedShopType).toBe('FASHION');
+    expect(reqExpansion.body.ticketNumber).toContain('TYP-');
+
+    // 3. Le Super Admin active FASHION + COSMETICS sur la boutique et génère automatiquement les catégories Mode
+    const patchFashion = await request(app.getHttpServer())
+      .patch(`/api/v1/admin/shops/${fashionShopId}/types`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({
+        shopType: 'FASHION',
+        enabledShopTypes: ['FASHION', 'COSMETICS'],
+        seedCategories: true,
+      })
       .expect(200);
 
     expect(patchFashion.body.shopType).toBe('FASHION');
+    expect(patchFashion.body.businessProfile.enabledShopTypes).toEqual(
+      expect.arrayContaining(['FASHION', 'COSMETICS']),
+    );
     expect(patchFashion.body.businessProfile.enableSizes).toBe(true);
     expect(patchFashion.body.businessProfile.enableColors).toBe(true);
     expect(patchFashion.body.businessProfile.enableMultiPhotos).toBe(true);
     expect(patchFashion.body.businessProfile.storefrontLayout).toBe('GALLERY');
 
-    // Seed catégories suggérées Mode
-    const seedFashionCats = await request(app.getHttpServer())
-      .post(`/api/v1/shops/${fashionShopId}/categories/seed-suggested`)
+    // 4. Créer une catégorie personnalisée avec un sellingMode explicite
+    const customCat = await request(app.getHttpServer())
+      .post(`/api/v1/shops/${fashionShopId}/categories`)
       .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        name: 'Boubous & Bazin Riche',
+        sellingMode: 'APPAREL_SIZE_COLOR',
+      })
       .expect(201);
-    expect(seedFashionCats.body.createdCount).toBeGreaterThanOrEqual(4);
+    expect(customCat.body.sellingMode).toBe('APPAREL_SIZE_COLOR');
 
     // 2. Créer une boutique de quartier (GROCERY)
     const createGrocery = await request(app.getHttpServer())
@@ -142,12 +203,14 @@ describe('ShopControl Lots 8 à 11 — Profils Métiers Multi-Secteurs, Gros/Dé
     expect(getGrocery.body.businessProfile.enableFastPosFavorites).toBe(true);
     expect(getGrocery.body.businessProfile.storefrontLayout).toBe('QUICK_LIST');
 
-    // Seed catégories suggérées Alimentation
-    const seedGroceryCats = await request(app.getHttpServer())
-      .post(`/api/v1/shops/${groceryShopId}/categories/seed-suggested`)
+    // Vérifier que les catégories Alimentation (avec WEIGHT_BULK, PIECE_CARTON_DLC, etc.) ont été pré-créées automatiquement
+    const groceryCats = await request(app.getHttpServer())
+      .get(`/api/v1/shops/${groceryShopId}/categories`)
       .set('Authorization', `Bearer ${ownerToken}`)
-      .expect(201);
-    expect(seedGroceryCats.body.createdCount).toBeGreaterThanOrEqual(5);
+      .expect(200);
+    expect(groceryCats.body.length).toBeGreaterThanOrEqual(5);
+    expect(groceryCats.body.some((c: any) => c.sellingMode === 'WEIGHT_BULK')).toBe(true);
+    expect(groceryCats.body.some((c: any) => c.sellingMode === 'PIECE_CARTON_DLC')).toBe(true);
 
     // 3. Créer une boutique Électronique (ELECTRONICS)
     const createElec = await request(app.getHttpServer())

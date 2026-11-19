@@ -3,7 +3,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Search, ShieldAlert, UserCheck } from 'lucide-react';
-import { TenantStatus, TENANT_STATUSES, TENANT_STATUS_LABELS } from '@shopcontrol/shared';
+import {
+  SHOP_TYPE_DESCRIPTIONS,
+  SHOP_TYPE_LABELS,
+  SHOP_TYPES,
+  ShopType,
+  TenantStatus,
+  TENANT_STATUSES,
+  TENANT_STATUS_LABELS,
+} from '@shopcontrol/shared';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { AppShell } from '@/components/layout/AppShell';
@@ -48,6 +56,7 @@ export default function AdminMerchantsPage() {
     ownerEmail: '',
     ownerPassword: '',
     initialShopName: '',
+    initialShopType: 'GROCERY' as ShopType,
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -94,6 +103,7 @@ export default function AdminMerchantsPage() {
         body: {
           ...form,
           initialShopName: form.initialShopName.trim() || undefined,
+          initialShopType: form.initialShopName.trim() ? form.initialShopType : undefined,
         },
       });
       setShowCreate(false);
@@ -105,6 +115,7 @@ export default function AdminMerchantsPage() {
         ownerEmail: '',
         ownerPassword: '',
         initialShopName: '',
+        initialShopType: 'GROCERY',
       });
       await load();
     } catch (err) {
@@ -417,6 +428,37 @@ export default function AdminMerchantsPage() {
                     placeholder="ex. Boutique Bamako Centre"
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800">
+                    Type de la boutique (définit ses catégories et son mode de vente) *
+                  </label>
+                  <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
+                    {SHOP_TYPES.map((st) => {
+                      const active = form.initialShopType === st;
+                      return (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => setForm({ ...form, initialShopType: st })}
+                          className={`rounded-xl border p-2.5 text-left transition ${
+                            active
+                              ? 'border-forest-900 bg-forest-900 text-white shadow-xs'
+                              : 'border-slate-200 bg-slate-50 text-slate-800 hover:border-brand-400'
+                          }`}
+                        >
+                          <p className="text-xs font-extrabold">{SHOP_TYPE_LABELS[st]}</p>
+                          <p
+                            className={`mt-0.5 line-clamp-2 text-[10px] leading-snug ${
+                              active ? 'text-emerald-100/85' : 'text-slate-500'
+                            }`}
+                          >
+                            {SHOP_TYPE_DESCRIPTIONS[st]}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="flex justify-end gap-2 pt-3">
                   <button

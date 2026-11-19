@@ -6,7 +6,13 @@ import {
 } from '@nestjs/common';
 import { Client } from 'pg';
 import { PrismaClient as ShopPrismaClient } from '../../generated/prisma-shop';
-import { DEFAULT_EXPENSE_CATEGORY_NAMES } from '@shopcontrol/shared';
+import {
+  DEFAULT_EXPENSE_CATEGORY_NAMES,
+  getSuggestedCategoriesForShopTypes,
+  normalizeBusinessProfile,
+  normalizeShopType,
+  ShopType,
+} from '@shopcontrol/shared';
 import { getEnv } from '../config/env.config';
 import { ControlPrismaService } from './control-prisma.service';
 import { runShopMigrations } from './shop-migration.runner';
@@ -152,7 +158,60 @@ export class ShopDatabaseManagerService implements OnModuleDestroy {
       });
     }
 
+    // Initialise automatiquement les catégories produits correspondant au(x) type(s) de la boutique choisi(s) par le Super Admin
+    const normalizedType = normalizeShopType(input.shopType);
+    const normalizedProfile = normalizeBusinessProfile(normalizedType, input.businessProfile);
+    const templates = getSuggestedCategoriesForShopTypes(
+      normalizedProfile.enabledShopTypes?.length
+        ? normalizedProfile.enabledShopTypes
+        : [normalizedType],
+    );
+    for (let i = 0; i < templates.length; i += 1) {
+      const tpl = templates[i];
+      await shopClient.category.upsert({
+        where: { name: tpl.name },
+        create: {
+          name: tpl.name,
+          sellingMode: tpl.sellingMode,
+          description: tpl.description,
+          sortOrder: i,
+          isActive: true,
+        },
+        update: {
+          sellingMode: tpl.sellingMode,
+        },
+      });
+    }
+
     return { dbName: input.dbName, schemaVersion: latestVersion };
+  }
+
+  async seedCategoriesForShopTypes(shopId: string, shopTypes: ShopType[]): Promise<number> {
+    const client = await this.getClientForShop(shopId);
+    const templates = getSuggestedCategoriesForShopTypes(shopTypes);
+    let createdCount = 0;
+    for (let i = 0; i < templates.length; i += 1) {
+      const tpl = templates[i];
+      const existing = await client.category.findUnique({ where: { name: tpl.name } });
+      if (!existing) {
+        await client.category.create({
+          data: {
+            name: tpl.name,
+            sellingMode: tpl.sellingMode,
+            description: tpl.description,
+            sortOrder: i,
+            isActive: true,
+          },
+        });
+        createdCount += 1;
+      } else if (existing.sellingMode === 'STANDARD_PIECE' && tpl.sellingMode !== 'STANDARD_PIECE') {
+        await client.category.update({
+          where: { id: existing.id },
+          data: { sellingMode: tpl.sellingMode },
+        });
+      }
+    }
+    return createdCount;
   }
 
   /**

@@ -15,10 +15,13 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  CategorySellingMode,
   createCategorySchema,
   createProductSchema,
+  getSuggestedCategoriesForShopTypes,
+  normalizeBusinessProfile,
+  normalizeCategorySellingMode,
   normalizeShopType,
-  SHOP_TYPE_SUGGESTED_CATEGORIES,
   updateCategorySchema,
   updateProductSchema,
 } from '@shopcontrol/shared';
@@ -59,7 +62,14 @@ export class CatalogService {
   }
 
   async listCategories(shopId: string) {
-    const client = await this.shopDbManager.getClientForShop(shopId);
+    const [shop, client] = await Promise.all([
+      this.controlPrisma.shop.findUnique({
+        where: { id: shopId },
+        select: { shopType: true },
+      }),
+      this.shopDbManager.getClientForShop(shopId),
+    ]);
+    const shopType = normalizeShopType(shop?.shopType);
     const categories = await client.category.findMany({
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       include: { _count: { select: { products: true } } },
@@ -67,6 +77,7 @@ export class CatalogService {
     return categories.map((c) => ({
       id: c.id,
       name: c.name,
+      sellingMode: normalizeCategorySellingMode(c.sellingMode, shopType, c.name),
       description: c.description,
       sortOrder: c.sortOrder,
       isActive: c.isActive,
@@ -76,9 +87,20 @@ export class CatalogService {
 
   async createCategory(
     shopId: string,
-    input: { name: string; description?: string; sortOrder?: number },
+    input: {
+      name: string;
+      sellingMode?: CategorySellingMode;
+      description?: string;
+      sortOrder?: number;
+    },
   ) {
-    const client = await this.shopDbManager.getClientForShop(shopId);
+    const [shop, client] = await Promise.all([
+      this.controlPrisma.shop.findUnique({
+        where: { id: shopId },
+        select: { shopType: true },
+      }),
+      this.shopDbManager.getClientForShop(shopId),
+    ]);
     const existing = await client.category.findUnique({ where: { name: input.name } });
     if (existing) {
       throw new ConflictException({
@@ -86,9 +108,15 @@ export class CatalogService {
         message: `La catégorie « ${input.name} » existe déjà.`,
       });
     }
+    const sellingMode = normalizeCategorySellingMode(
+      input.sellingMode,
+      normalizeShopType(shop?.shopType),
+      input.name,
+    );
     return client.category.create({
       data: {
         name: input.name,
+        sellingMode,
         description: input.description || null,
         sortOrder: input.sortOrder ?? 0,
       },
@@ -98,7 +126,13 @@ export class CatalogService {
   async updateCategory(
     shopId: string,
     categoryId: string,
-    input: { name?: string; description?: string; sortOrder?: number; isActive?: boolean },
+    input: {
+      name?: string;
+      sellingMode?: CategorySellingMode;
+      description?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
   ) {
     const client = await this.shopDbManager.getClientForShop(shopId);
     const existing = await client.category.findUnique({ where: { id: categoryId } });
@@ -109,6 +143,7 @@ export class CatalogService {
       where: { id: categoryId },
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.sellingMode !== undefined ? { sellingMode: input.sellingMode } : {}),
         ...(input.description !== undefined ? { description: input.description } : {}),
         ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
@@ -119,21 +154,35 @@ export class CatalogService {
   async seedSuggestedCategories(shopId: string) {
     const shop = await this.controlPrisma.shop.findUnique({
       where: { id: shopId },
-      select: { shopType: true },
+      select: { shopType: true, businessProfile: true },
     });
     const shopType = normalizeShopType(shop?.shopType);
-    const suggested = SHOP_TYPE_SUGGESTED_CATEGORIES[shopType] || [];
+    const profile = normalizeBusinessProfile(shopType, shop?.businessProfile);
+    const suggested = getSuggestedCategoriesForShopTypes(
+      profile.enabledShopTypes?.length ? profile.enabledShopTypes : [shopType],
+    );
     const client = await this.shopDbManager.getClientForShop(shopId);
 
     let createdCount = 0;
     for (let i = 0; i < suggested.length; i += 1) {
-      const name = suggested[i];
-      const existing = await client.category.findUnique({ where: { name } });
+      const tpl = suggested[i];
+      const existing = await client.category.findUnique({ where: { name: tpl.name } });
       if (!existing) {
         await client.category.create({
-          data: { name, sortOrder: i, isActive: true },
+          data: {
+            name: tpl.name,
+            sellingMode: tpl.sellingMode,
+            description: tpl.description,
+            sortOrder: i,
+            isActive: true,
+          },
         });
         createdCount += 1;
+      } else if (existing.sellingMode === 'STANDARD_PIECE' && tpl.sellingMode !== 'STANDARD_PIECE') {
+        await client.category.update({
+          where: { id: existing.id },
+          data: { sellingMode: tpl.sellingMode, description: existing.description || tpl.description },
+        });
       }
     }
 

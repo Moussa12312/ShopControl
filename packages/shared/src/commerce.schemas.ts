@@ -5,6 +5,7 @@ import {
   PRODUCT_STATUSES,
   SALE_RETURN_CONDITIONS,
 } from './commerce.enums';
+import { CATEGORY_SELLING_MODES } from './shop-profiles';
 
 const xofInt = z.number().int('Le montant XOF doit être un nombre entier.').min(0);
 const positiveInt = z.number().int('La quantité doit être un entier positif.').min(1);
@@ -12,6 +13,7 @@ const positiveInt = z.number().int('La quantité doit être un entier positif.')
 // --- Catégories & Produits ---
 export const createCategorySchema = z.object({
   name: z.string().trim().min(2, 'Nom de catégorie requis.').max(80),
+  sellingMode: z.enum(CATEGORY_SELLING_MODES).default('STANDARD_PIECE'),
   description: z.string().trim().max(300).optional(),
   sortOrder: z.number().int().min(0).max(9999).default(0),
 });

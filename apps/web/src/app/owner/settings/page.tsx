@@ -28,14 +28,8 @@ import {
   normalizeShopType,
   PLATFORM_MODULE_LABELS,
   PlatformModuleKey,
-  SHOP_TYPE_DESCRIPTIONS,
-  SHOP_TYPE_LABELS,
-  SHOP_TYPE_PRESETS,
-  SHOP_TYPES,
+  SHOP_TYPE_SHORT_LABELS,
   ShopType,
-  STOREFRONT_LAYOUT_LABELS,
-  STOREFRONT_LAYOUTS,
-  StorefrontLayout,
   SUBSCRIPTION_PLAN_LABELS,
   SubscriptionPlan,
   SUPPORT_TICKET_STATUS_LABELS,
@@ -151,12 +145,10 @@ export default function OwnerSettingsPage() {
   // Formulaire Entreprise
   const [companyForm, setCompanyForm] = useState({ name: '', legalName: '', phone: '', email: '' });
 
-  // Formulaire Boutique + Logo + Profil Métier + Ticket + Livraison
+  // Formulaire Boutique + Logo + Ticket + Livraison
   const [shopForm, setShopForm] = useState({
     name: '',
     slug: '',
-    shopType: 'GENERAL' as ShopType,
-    businessProfile: SHOP_TYPE_PRESETS.GENERAL as BusinessProfileConfig,
     logoUrl: null as string | null,
     phone: '',
     email: '',
@@ -186,13 +178,9 @@ export default function OwnerSettingsPage() {
   const hydrateShopForm = useCallback((s: ShopDetail) => {
     const r = { ...DEFAULT_RECEIPT_SETTINGS, ...(s.receiptSettings || {}) };
     const d = { ...DEFAULT_DELIVERY_CONFIG, ...(s.deliveryConfig || {}) };
-    const st = normalizeShopType(s.shopType);
-    const bp = normalizeBusinessProfile(st, s.businessProfile);
     setShopForm({
       name: s.name || '',
       slug: s.slug || '',
-      shopType: st,
-      businessProfile: bp,
       logoUrl: s.logoUrl || null,
       phone: s.phone || '',
       email: s.email || '',
@@ -279,8 +267,6 @@ export default function OwnerSettingsPage() {
         body: {
           name: shopForm.name.trim(),
           slug: shopForm.slug.trim(),
-          shopType: shopForm.shopType,
-          businessProfile: shopForm.businessProfile,
           logoUrl: shopForm.logoUrl,
           phone: shopForm.phone.trim() || undefined,
           email: shopForm.email.trim() || '',
@@ -740,173 +726,6 @@ export default function OwnerSettingsPage() {
                             setShopForm({ ...shopForm, taxRatePercent: Number(e.target.value) })
                           }
                           className="sc-input mt-1 tabular disabled:bg-slate-100"
-                        />
-                      </div>
-                    </div>
-                  </section>
-
-                  {/* Type de boutique & Options métier à la carte (Lots 8–11) */}
-                  <section className="sc-card space-y-4 p-5">
-                    <div>
-                      <h2 className="text-base font-extrabold text-slate-900">
-                        Type de boutique & Options métier (Mode, Alimentation, Électronique…)
-                      </h2>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        Choisissez le secteur de cette boutique pour pré-configurer l’application, ou activez/désactivez chaque option à la carte.
-                      </p>
-                    </div>
-
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {SHOP_TYPES.map((t) => {
-                        const active = shopForm.shopType === t;
-                        return (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() =>
-                              setShopForm((prev) => ({
-                                ...prev,
-                                shopType: t,
-                                businessProfile: {
-                                  ...SHOP_TYPE_PRESETS[t],
-                                  defaultUnits: [...SHOP_TYPE_PRESETS[t].defaultUnits],
-                                },
-                              }))
-                            }
-                            className={`rounded-2xl border p-3 text-left transition ${
-                              active
-                                ? 'border-forest-900 bg-forest-900 text-white shadow-sm'
-                                : 'border-slate-200 bg-porcelain-50 text-slate-800 hover:border-brand-400'
-                            }`}
-                          >
-                            <p className="text-xs font-extrabold">{SHOP_TYPE_LABELS[t]}</p>
-                            <p
-                              className={`mt-0.5 text-[11px] leading-snug ${
-                                active ? 'text-emerald-100/85' : 'text-slate-500'
-                              }`}
-                            >
-                              {SHOP_TYPE_DESCRIPTIONS[t]}
-                            </p>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="space-y-2 border-t border-slate-100 pt-3">
-                      <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
-                        Options métier activées sur cette boutique (personnalisables)
-                      </p>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {(
-                          [
-                            {
-                              key: 'enableSizes',
-                              label: 'Tailles & Pointures (XS..3XL, 36..45)',
-                            },
-                            {
-                              key: 'enableColors',
-                              label: 'Couleurs & Pastilles visuelles',
-                            },
-                            {
-                              key: 'enableMultiPhotos',
-                              label: 'Galerie multi-photos (jusqu’à 10 photos)',
-                            },
-                            {
-                              key: 'enableBulkUnits',
-                              label: 'Gros ↔ Détail (Carton / Sac / Paquet)',
-                            },
-                            {
-                              key: 'enableAmountSale',
-                              label: 'Vente au montant / fraction (ex: 250 F de sucre)',
-                            },
-                            {
-                              key: 'enableExpiryTracking',
-                              label: 'Dates de péremption (DLC), Lots FEFO & Rebut',
-                            },
-                            {
-                              key: 'enableSerialWarranty',
-                              label: 'N° de série / IMEI & Garantie sur ticket',
-                            },
-                            {
-                              key: 'enableBrandModel',
-                              label: 'Marque, Modèle & Contenance (ml/g)',
-                            },
-                            {
-                              key: 'enableFastPosFavorites',
-                              label: 'Barre Favoris POS Express en caisse',
-                            },
-                          ] as const
-                        ).map((opt) => (
-                          <label
-                            key={opt.key}
-                            className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-porcelain-50 p-2.5 text-xs font-semibold text-slate-800"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={Boolean(shopForm.businessProfile[opt.key])}
-                              onChange={(e) =>
-                                setShopForm((prev) => ({
-                                  ...prev,
-                                  businessProfile: {
-                                    ...prev.businessProfile,
-                                    [opt.key]: e.target.checked,
-                                  },
-                                }))
-                              }
-                              className="h-4 w-4 accent-brand-700"
-                            />
-                            <span>{opt.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700">
-                          Disposition de la vitrine QR publique
-                        </label>
-                        <select
-                          value={shopForm.businessProfile.storefrontLayout}
-                          onChange={(e) =>
-                            setShopForm((prev) => ({
-                              ...prev,
-                              businessProfile: {
-                                ...prev.businessProfile,
-                                storefrontLayout: e.target.value as StorefrontLayout,
-                              },
-                            }))
-                          }
-                          className="sc-input mt-1"
-                        >
-                          {STOREFRONT_LAYOUTS.map((lay) => (
-                            <option key={lay} value={lay}>
-                              {STOREFRONT_LAYOUT_LABELS[lay]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700">
-                          Unités proposées par défaut (séparées par virgule)
-                        </label>
-                        <input
-                          value={shopForm.businessProfile.defaultUnits.join(', ')}
-                          onChange={(e) => {
-                            const units = e.target.value
-                              .split(',')
-                              .map((u) => u.trim())
-                              .filter(Boolean);
-                            setShopForm((prev) => ({
-                              ...prev,
-                              businessProfile: {
-                                ...prev.businessProfile,
-                                defaultUnits: units.length > 0 ? units : ['unité'],
-                              },
-                            }));
-                          }}
-                          placeholder="unité, sachet, boîte, kg, L…"
-                          className="sc-input mt-1"
                         />
                       </div>
                     </div>

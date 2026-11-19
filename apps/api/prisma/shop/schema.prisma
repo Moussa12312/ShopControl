@@ -123,6 +123,7 @@ model ShopAuditLog {
 model Category {
   id          String   @id @default(uuid()) @db.Uuid
   name        String   @unique @db.VarChar(80)
+  sellingMode String   @default("STANDARD_PIECE") @map("selling_mode") @db.VarChar(40)
   description String?  @db.VarChar(300)
   sortOrder   Int      @default(0) @map("sort_order")
   isActive    Boolean  @default(true) @map("is_active")
