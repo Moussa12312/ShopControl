@@ -128,13 +128,13 @@ export default function OwnerOperatorsPage() {
             {formError ? (
               <p className="mt-2 text-xs text-red-700">{formError}</p>
             ) : null}
-            <div className="mt-3 flex flex-wrap gap-3">
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <input
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="Prénom (ex. Aminata, Sékou…)"
-                className="flex-1 min-w-[180px] rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm sm:min-w-[180px] sm:flex-1"
               />
               <input
                 type="password"
@@ -143,12 +143,12 @@ export default function OwnerOperatorsPage() {
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="PIN 4–6 chiffres (optionnel)"
-                className="w-56 rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm sm:w-56"
               />
               <button
                 type="submit"
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-forest-900 px-4 py-2 text-sm font-semibold text-white hover:bg-forest-800 disabled:opacity-50 sm:w-auto"
               >
                 <Plus className="h-4 w-4" />
                 Ajouter

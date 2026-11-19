@@ -175,7 +175,7 @@ export default function ClientsReceivablesPage() {
           <div className="space-y-4">
             <form
               onSubmit={handleCreateClient}
-              className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-5"
+              className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5"
             >
               <input
                 required
@@ -208,7 +208,7 @@ export default function ClientsReceivablesPage() {
               <button
                 type="submit"
                 disabled={busy}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-700 px-4 py-2 text-sm font-semibold text-white"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-forest-900 px-4 py-2 text-sm font-semibold text-white hover:bg-forest-800 sm:col-span-2 lg:col-span-1"
               >
                 <Plus className="h-4 w-4" />
                 Ajouter
@@ -218,38 +218,77 @@ export default function ClientsReceivablesPage() {
             {clients.length === 0 ? (
               <EmptyState title="Aucun client" description="Ajoutez vos clients réguliers ou crédits." />
             ) : (
-              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                  <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
-                    <tr>
-                      <th className="px-4 py-3">Client</th>
-                      <th className="px-4 py-3">Plafond crédit</th>
-                      <th className="px-4 py-3">Encours dû</th>
-                      <th className="px-4 py-3">Ventes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {clients.map((c) => (
-                      <tr key={c.id}>
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-slate-900">{c.fullName}</p>
-                          <p className="text-xs text-slate-500">
-                            {c.phone}
-                            {c.address ? ` · ${c.address}` : ''}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-xs font-medium">{formatXof(c.creditLimitXof)}</td>
-                        <td className="px-4 py-3 text-xs font-bold">
-                          <span className={c.outstandingDebtXof > 0 ? 'text-amber-800' : 'text-emerald-700'}>
+              <>
+                {/* Cartes mobile (< md) */}
+                <div className="space-y-2.5 md:hidden">
+                  {clients.map((c) => (
+                    <div
+                      key={`m-${c.id}`}
+                      className="rounded-2xl border border-slate-200 bg-white p-4 text-xs shadow-xs"
+                    >
+                      <p className="text-sm font-bold text-slate-900">{c.fullName}</p>
+                      <p className="text-slate-500">
+                        {c.phone}
+                        {c.address ? ` · ${c.address}` : ''}
+                      </p>
+                      <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-2.5 text-center">
+                        <div>
+                          <p className="text-[10px] text-slate-400">Plafond</p>
+                          <p className="font-semibold text-slate-800">{formatXof(c.creditLimitXof)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400">Encours dû</p>
+                          <p
+                            className={`font-bold ${
+                              c.outstandingDebtXof > 0 ? 'text-amber-800' : 'text-emerald-700'
+                            }`}
+                          >
                             {formatXof(c.outstandingDebtXof)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-600">{c.salesCount}</td>
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400">Ventes</p>
+                          <p className="font-semibold text-slate-700">{c.salesCount}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Tableau desktop (>= md) */}
+                <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
+                      <tr>
+                        <th className="px-4 py-3">Client</th>
+                        <th className="px-4 py-3">Plafond crédit</th>
+                        <th className="px-4 py-3">Encours dû</th>
+                        <th className="px-4 py-3">Ventes</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {clients.map((c) => (
+                        <tr key={c.id}>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-slate-900">{c.fullName}</p>
+                            <p className="text-xs text-slate-500">
+                              {c.phone}
+                              {c.address ? ` · ${c.address}` : ''}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 text-xs font-medium">{formatXof(c.creditLimitXof)}</td>
+                          <td className="px-4 py-3 text-xs font-bold">
+                            <span className={c.outstandingDebtXof > 0 ? 'text-amber-800' : 'text-emerald-700'}>
+                              {formatXof(c.outstandingDebtXof)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-600">{c.salesCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         ) : receivables.length === 0 ? (

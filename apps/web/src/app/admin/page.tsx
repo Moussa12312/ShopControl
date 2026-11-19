@@ -73,10 +73,10 @@ export default function AdminDashboardPage() {
   const dbHealth: 'OK' | 'CRITICAL' = (data?.shops.dbFailed ?? 0) > 0 ? 'CRITICAL' : 'OK';
 
   const heroSection = (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-[26px]">
+    <div className="space-y-4 sm:space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold tracking-tight text-white sm:text-[26px]">
             Bonjour {user?.fullName.split(' ')[0] || 'Admin'} !
           </h1>
           <p className="mt-0.5 text-xs text-emerald-200/70">
@@ -85,20 +85,20 @@ export default function AdminDashboardPage() {
         </div>
         <Link
           href="/admin/merchants"
-          className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold text-forest-900 shadow-sm hover:bg-emerald-50"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold text-forest-900 shadow-sm hover:bg-emerald-50 sm:w-auto"
         >
           <span>Nouveau marchand</span>
           <Plus className="h-4 w-4 stroke-[2.5]" />
         </Link>
       </div>
 
-      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-white/10 bg-forest-800/85 p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3.5 xl:grid-cols-4">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-forest-800/85 p-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-emerald-200">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-emerald-200">
               <Building2 className="h-4 w-4" />
             </span>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-medium text-[#98b3ae]">Marchands</p>
               <p className="mt-0.5 text-xl font-bold text-white">{data?.merchants.total ?? 0}</p>
             </div>
@@ -111,12 +111,12 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-forest-800/85 p-4">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-forest-800/85 p-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-emerald-200">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-emerald-200">
               <Store className="h-4 w-4" />
             </span>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-medium text-[#98b3ae]">Boutiques actives</p>
               <p className="mt-0.5 text-xl font-bold text-white">{data?.shops.total ?? 0}</p>
             </div>
@@ -126,13 +126,13 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-forest-800/85 p-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-emerald-200">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-forest-800/85 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-emerald-200">
                 <Database className="h-4 w-4" />
               </span>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-medium text-[#98b3ae]">Bases BDD dédiées</p>
                 <p className="mt-0.5 text-xl font-bold text-white">{data?.shops.dbReady ?? 0}</p>
               </div>
@@ -144,9 +144,9 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        <div className="lime-glow-card flex flex-col justify-between rounded-2xl border border-limeglow-400/25 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
+        <div className="lime-glow-card flex min-w-0 flex-col justify-between rounded-2xl border border-limeglow-400/25 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
+            <div className="min-w-0">
               <p className="text-lg font-bold text-white">
                 {data?.security.activeSessionsCount ?? 0}{' '}
                 <span className="text-xs font-medium text-emerald-100/80">Sessions</span>
@@ -176,11 +176,11 @@ export default function AdminDashboardPage() {
       ) : error ? (
         <ErrorState message={error} onRetry={load} />
       ) : data ? (
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-card">
-          <div className="mb-4 flex items-center justify-between">
+        <div className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-card sm:p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <KeyRound className="h-5 w-5 text-brand-700" />
-              <h2 className="text-base font-bold text-slate-900">
+              <KeyRound className="h-5 w-5 shrink-0 text-brand-700" />
+              <h2 className="text-sm font-bold text-slate-900 sm:text-base">
                 Activité d’administration et de sécurité récente
               </h2>
             </div>
@@ -198,14 +198,16 @@ export default function AdminDashboardPage() {
               {data.recentAudit.map((item) => (
                 <div
                   key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
+                  className="flex flex-col gap-1.5 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                  <div className="flex min-w-0 items-start gap-2.5 sm:items-center">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
                       <ShieldAlert className="h-4 w-4" />
                     </span>
-                    <div>
-                      <p className="font-mono text-xs font-bold text-slate-900">{item.action}</p>
+                    <div className="min-w-0">
+                      <p className="break-all font-mono text-xs font-bold text-slate-900">
+                        {item.action}
+                      </p>
                       <p className="text-xs text-slate-500">
                         {item.entityType}
                         {item.actorName ? ` · ${item.actorName}` : ''}
@@ -213,7 +215,7 @@ export default function AdminDashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs text-slate-400">
+                  <span className="pl-10 text-[11px] text-slate-400 sm:shrink-0 sm:pl-0 sm:text-xs">
                     {formatDateTimeInTimezone(item.createdAt)}
                   </span>
                 </div>

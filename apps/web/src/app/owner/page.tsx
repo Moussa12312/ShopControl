@@ -160,11 +160,11 @@ export default function OwnerDashboardPage() {
         : 'OK';
 
   const heroSection = (
-    <div className="space-y-5">
+    <div className="space-y-4 sm:space-y-5">
       {/* Salutation + sélecteur de période + CTA blanc pill */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-[26px]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold tracking-tight text-white sm:text-[26px]">
             Bonjour {firstName} !
           </h1>
           <p className="mt-0.5 text-xs text-emerald-200/70">
@@ -174,12 +174,12 @@ export default function OwnerDashboardPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5">
           {/* Sélecteur Jour / Semaine / Mois */}
           <div
             role="group"
             aria-label="Période d'analyse"
-            className="inline-flex rounded-full border border-white/10 bg-forest-800 p-1 text-xs font-semibold"
+            className="grid w-full grid-cols-3 rounded-full border border-white/10 bg-forest-800 p-1 text-xs font-semibold sm:inline-flex sm:w-auto"
           >
             {(
               [
@@ -192,7 +192,7 @@ export default function OwnerDashboardPage() {
                 key={opt.key}
                 type="button"
                 onClick={() => setPeriod(opt.key)}
-                className={`rounded-full px-3.5 py-1.5 transition-all ${
+                className={`rounded-full px-3 py-1.5 text-center transition-all sm:px-3.5 ${
                   period === opt.key
                     ? 'bg-white/15 text-white shadow-xs ring-1 ring-white/20'
                     : 'text-[#8ea9a4] hover:text-white'
@@ -206,7 +206,7 @@ export default function OwnerDashboardPage() {
           {!supportGrantId ? (
             <Link
               href={shops.length > 0 ? '/pos' : '/owner/shops'}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold text-forest-900 shadow-sm transition hover:bg-emerald-50"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold text-forest-900 shadow-sm transition hover:bg-emerald-50 sm:w-auto"
             >
               <span>{shops.length > 0 ? 'Nouvelle vente' : 'Créer boutique'}</span>
               <Plus className="h-4 w-4 stroke-[2.5]" />
@@ -216,25 +216,25 @@ export default function OwnerDashboardPage() {
       </div>
 
       {/* 4 cartes KPI sombres translucides + 4e carte Actions Lime-Glow */}
-      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3.5 xl:grid-cols-4">
         {/* KPI 1 : Chiffre d'affaires */}
-        <div className="rounded-2xl border border-white/10 bg-forest-800/85 p-4 backdrop-blur-xs">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-forest-800/85 p-4 backdrop-blur-xs">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-emerald-200">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-emerald-200">
                 <ShoppingBag className="h-4 w-4" />
               </span>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-medium text-[#98b3ae]">Chiffre d’affaires</p>
-                <p className="mt-0.5 text-xl font-bold tracking-tight text-white">
+                <p className="mt-0.5 truncate text-lg font-bold tracking-tight text-white sm:text-xl">
                   {formatXof(kpis?.currentSalesXof ?? 0)}
                 </p>
               </div>
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-[11px]">
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
             <TrendingUp
-              className={`h-3.5 w-3.5 ${
+              className={`h-3.5 w-3.5 shrink-0 ${
                 (kpis?.salesDeltaPercent ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
               }`}
             />
@@ -253,14 +253,14 @@ export default function OwnerDashboardPage() {
         </div>
 
         {/* KPI 2 : Total Produits */}
-        <div className="rounded-2xl border border-white/10 bg-forest-800/85 p-4 backdrop-blur-xs">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-emerald-200">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-forest-800/85 p-4 backdrop-blur-xs">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-emerald-200">
               <Package className="h-4 w-4" />
             </span>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-medium text-[#98b3ae]">Total Produits</p>
-              <p className="mt-0.5 text-xl font-bold tracking-tight text-white">
+              <p className="mt-0.5 text-lg font-bold tracking-tight text-white sm:text-xl">
                 {kpis?.totalProductsCount ?? 0}{' '}
                 <span className="text-xs font-normal text-[#8ea9a4]">articles</span>
               </p>
@@ -279,15 +279,15 @@ export default function OwnerDashboardPage() {
         </div>
 
         {/* KPI 3 : Créances / Risque encours */}
-        <div className="rounded-2xl border border-white/10 bg-forest-800/85 p-4 backdrop-blur-xs">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-emerald-200">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-forest-800/85 p-4 backdrop-blur-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-emerald-200">
                 <Receipt className="h-4 w-4" />
               </span>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-medium text-[#98b3ae]">Créances clients</p>
-                <p className="mt-0.5 text-xl font-bold tracking-tight text-white">
+                <p className="mt-0.5 text-lg font-bold tracking-tight text-white sm:text-xl">
                   {kpis?.receivableRatioPercent ?? 0}
                   <span className="ml-0.5 text-xs font-normal text-[#8ea9a4]">%</span>
                 </p>
@@ -314,9 +314,9 @@ export default function OwnerDashboardPage() {
         </div>
 
         {/* KPI 4 : Carte lumineuse Lime-Glow Actions prioritaires */}
-        <div className="lime-glow-card flex flex-col justify-between rounded-2xl border border-limeglow-400/25 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
+        <div className="lime-glow-card flex min-w-0 flex-col justify-between rounded-2xl border border-limeglow-400/25 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
+            <div className="min-w-0">
               <p className="text-lg font-bold text-white">
                 {kpis?.priorityActionsCount ?? 0}{' '}
                 <span className="text-xs font-medium text-emerald-100/80">Actions</span>
@@ -324,7 +324,7 @@ export default function OwnerDashboardPage() {
               <p className="text-xs font-semibold text-emerald-50">
                 Alertes & suivi temps réel
               </p>
-              <p className="mt-0.5 text-[11px] text-emerald-200/75">
+              <p className="mt-0.5 truncate text-[11px] text-emerald-200/75">
                 Dépenses : {formatXof(kpis?.expensesXof ?? 0)}
               </p>
             </div>
@@ -362,18 +362,18 @@ export default function OwnerDashboardPage() {
           }
         />
       ) : (
-        <div className="grid gap-5 lg:grid-cols-12">
+        <div className="grid gap-4 lg:grid-cols-12 lg:gap-5">
           {/* Panneau gauche : Analytique rapide + Graphique double courbe + Actions rapides */}
-          <section className="flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-5 shadow-card lg:col-span-6">
+          <section className="flex min-w-0 flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-4 shadow-card sm:p-5 lg:col-span-6">
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-base font-bold text-slate-900">Analytique rapide</h2>
-                <div className="inline-flex items-center gap-1.5">
+                <div className="flex w-full items-center justify-between gap-1.5 sm:inline-flex sm:w-auto">
                   <select
                     value={chartMode}
                     onChange={(e) => setChartMode(e.target.value as 'sales' | 'count')}
                     aria-label="Indicateur du graphique"
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
+                    className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 sm:flex-none"
                   >
                     <option value="sales">Vue Chiffre d’affaires (XOF)</option>
                     <option value="count">Vue Nombre de ventes</option>
@@ -381,26 +381,26 @@ export default function OwnerDashboardPage() {
                   <Link
                     href="/pos"
                     title="Ouvrir le comptoir POS"
-                    className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                   >
                     <ArrowUpRight className="h-4 w-4" />
                   </Link>
                 </div>
               </div>
 
-              {/* 3 mini-cartes KPI blanches (style screenshot : bordure foncée sur la 1re active) */}
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {/* 3 mini-cartes KPI blanches (responsive 2+1 sur téléphone, 3 cols sur sm+) */}
+              <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => setChartMode('sales')}
-                  className={`rounded-2xl border p-3.5 text-left transition ${
+                  className={`min-w-0 rounded-2xl border p-3 text-left transition sm:p-3.5 ${
                     chartMode === 'sales'
                       ? 'border-forest-900 bg-white shadow-xs ring-1 ring-forest-900/10'
                       : 'border-slate-200 bg-slate-50/60 hover:border-slate-300'
                   }`}
                 >
-                  <p className="text-[11px] font-medium text-slate-500">Panier moyen</p>
-                  <p className="mt-1 text-base font-bold text-slate-900">
+                  <p className="truncate text-[11px] font-medium text-slate-500">Panier moyen</p>
+                  <p className="mt-1 truncate text-sm font-bold text-slate-900 sm:text-base">
                     {formatXof(kpis?.averageOrderXof ?? 0)}
                   </p>
                 </button>
@@ -408,10 +408,10 @@ export default function OwnerDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setChartMode('sales')}
-                  className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5 text-left transition hover:border-slate-300"
+                  className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 text-left transition hover:border-slate-300 sm:p-3.5"
                 >
-                  <p className="text-[11px] font-medium text-slate-500">Période précédente</p>
-                  <p className="mt-1 text-base font-bold text-slate-900">
+                  <p className="truncate text-[11px] font-medium text-slate-500">Période préc.</p>
+                  <p className="mt-1 truncate text-sm font-bold text-slate-900 sm:text-base">
                     {formatXof(kpis?.previousSalesXof ?? 0)}
                   </p>
                 </button>
@@ -419,14 +419,14 @@ export default function OwnerDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setChartMode('count')}
-                  className={`rounded-2xl border p-3.5 text-left transition ${
+                  className={`col-span-2 min-w-0 rounded-2xl border p-3 text-left transition sm:col-span-1 sm:p-3.5 ${
                     chartMode === 'count'
                       ? 'border-forest-900 bg-white shadow-xs ring-1 ring-forest-900/10'
                       : 'border-slate-200 bg-slate-50/60 hover:border-slate-300'
                   }`}
                 >
-                  <p className="text-[11px] font-medium text-slate-500">Produits stock bas</p>
-                  <p className="mt-1 text-base font-bold text-slate-900">
+                  <p className="truncate text-[11px] font-medium text-slate-500">Produits stock bas</p>
+                  <p className="mt-1 text-sm font-bold text-slate-900 sm:text-base">
                     {kpis?.lowStockCount ?? 0}{' '}
                     <span className="text-xs font-normal text-slate-500">articles</span>
                   </p>
@@ -446,41 +446,41 @@ export default function OwnerDashboardPage() {
             <div className="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200/80 bg-slate-50/40">
               <Link
                 href="/commerce/stock"
-                className="flex items-center justify-between px-4 py-3 text-xs transition hover:bg-white"
+                className="flex items-center justify-between gap-2 px-3.5 py-3 text-xs transition hover:bg-white sm:px-4"
               >
-                <span className="flex items-center gap-2.5 text-slate-700">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <span>
+                <span className="flex min-w-0 items-center gap-2.5 text-slate-700">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                  <span className="min-w-0">
                     <strong className="text-slate-900">{kpis?.lowStockCount ?? 0} produit(s)</strong>{' '}
                     en seuil bas ou rupture de stock
                   </span>
                 </span>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
               </Link>
 
               <Link
                 href="/commerce/clients"
-                className="flex items-center justify-between px-4 py-3 text-xs transition hover:bg-white"
+                className="flex items-center justify-between gap-2 px-3.5 py-3 text-xs transition hover:bg-white sm:px-4"
               >
-                <span className="flex items-center gap-2.5 text-slate-700">
-                  <Receipt className="h-4 w-4 text-brand-700" />
-                  <span>
+                <span className="flex min-w-0 items-center gap-2.5 text-slate-700">
+                  <Receipt className="h-4 w-4 shrink-0 text-brand-700" />
+                  <span className="min-w-0">
                     <strong className="text-slate-900">
                       {kpis?.openReceivablesCount ?? 0} créance(s)
                     </strong>{' '}
                     client(s) à encaisser ({formatXof(kpis?.openReceivablesAmountXof ?? 0)})
                   </span>
                 </span>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
               </Link>
 
               <Link
                 href="/commerce/cash"
-                className="flex items-center justify-between px-4 py-3 text-xs transition hover:bg-white"
+                className="flex items-center justify-between gap-2 px-3.5 py-3 text-xs transition hover:bg-white sm:px-4"
               >
-                <span className="flex items-center gap-2.5 text-slate-700">
-                  <Banknote className="h-4 w-4 text-emerald-700" />
-                  <span>
+                <span className="flex min-w-0 items-center gap-2.5 text-slate-700">
+                  <Banknote className="h-4 w-4 shrink-0 text-emerald-700" />
+                  <span className="min-w-0">
                     <strong className="text-slate-900">
                       {kpis?.openCashSessionsCount ?? 0} caisse(s) ouverte(s)
                     </strong>
@@ -489,19 +489,19 @@ export default function OwnerDashboardPage() {
                       : ' · suivi des clôtures et écarts'}
                   </span>
                 </span>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
               </Link>
             </div>
           </section>
 
-          {/* Panneau droit : Tableau Produits (avec barres segmentées) & onglet Boutiques/BDD */}
-          <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-card lg:col-span-6">
-            <div className="flex flex-wrap items-center justify-between gap-2.5">
-              <div className="inline-flex items-center gap-2">
+          {/* Panneau droit : Produits (cartes mobiles + tableau desktop) & onglet Boutiques/BDD */}
+          <section className="min-w-0 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-card sm:p-5 lg:col-span-6">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="inline-flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setRightTab('products')}
-                  className={`rounded-full px-3 py-1 text-sm font-bold transition ${
+                  className={`rounded-full px-3 py-1.5 text-xs font-bold transition sm:text-sm ${
                     rightTab === 'products'
                       ? 'bg-forest-900 text-white'
                       : 'text-slate-500 hover:bg-slate-100'
@@ -515,7 +515,7 @@ export default function OwnerDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setRightTab('shops')}
-                  className={`rounded-full px-3 py-1 text-sm font-bold transition ${
+                  className={`rounded-full px-3 py-1.5 text-xs font-bold transition sm:text-sm ${
                     rightTab === 'shops'
                       ? 'bg-forest-900 text-white'
                       : 'text-slate-500 hover:bg-slate-100'
@@ -529,14 +529,14 @@ export default function OwnerDashboardPage() {
               </div>
 
               {rightTab === 'products' ? (
-                <div className="relative flex-1 sm:max-w-[200px]">
-                  <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-slate-400" />
+                <div className="relative w-full sm:max-w-[210px]">
+                  <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
                   <input
                     type="search"
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
                     placeholder="Rechercher…"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-3 text-xs"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-8 pr-3 text-xs sm:py-1.5"
                   />
                 </div>
               ) : null}
@@ -559,94 +559,148 @@ export default function OwnerDashboardPage() {
                   />
                 </div>
               ) : (
-                <div className="mt-4 overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                        <th className="pb-2.5 pr-3">Produit</th>
-                        <th className="pb-2.5 pr-3">Prix</th>
-                        <th className="pb-2.5 pr-3">Stock</th>
-                        <th className="pb-2.5 pr-3">Ventes</th>
-                        <th className="pb-2.5 text-right">Santé stock</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100/80">
-                      {filteredProducts.slice(0, 9).map((prod) => (
-                        <tr
-                          key={`${prod.shopId}-${prod.id}`}
-                          className="group transition hover:bg-slate-50"
-                        >
-                          <td className="py-3 pr-3">
-                            <div className="flex items-center gap-2.5">
-                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-xs font-bold text-brand-800">
-                                {prod.name.slice(0, 2).toUpperCase()}
-                              </span>
-                              <div className="min-w-0">
-                                <p className="truncate font-semibold text-slate-900">{prod.name}</p>
-                                <p className="truncate text-[11px] text-slate-400">
-                                  {prod.sku}
-                                  {selectedShopId === 'ALL' ? ` · ${prod.shopName}` : ''}
-                                </p>
-                              </div>
+                <>
+                  {/* Vue cartes responsive sur téléphone (< sm) : zéro scroll horizontal */}
+                  <div className="mt-4 space-y-2.5 sm:hidden">
+                    {filteredProducts.slice(0, 9).map((prod) => (
+                      <div
+                        key={`m-${prod.shopId}-${prod.id}`}
+                        className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-3.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-xs font-bold text-brand-800">
+                              {prod.name.slice(0, 2).toUpperCase()}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900">
+                                {prod.name}
+                              </p>
+                              <p className="truncate text-[11px] text-slate-400">
+                                {prod.sku}
+                                {selectedShopId === 'ALL' ? ` · ${prod.shopName}` : ''}
+                              </p>
                             </div>
-                          </td>
-                          <td className="py-3 pr-3 text-xs font-semibold text-slate-800">
-                            {formatXof(prod.salePriceXof)}
-                          </td>
-                          <td className="py-3 pr-3 text-xs font-bold text-slate-700">
-                            {prod.stockAvailable}
-                          </td>
-                          <td className="py-3 pr-3 text-xs font-medium text-slate-600">
-                            {prod.salesQty}
-                          </td>
-                          <td className="py-3 text-right">
-                            <HealthBarPill
-                              level={prod.health}
-                              label={
-                                prod.health === 'OK'
-                                  ? 'Sain'
-                                  : prod.health === 'LOW'
-                                    ? 'Bas'
-                                    : 'Critique'
-                              }
-                            />
-                          </td>
+                          </div>
+                          <HealthBarPill
+                            level={prod.health}
+                            label={
+                              prod.health === 'OK'
+                                ? 'Sain'
+                                : prod.health === 'LOW'
+                                  ? 'Bas'
+                                  : 'Critique'
+                            }
+                          />
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-white px-3 py-2 text-center text-xs">
+                          <div>
+                            <p className="text-[10px] text-slate-400">Prix</p>
+                            <p className="font-bold text-slate-900">{formatXof(prod.salePriceXof)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400">Stock</p>
+                            <p className="font-bold text-slate-800">{prod.stockAvailable}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400">Ventes</p>
+                            <p className="font-semibold text-brand-700">{prod.salesQty}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Vue tableau élégant tablette & desktop (>= sm) */}
+                  <div className="mt-4 hidden overflow-x-auto sm:block">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          <th className="pb-2.5 pr-3">Produit</th>
+                          <th className="pb-2.5 pr-3">Prix</th>
+                          <th className="pb-2.5 pr-3">Stock</th>
+                          <th className="pb-2.5 pr-3">Ventes</th>
+                          <th className="pb-2.5 text-right">Santé stock</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100/80">
+                        {filteredProducts.slice(0, 9).map((prod) => (
+                          <tr
+                            key={`${prod.shopId}-${prod.id}`}
+                            className="group transition hover:bg-slate-50"
+                          >
+                            <td className="py-3 pr-3">
+                              <div className="flex items-center gap-2.5">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-xs font-bold text-brand-800">
+                                  {prod.name.slice(0, 2).toUpperCase()}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="truncate font-semibold text-slate-900">{prod.name}</p>
+                                  <p className="truncate text-[11px] text-slate-400">
+                                    {prod.sku}
+                                    {selectedShopId === 'ALL' ? ` · ${prod.shopName}` : ''}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="whitespace-nowrap py-3 pr-3 text-xs font-semibold text-slate-800">
+                              {formatXof(prod.salePriceXof)}
+                            </td>
+                            <td className="py-3 pr-3 text-xs font-bold text-slate-700">
+                              {prod.stockAvailable}
+                            </td>
+                            <td className="py-3 pr-3 text-xs font-medium text-slate-600">
+                              {prod.salesQty}
+                            </td>
+                            <td className="py-3 text-right">
+                              <HealthBarPill
+                                level={prod.health}
+                                label={
+                                  prod.health === 'OK'
+                                    ? 'Sain'
+                                    : prod.health === 'LOW'
+                                      ? 'Bas'
+                                      : 'Critique'
+                                }
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )
             ) : (
               <div className="mt-4 space-y-2.5">
                 {(overview?.byShop || []).map((shop) => (
                   <div
                     key={shop.shopId}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/50 p-3.5 transition hover:bg-white"
+                    className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/50 p-3.5 transition hover:bg-white sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-forest-900 text-white">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-forest-900 text-white">
                         <Store className="h-4 w-4" />
                       </span>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-slate-900">{shop.shopName}</p>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate font-bold text-slate-900">{shop.shopName}</p>
                           <StatusBadge status={shop.status} />
                         </div>
                         <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-slate-500">
-                          <Database className="h-3 w-3 text-brand-700" />
-                          {shop.dbName}
+                          <Database className="h-3 w-3 shrink-0 text-brand-700" />
+                          <span className="truncate">{shop.dbName}</span>
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-600">
+                    <div className="flex items-center justify-between gap-3 border-t border-slate-200/60 pt-2.5 text-xs text-slate-600 sm:border-t-0 sm:pt-0">
                       <span>
                         {shop.activeAgentsCount} ag. · {shop.activeOperatorsCount} op.
                       </span>
                       <button
                         type="button"
                         onClick={() => setSelectedShopId(shop.shopId)}
-                        className="rounded-full bg-forest-900 px-3 py-1 text-xs font-semibold text-white hover:bg-forest-800"
+                        className="rounded-full bg-forest-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-forest-800"
                       >
                         Ouvrir
                       </button>

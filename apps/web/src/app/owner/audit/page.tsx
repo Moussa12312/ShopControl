@@ -140,53 +140,94 @@ export default function OwnerAuditPage() {
             description="Les opérations sensibles sur votre entreprise et vos boutiques apparaîtront automatiquement ici."
           />
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
-                <tr>
-                  <th className="px-4 py-3">Source</th>
-                  <th className="px-4 py-3">Action</th>
-                  <th className="px-4 py-3">Boutique</th>
-                  <th className="px-4 py-3">Compte / Opérateur déclaré</th>
-                  <th className="px-4 py-3">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {items.map((row) => (
-                  <tr key={`${row.source}-${row.id}`}>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          row.source === 'SHOP_DB'
-                            ? 'bg-brand-50 text-brand-800'
-                            : 'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        <Database className="h-3 w-3" />
-                        {row.source === 'SHOP_DB' ? 'Base boutique' : 'Plateforme'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <p className="font-mono text-xs font-semibold text-slate-900">{row.action}</p>
-                      {row.reason ? <p className="text-xs text-slate-500">{row.reason}</p> : null}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-slate-700">{row.shopName || 'Entreprise'}</td>
-                    <td className="px-4 py-2.5 text-xs text-slate-700">
-                      <span>{row.actorName || 'Système'}</span>
-                      {row.declaredOperatorName ? (
-                        <span className="ml-1.5 rounded bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-800">
-                          Opérateur : {row.declaredOperatorName}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">
+          <>
+            {/* Mobile cards (< md) */}
+            <div className="space-y-2.5 md:hidden">
+              {items.map((row) => (
+                <div
+                  key={`m-${row.source}-${row.id}`}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 text-xs shadow-xs"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        row.source === 'SHOP_DB'
+                          ? 'bg-brand-50 text-brand-800'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      <Database className="h-3 w-3" />
+                      {row.source === 'SHOP_DB' ? 'Base boutique' : 'Plateforme'}
+                    </span>
+                    <span className="text-[11px] text-slate-400">
                       {formatDateTimeInTimezone(row.createdAt)}
-                    </td>
+                    </span>
+                  </div>
+                  <p className="mt-2 break-all font-mono font-bold text-slate-900">{row.action}</p>
+                  {row.reason ? <p className="mt-0.5 text-slate-600">{row.reason}</p> : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-slate-600">
+                    <span>{row.shopName || 'Entreprise'}</span>
+                    <span>·</span>
+                    <span>{row.actorName || 'Système'}</span>
+                    {row.declaredOperatorName ? (
+                      <span className="rounded bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-800">
+                        Op. {row.declaredOperatorName}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table (>= md) */}
+            <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3">Source</th>
+                    <th className="px-4 py-3">Action</th>
+                    <th className="px-4 py-3">Boutique</th>
+                    <th className="px-4 py-3">Compte / Opérateur déclaré</th>
+                    <th className="px-4 py-3">Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {items.map((row) => (
+                    <tr key={`${row.source}-${row.id}`}>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            row.source === 'SHOP_DB'
+                              ? 'bg-brand-50 text-brand-800'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          <Database className="h-3 w-3" />
+                          {row.source === 'SHOP_DB' ? 'Base boutique' : 'Plateforme'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <p className="font-mono text-xs font-semibold text-slate-900">{row.action}</p>
+                        {row.reason ? <p className="text-xs text-slate-500">{row.reason}</p> : null}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-slate-700">{row.shopName || 'Entreprise'}</td>
+                      <td className="px-4 py-2.5 text-xs text-slate-700">
+                        <span>{row.actorName || 'Système'}</span>
+                        {row.declaredOperatorName ? (
+                          <span className="ml-1.5 rounded bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-800">
+                            Opérateur : {row.declaredOperatorName}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-slate-500">
+                        {formatDateTimeInTimezone(row.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </AppShell>

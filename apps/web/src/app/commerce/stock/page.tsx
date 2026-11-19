@@ -165,37 +165,39 @@ export default function StockPage() {
   return (
     <AppShell allowedRoles={['OWNER', 'AGENT']}>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Stocks, Mouvements & Inventaire</h1>
-            <p className="text-sm text-slate-600">
+            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
+              Stocks, Mouvements & Inventaire
+            </h1>
+            <p className="text-xs text-slate-600 sm:text-sm">
               Registre immuable de mouvements (append-only) : le stock disponible est la somme exacte
               des mouvements.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <ShopPickerInline shopId={shopId} onChange={selectShop} />
-            <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 text-xs font-semibold">
+            <div className="grid w-full grid-cols-3 rounded-xl border border-slate-200 bg-white p-1 text-xs font-semibold sm:inline-flex sm:w-auto">
               <button
                 type="button"
                 onClick={() => setTab('movements')}
-                className={`rounded-lg px-3 py-1.5 ${tab === 'movements' ? 'bg-brand-700 text-white' : 'text-slate-600'}`}
+                className={`rounded-lg px-2.5 py-1.5 text-center sm:px-3 ${tab === 'movements' ? 'bg-forest-900 text-white' : 'text-slate-600'}`}
               >
                 Mouvements
               </button>
               <button
                 type="button"
                 onClick={() => setTab('adjust')}
-                className={`rounded-lg px-3 py-1.5 ${tab === 'adjust' ? 'bg-brand-700 text-white' : 'text-slate-600'}`}
+                className={`rounded-lg px-2.5 py-1.5 text-center sm:px-3 ${tab === 'adjust' ? 'bg-forest-900 text-white' : 'text-slate-600'}`}
               >
-                Correction / Perte
+                Correction
               </button>
               <button
                 type="button"
                 onClick={() => setTab('inventory')}
-                className={`rounded-lg px-3 py-1.5 ${tab === 'inventory' ? 'bg-brand-700 text-white' : 'text-slate-600'}`}
+                className={`rounded-lg px-2.5 py-1.5 text-center sm:px-3 ${tab === 'inventory' ? 'bg-forest-900 text-white' : 'text-slate-600'}`}
               >
-                Inventaire physique
+                Inventaire
               </button>
             </div>
           </div>
@@ -244,62 +246,101 @@ export default function StockPage() {
               description="Les réceptions fournisseurs, ventes, retours et inventaires apparaîtront ici."
             />
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3">Produit</th>
-                    <th className="px-4 py-3">Type</th>
-                    <th className="px-4 py-3">Delta (Avant → Après)</th>
-                    <th className="px-4 py-3">Motif / Opérateur</th>
-                    <th className="px-4 py-3">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {movements.map((m) => (
-                    <tr key={m.id}>
-                      <td className="px-4 py-2.5">
-                        <p className="font-semibold text-slate-900">{m.productName}</p>
-                        <p className="font-mono text-xs text-slate-400">{m.sku}</p>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs font-medium text-slate-700">
-                        {STOCK_MOVEMENT_LABELS[m.movementType] || m.movementType}
-                      </td>
-                      <td className="px-4 py-2.5 font-mono text-xs">
-                        <span
-                          className={`font-bold ${
-                            m.quantityDelta > 0
-                              ? 'text-emerald-700'
-                              : m.quantityDelta < 0
-                                ? 'text-red-600'
-                                : 'text-slate-500'
-                          }`}
-                        >
-                          {m.quantityDelta > 0 ? `+${m.quantityDelta}` : m.quantityDelta}
-                        </span>{' '}
-                        <span className="text-slate-400">
-                          ({m.qtyBefore} → {m.qtyAfter})
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-600">
-                        <p>{m.reason || '—'}</p>
-                        {m.declaredOperatorName ? (
-                          <p className="text-slate-400">Opérateur : {m.declaredOperatorName}</p>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-500">
-                        {formatDateTimeInTimezone(m.createdAt)}
-                      </td>
+            <>
+              {/* Cartes mobiles mouvements (< md) */}
+              <div className="space-y-2.5 md:hidden">
+                {movements.map((m) => (
+                  <div
+                    key={`m-${m.id}`}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 text-xs shadow-xs"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-slate-900">{m.productName}</p>
+                        <p className="font-mono text-[11px] text-slate-400">{m.sku}</p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 font-mono font-bold ${
+                          m.quantityDelta > 0
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : m.quantityDelta < 0
+                              ? 'bg-red-50 text-red-700'
+                              : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {m.quantityDelta > 0 ? `+${m.quantityDelta}` : m.quantityDelta} ({m.qtyBefore} → {m.qtyAfter})
+                      </span>
+                    </div>
+                    <p className="mt-2 font-medium text-slate-700">
+                      {STOCK_MOVEMENT_LABELS[m.movementType] || m.movementType}
+                    </p>
+                    {m.reason ? <p className="mt-0.5 text-slate-500">{m.reason}</p> : null}
+                    <div className="mt-1.5 flex flex-wrap justify-between gap-1 text-[11px] text-slate-400">
+                      <span>{m.declaredOperatorName ? `Op. ${m.declaredOperatorName}` : '—'}</span>
+                      <span>{formatDateTimeInTimezone(m.createdAt)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Tableau desktop (>= md) */}
+              <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3">Produit</th>
+                      <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">Delta (Avant → Après)</th>
+                      <th className="px-4 py-3">Motif / Opérateur</th>
+                      <th className="px-4 py-3">Date</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {movements.map((m) => (
+                      <tr key={m.id}>
+                        <td className="px-4 py-2.5">
+                          <p className="font-semibold text-slate-900">{m.productName}</p>
+                          <p className="font-mono text-xs text-slate-400">{m.sku}</p>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs font-medium text-slate-700">
+                          {STOCK_MOVEMENT_LABELS[m.movementType] || m.movementType}
+                        </td>
+                        <td className="px-4 py-2.5 font-mono text-xs">
+                          <span
+                            className={`font-bold ${
+                              m.quantityDelta > 0
+                                ? 'text-emerald-700'
+                                : m.quantityDelta < 0
+                                  ? 'text-red-600'
+                                  : 'text-slate-500'
+                            }`}
+                          >
+                            {m.quantityDelta > 0 ? `+${m.quantityDelta}` : m.quantityDelta}
+                          </span>{' '}
+                          <span className="text-slate-400">
+                            ({m.qtyBefore} → {m.qtyAfter})
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-slate-600">
+                          <p>{m.reason || '—'}</p>
+                          {m.declaredOperatorName ? (
+                            <p className="text-slate-400">Opérateur : {m.declaredOperatorName}</p>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-slate-500">
+                          {formatDateTimeInTimezone(m.createdAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )
         ) : tab === 'adjust' ? (
           <form
             onSubmit={handleAdjust}
-            className="max-w-xl space-y-4 rounded-2xl border border-slate-200 bg-white p-6"
+            className="w-full max-w-2xl space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6"
           >
             <h2 className="text-base font-bold text-slate-900">Correction ou perte de stock</h2>
             <div>
@@ -358,27 +399,55 @@ export default function StockPage() {
             <button
               type="submit"
               disabled={busy || adjForm.quantityDelta === 0}
-              className="rounded-xl bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
+              className="w-full rounded-xl bg-forest-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-forest-800 disabled:opacity-50 sm:w-auto"
             >
               Valider le mouvement tracé
             </button>
           </form>
         ) : (
-          <form onSubmit={handleSubmitInventory} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <form onSubmit={handleSubmitInventory} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
-                <ClipboardCheck className="h-5 w-5 text-brand-700" />
+                <ClipboardCheck className="h-5 w-5 shrink-0 text-brand-700" />
                 <h2 className="text-base font-bold text-slate-900">Comptage d’inventaire physique</h2>
               </div>
               <input
                 required
                 value={invReason}
                 onChange={(e) => setInvReason(e.target.value)}
-                className="w-72 rounded-xl border border-slate-300 px-3 py-1.5 text-sm"
+                className="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-sm sm:w-72"
                 placeholder="Libellé de l’inventaire"
               />
             </div>
-            <div className="overflow-x-auto">
+
+            {/* Mobile comptage cartes (< md) */}
+            <div className="space-y-2.5 md:hidden">
+              {products.map((p) => (
+                <div
+                  key={`inv-m-${p.id}`}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-xs"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-900">{p.name}</p>
+                    <p className="text-slate-500">
+                      <span className="font-mono">{p.sku}</span> · Théorique :{' '}
+                      <strong>{p.stockPhysical}</strong>
+                    </p>
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder={String(p.stockPhysical)}
+                    value={countedMap[p.id] ?? ''}
+                    onChange={(e) => setCountedMap({ ...countedMap, [p.id]: e.target.value })}
+                    className="w-24 shrink-0 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-center text-sm font-bold"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table (>= md) */}
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
                   <tr>
@@ -412,7 +481,7 @@ export default function StockPage() {
             <button
               type="submit"
               disabled={busy}
-              className="rounded-xl bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-800"
+              className="w-full rounded-xl bg-forest-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-forest-800 sm:w-auto"
             >
               Valider l’inventaire et corriger les écarts
             </button>

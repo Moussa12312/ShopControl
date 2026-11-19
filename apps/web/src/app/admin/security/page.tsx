@@ -158,46 +158,75 @@ export default function AdminSecurityPage() {
               )}
             </section>
 
-            <section className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-              <div className="border-b border-slate-100 px-5 py-4">
+            <section className="rounded-2xl border border-slate-200 bg-white">
+              <div className="border-b border-slate-100 px-4 py-3.5 sm:px-5 sm:py-4">
                 <h2 className="text-base font-semibold text-slate-900">
                   Journal d’audit plateforme (immuable)
                 </h2>
               </div>
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3">#</th>
-                    <th className="px-4 py-3">Action</th>
-                    <th className="px-4 py-3">Auteur</th>
-                    <th className="px-4 py-3">Motif</th>
-                    <th className="px-4 py-3">Date (Bamako)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {audits.map((row) => (
-                    <tr key={row.id}>
-                      <td className="px-4 py-2.5 font-mono text-xs text-slate-400">
-                        {row.sequenceNumber}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-slate-800">
-                          <ShieldAlert className="h-3.5 w-3.5 text-slate-400" />
-                          {row.action}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-700">
-                        {row.actorName || 'Système'}{' '}
-                        {row.actorRole ? <span className="text-slate-400">({row.actorRole})</span> : null}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-600">{row.reason || '—'}</td>
-                      <td className="px-4 py-2.5 text-xs text-slate-500">
-                        {formatDateTimeInTimezone(row.createdAt)}
-                      </td>
+
+              {/* Mobile cards (< md) */}
+              <div className="divide-y divide-slate-100 md:hidden">
+                {audits.map((row) => (
+                  <div key={`m-${row.id}`} className="space-y-1 p-4 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex min-w-0 items-center gap-1.5 break-all font-mono font-semibold text-slate-900">
+                        <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        {row.action}
+                      </span>
+                      <span className="shrink-0 font-mono text-[11px] text-slate-400">
+                        #{row.sequenceNumber}
+                      </span>
+                    </div>
+                    <p className="text-slate-600">
+                      {row.actorName || 'Système'}
+                      {row.actorRole ? ` (${row.actorRole})` : ''}
+                    </p>
+                    {row.reason ? <p className="text-slate-500">{row.reason}</p> : null}
+                    <p className="text-[11px] text-slate-400">
+                      {formatDateTimeInTimezone(row.createdAt)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table (>= md) */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3">#</th>
+                      <th className="px-4 py-3">Action</th>
+                      <th className="px-4 py-3">Auteur</th>
+                      <th className="px-4 py-3">Motif</th>
+                      <th className="px-4 py-3">Date (Bamako)</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {audits.map((row) => (
+                      <tr key={row.id}>
+                        <td className="px-4 py-2.5 font-mono text-xs text-slate-400">
+                          {row.sequenceNumber}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-slate-800">
+                            <ShieldAlert className="h-3.5 w-3.5 text-slate-400" />
+                            {row.action}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-slate-700">
+                          {row.actorName || 'Système'}{' '}
+                          {row.actorRole ? <span className="text-slate-400">({row.actorRole})</span> : null}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-slate-600">{row.reason || '—'}</td>
+                        <td className="px-4 py-2.5 text-xs text-slate-500">
+                          {formatDateTimeInTimezone(row.createdAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </section>
           </>
         )}

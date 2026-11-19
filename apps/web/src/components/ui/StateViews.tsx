@@ -139,18 +139,18 @@ export function ConfirmModal({
       aria-labelledby="confirm-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs"
     >
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+      <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl sm:p-6">
         <h3 id="confirm-modal-title" className="text-lg font-semibold text-slate-900">
           {title}
         </h3>
         <p className="mt-2 text-sm text-slate-600">{description}</p>
         {children ? <div className="mt-4">{children}</div> : null}
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
           <button
             type="button"
             disabled={busy}
             onClick={onCancel}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 sm:w-auto sm:py-2"
           >
             Annuler
           </button>
@@ -158,7 +158,7 @@ export function ConfirmModal({
             type="button"
             disabled={busy}
             onClick={onConfirm}
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
+            className={`w-full rounded-xl px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 sm:w-auto sm:py-2 ${
               danger ? 'bg-red-600 hover:bg-red-700' : 'bg-brand-700 hover:bg-brand-800'
             }`}
           >

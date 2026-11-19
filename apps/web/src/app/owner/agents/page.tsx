@@ -248,13 +248,13 @@ export default function OwnerAgentsPage() {
               Un compte Agent est strictement cloisonné à une seule boutique. Contrôle appliqué côté serveur.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             {shops.length > 0 ? (
               <select
                 value={targetShopId}
                 onChange={(e) => setTargetShopId(e.target.value)}
                 aria-label="Choisir la boutique"
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm sm:flex-none"
               >
                 {shops.map((s) => (
                   <option key={s.shopId} value={s.shopId}>
@@ -267,7 +267,7 @@ export default function OwnerAgentsPage() {
               <button
                 type="button"
                 onClick={openCreate}
-                className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800"
+                className="inline-flex items-center gap-2 rounded-xl bg-forest-900 px-4 py-2 text-sm font-semibold text-white hover:bg-forest-800"
               >
                 <Plus className="h-4 w-4" />
                 Nouvel Agent

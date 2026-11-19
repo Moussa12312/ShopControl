@@ -351,25 +351,25 @@ export default function PurchasesPage() {
           <div className="space-y-4">
             <form
               onSubmit={handleCreateSupplier}
-              className="flex flex-wrap gap-3 rounded-2xl border border-slate-200 bg-white p-4"
+              className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap"
             >
               <input
                 required
                 value={supName}
                 onChange={(e) => setSupName(e.target.value)}
                 placeholder="Nom du fournisseur *"
-                className="flex-1 min-w-[200px] rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm sm:min-w-[200px] sm:flex-1"
               />
               <input
                 value={supPhone}
                 onChange={(e) => setSupPhone(e.target.value)}
                 placeholder="Téléphone"
-                className="w-48 rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm sm:w-48"
               />
               <button
                 type="submit"
                 disabled={busy}
-                className="rounded-xl bg-brand-700 px-4 py-2 text-sm font-semibold text-white"
+                className="w-full rounded-xl bg-forest-900 px-4 py-2 text-sm font-semibold text-white hover:bg-forest-800 sm:w-auto"
               >
                 Ajouter fournisseur
               </button>
@@ -466,7 +466,10 @@ export default function PurchasesPage() {
         {/* Modale Réception partielle/totale */}
         {receiveTarget ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-            <form onSubmit={handleReceive} className="w-full max-w-lg space-y-3 rounded-2xl bg-white p-6 shadow-xl">
+            <form
+              onSubmit={handleReceive}
+              className="max-h-[90dvh] w-full max-w-lg space-y-3 overflow-y-auto rounded-2xl bg-white p-5 shadow-xl sm:p-6"
+            >
               <h3 className="text-lg font-bold text-slate-900">
                 Réception — {receiveTarget.poNumber}
               </h3>
@@ -477,48 +480,57 @@ export default function PurchasesPage() {
                 {receiveTarget.items.map((item) => {
                   const rem = item.orderedQty - item.receivedQty;
                   return (
-                    <div key={item.id} className="grid grid-cols-12 items-center gap-2 rounded-xl bg-slate-50 p-2.5 text-xs">
-                      <div className="col-span-6">
+                    <div
+                      key={item.id}
+                      className="grid grid-cols-2 items-center gap-2 rounded-xl bg-slate-50 p-3 text-xs sm:grid-cols-12"
+                    >
+                      <div className="col-span-2 sm:col-span-6">
                         <p className="font-semibold text-slate-900">{item.productName}</p>
                         <p className="text-slate-500">Reliquat : {rem} / {item.orderedQty}</p>
                       </div>
-                      <input
-                        type="number"
-                        min={0}
-                        max={rem}
-                        value={receiveQtys[item.id] ?? 0}
-                        onChange={(e) =>
-                          setReceiveQtys({ ...receiveQtys, [item.id]: Number(e.target.value) || 0 })
-                        }
-                        className="col-span-3 rounded-lg border border-slate-300 px-2 py-1"
-                        placeholder="Qté"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        value={receiveCosts[item.id] ?? item.unitCostXof}
-                        onChange={(e) =>
-                          setReceiveCosts({ ...receiveCosts, [item.id]: Number(e.target.value) || 0 })
-                        }
-                        className="col-span-3 rounded-lg border border-slate-300 px-2 py-1"
-                        placeholder="Coût XOF"
-                      />
+                      <div className="sm:col-span-3">
+                        <label className="mb-0.5 block text-[10px] text-slate-500">Qté reçue</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={rem}
+                          value={receiveQtys[item.id] ?? 0}
+                          onChange={(e) =>
+                            setReceiveQtys({ ...receiveQtys, [item.id]: Number(e.target.value) || 0 })
+                          }
+                          className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5"
+                          placeholder="Qté"
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <label className="mb-0.5 block text-[10px] text-slate-500">Coût XOF</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={receiveCosts[item.id] ?? item.unitCostXof}
+                          onChange={(e) =>
+                            setReceiveCosts({ ...receiveCosts, [item.id]: Number(e.target.value) || 0 })
+                          }
+                          className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5"
+                          placeholder="Coût XOF"
+                        />
+                      </div>
                     </div>
                   );
                 })}
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setReceiveTarget(null)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 sm:w-auto"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={busy}
-                  className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white"
+                  className="w-full rounded-xl bg-forest-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto"
                 >
                   Valider la réception
                 </button>

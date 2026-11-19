@@ -158,25 +158,25 @@ export default function AdminMerchantsPage() {
   return (
     <AppShell allowedRoles={['SUPER_ADMIN']}>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Marchands</h1>
-            <p className="text-sm text-slate-600">
+            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Marchands</h1>
+            <p className="text-xs text-slate-600 sm:text-sm">
               Créez des entreprises marchandes, gérez leur statut ou ouvrez un accès support borné.
             </p>
           </div>
           <button
             type="button"
             onClick={() => setShowCreate(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-800"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-forest-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-forest-800 sm:w-auto"
           >
             <Plus className="h-4 w-4" />
             Nouveau marchand
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <div className="relative flex-1 min-w-[220px]">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:gap-3">
+          <div className="relative flex-1 sm:min-w-[220px]">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="search"
@@ -190,7 +190,7 @@ export default function AdminMerchantsPage() {
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             aria-label="Filtrer par statut"
-            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm sm:w-auto"
           >
             <option value="">Tous les statuts</option>
             {TENANT_STATUSES.map((s) => (
@@ -211,72 +211,128 @@ export default function AdminMerchantsPage() {
             description="Créez votre premier compte marchand avec son propriétaire et sa première boutique."
           />
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
-                <tr>
-                  <th className="px-4 py-3">Entreprise</th>
-                  <th className="px-4 py-3">Propriétaire</th>
-                  <th className="px-4 py-3">Boutiques</th>
-                  <th className="px-4 py-3">Statut</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {items.map((m) => (
-                  <tr key={m.id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-900">{m.name}</p>
-                      <p className="text-xs text-slate-500">
+          <>
+            {/* Cartes mobile (< md) */}
+            <div className="space-y-3 md:hidden">
+              {items.map((m) => (
+                <div
+                  key={`m-${m.id}`}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-slate-900">{m.name}</p>
+                      <p className="truncate text-xs text-slate-500">
                         {m.email} · {m.phone}
                       </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      {m.owner ? (
-                        <>
-                          <p className="font-medium text-slate-800">{m.owner.fullName}</p>
-                          <p className="text-xs text-slate-500">{m.owner.email}</p>
-                        </>
-                      ) : (
-                        <span className="text-xs text-slate-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-slate-700">{m.shopsCount}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={m.status} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex flex-wrap justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setStatusModal({
-                              merchant: m,
-                              nextStatus: m.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED',
-                              reason: '',
-                            })
-                          }
-                          className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                        >
-                          Changer statut
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSupportModal({ merchant: m, reason: '', durationMinutes: 30 })
-                          }
-                          className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
-                        >
-                          <UserCheck className="h-3.5 w-3.5" />
-                          Assistance (RO)
-                        </button>
-                      </div>
-                    </td>
+                    </div>
+                    <StatusBadge status={m.status} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    <span className="truncate">
+                      Proprio : <strong>{m.owner ? m.owner.fullName : '—'}</strong>
+                    </span>
+                    <span className="shrink-0 font-semibold text-slate-800">
+                      {m.shopsCount} boutique(s)
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setStatusModal({
+                          merchant: m,
+                          nextStatus: m.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED',
+                          reason: '',
+                        })
+                      }
+                      className="rounded-xl border border-slate-300 py-2 text-xs font-semibold text-slate-700"
+                    >
+                      Changer statut
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSupportModal({ merchant: m, reason: '', durationMinutes: 30 })
+                      }
+                      className="inline-flex items-center justify-center gap-1 rounded-xl bg-indigo-50 py-2 text-xs font-semibold text-indigo-700"
+                    >
+                      <UserCheck className="h-3.5 w-3.5" />
+                      Assistance (RO)
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tableau desktop (>= md) */}
+            <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3">Entreprise</th>
+                    <th className="px-4 py-3">Propriétaire</th>
+                    <th className="px-4 py-3">Boutiques</th>
+                    <th className="px-4 py-3">Statut</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {items.map((m) => (
+                    <tr key={m.id} className="hover:bg-slate-50/70">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-slate-900">{m.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {m.email} · {m.phone}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        {m.owner ? (
+                          <>
+                            <p className="font-medium text-slate-800">{m.owner.fullName}</p>
+                            <p className="text-xs text-slate-500">{m.owner.email}</p>
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-slate-700">{m.shopsCount}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={m.status} />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="inline-flex flex-wrap justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setStatusModal({
+                                merchant: m,
+                                nextStatus: m.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED',
+                                reason: '',
+                              })
+                            }
+                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                          >
+                            Changer statut
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSupportModal({ merchant: m, reason: '', durationMinutes: 30 })
+                            }
+                            className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                          >
+                            <UserCheck className="h-3.5 w-3.5" />
+                            Assistance (RO)
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* Modale création marchand */}

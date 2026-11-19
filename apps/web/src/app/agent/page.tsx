@@ -176,10 +176,10 @@ export default function AgentHomePage() {
   };
 
   const heroSection = (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">
+    <div className="space-y-4 sm:space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-bold tracking-tight text-white sm:text-2xl">
             {overview?.shop.name || shop?.shopName || 'Espace Boutique'}
           </h1>
           <p className="mt-0.5 text-xs text-emerald-200/75">
@@ -191,29 +191,29 @@ export default function AgentHomePage() {
         </div>
         <Link
           href="/pos"
-          className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold text-forest-900 shadow-sm hover:bg-emerald-50"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold text-forest-900 shadow-sm hover:bg-emerald-50 sm:w-auto"
         >
           <span>Ouvrir le comptoir POS</span>
           <Plus className="h-4 w-4 stroke-[2.5]" />
         </Link>
       </div>
 
-      <div className="grid gap-3.5 sm:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-forest-800/85 p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-3.5">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-forest-800/85 p-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-emerald-200">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-emerald-200">
               <ShoppingBag className="h-4 w-4" />
             </span>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-[#98b3ae]">Ventes (7 derniers jours)</p>
-              <p className="text-lg font-bold text-white">
+              <p className="truncate text-lg font-bold text-white">
                 {formatXof(analytics?.kpis.currentSalesXof ?? 0)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-forest-800/85 p-4">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-forest-800/85 p-4">
           <p className="text-xs text-[#98b3ae]">Sessions de caisse ouvertes</p>
           <p className="mt-1 text-xl font-bold text-white">
             {analytics?.kpis.openCashSessionsCount ?? 0}
@@ -225,8 +225,8 @@ export default function AgentHomePage() {
           </p>
         </div>
 
-        <div className="lime-glow-card flex items-center justify-between gap-3 rounded-2xl border border-limeglow-400/25 p-4">
-          <div>
+        <div className="lime-glow-card flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-2xl border border-limeglow-400/25 p-4 sm:flex-nowrap">
+          <div className="min-w-0">
             <p className="text-lg font-bold text-white">
               {analytics?.kpis.lowStockCount ?? 0}{' '}
               <span className="text-xs font-normal text-emerald-100">alertes stock</span>
@@ -235,7 +235,7 @@ export default function AgentHomePage() {
           </div>
           <Link
             href="/commerce/cash"
-            className="inline-flex items-center gap-1 rounded-full bg-limeglow-400 px-3.5 py-2 text-xs font-bold text-forest-950"
+            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-limeglow-400 px-3.5 py-2 text-xs font-bold text-forest-950"
           >
             <span>Caisse</span>
             <Sparkles className="h-3.5 w-3.5" />
@@ -324,18 +324,18 @@ export default function AgentHomePage() {
                   en cas de coupure réseau.
                 </p>
 
-                <div className="mt-4 flex flex-wrap items-center gap-2.5">
+                <div className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center">
                   <input
                     value={terminalLabel}
                     onChange={(e) => setTerminalLabel(e.target.value)}
                     placeholder="Nom du poste"
-                    className="flex-1 min-w-[180px] rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm sm:flex-1"
                   />
                   <button
                     type="button"
                     disabled={busy}
                     onClick={handleRegisterTerminal}
-                    className="rounded-full bg-forest-900 px-4 py-2 text-xs font-bold text-white hover:bg-forest-800 disabled:opacity-50"
+                    className="w-full rounded-full bg-forest-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-forest-800 disabled:opacity-50 sm:w-auto sm:py-2"
                   >
                     {busy ? 'Enregistrement…' : 'Synchroniser ce terminal'}
                   </button>

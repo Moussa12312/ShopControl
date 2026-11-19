@@ -36,7 +36,7 @@ export function HealthBarPill({
 
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${palette.wrap}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap ${palette.wrap}`}
     >
       {subText ? <span className="opacity-80">{subText}</span> : null}
       <span>{label}</span>
@@ -62,7 +62,7 @@ export interface ChartPoint {
 
 /**
  * Graphique comparatif double courbe (période actuelle vs période précédente)
- * 100 % SVG natif : zéro dépendance externe lourde, interactif sur PC & mobile.
+ * 100 % SVG natif, tactile sur mobile et tooltip adaptatif sans débordement.
  */
 export function DualLineAnalyticsChart({
   points,
@@ -77,7 +77,7 @@ export function DualLineAnalyticsChart({
 
   if (!points || points.length === 0) {
     return (
-      <div className="flex h-52 items-center justify-center rounded-2xl bg-slate-50 text-xs text-slate-400">
+      <div className="flex h-48 items-center justify-center rounded-2xl bg-slate-50 text-xs text-slate-400">
         Aucune donnée sur cette période
       </div>
     );
@@ -85,8 +85,8 @@ export function DualLineAnalyticsChart({
 
   const width = 560;
   const height = 210;
-  const padLeft = 44;
-  const padRight = 16;
+  const padLeft = 40;
+  const padRight = 14;
   const padTop = 18;
   const padBottom = 30;
   const innerW = width - padLeft - padRight;
@@ -124,8 +124,8 @@ export function DualLineAnalyticsChart({
       : '';
 
   const activeIdx =
-    hoveredIdx !== null && hoveredIdx >= 0 && hoveredIdx < points.length ? hoveredIdx : null;
-  const activePoint = activeIdx !== null ? points[activeIdx] : null;
+    hoveredIdx !== null && hoveredIdx >= 0 && hoveredIdx < points.length ? hoveredIdx : 0;
+  const activePoint = points[activeIdx];
 
   const formatAxisVal = (val: number) => {
     if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
@@ -135,9 +135,28 @@ export function DualLineAnalyticsChart({
 
   return (
     <div className="relative w-full select-none">
+      {/* Bandeau de lecture mobile (évite tout chevauchement sur petits écrans) */}
+      {activePoint ? (
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-forest-900 px-3 py-2 text-xs text-white sm:hidden">
+          <div>
+            <span className="text-[10px] text-emerald-200/80">{activePoint.label} · </span>
+            <strong className="text-sm">
+              {metricMode === 'count'
+                ? `${activePoint.salesCount} vente(s)`
+                : formatXof(activePoint.currentXof)}
+            </strong>
+          </div>
+          {metricMode === 'sales' ? (
+            <span className="text-[11px] text-amber-300">
+              Préc. : {formatXof(activePoint.previousXof)}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="h-52 w-full overflow-visible"
+        className="h-44 w-full overflow-visible sm:h-52"
         role="img"
         aria-label="Évolution comparative des ventes"
       >
@@ -148,7 +167,6 @@ export function DualLineAnalyticsChart({
           </linearGradient>
         </defs>
 
-        {/* Grille horizontale légère */}
         {[0, 0.5, 1].map((ratio) => {
           const y = padTop + innerH * (1 - ratio);
           const v = Math.round(niceMax * ratio);
@@ -164,7 +182,7 @@ export function DualLineAnalyticsChart({
                 strokeWidth="1"
               />
               <text
-                x={padLeft - 8}
+                x={padLeft - 6}
                 y={y + 4}
                 textAnchor="end"
                 className="fill-slate-400 text-[10px]"
@@ -175,7 +193,6 @@ export function DualLineAnalyticsChart({
           );
         })}
 
-        {/* Remplissage & courbes */}
         {areaPath ? <path d={areaPath} fill="url(#scAreaMint)" /> : null}
         {prevLinePath ? (
           <path
@@ -197,45 +214,39 @@ export function DualLineAnalyticsChart({
           />
         ) : null}
 
-        {/* Ligne guide verticale au point survolé */}
-        {activeIdx !== null ? (
-          <>
-            <line
-              x1={xAt(activeIdx)}
-              y1={padTop}
-              x2={xAt(activeIdx)}
-              y2={padTop + innerH}
-              stroke="#0c2221"
-              strokeDasharray="3 3"
-              strokeWidth="1"
-              opacity="0.35"
-            />
-            {metricMode === 'sales' ? (
-              <circle
-                cx={xAt(activeIdx)}
-                cy={yAt(prevValues[activeIdx])}
-                r="4"
-                fill="#ffffff"
-                stroke="#d97706"
-                strokeWidth="2"
-              />
-            ) : null}
-            <circle
-              cx={xAt(activeIdx)}
-              cy={yAt(currValues[activeIdx])}
-              r="5"
-              fill="#ffffff"
-              stroke="#0c2221"
-              strokeWidth="2.5"
-            />
-          </>
+        <line
+          x1={xAt(activeIdx)}
+          y1={padTop}
+          x2={xAt(activeIdx)}
+          y2={padTop + innerH}
+          stroke="#0c2221"
+          strokeDasharray="3 3"
+          strokeWidth="1"
+          opacity="0.35"
+        />
+        {metricMode === 'sales' ? (
+          <circle
+            cx={xAt(activeIdx)}
+            cy={yAt(prevValues[activeIdx])}
+            r="4"
+            fill="#ffffff"
+            stroke="#d97706"
+            strokeWidth="2"
+          />
         ) : null}
+        <circle
+          cx={xAt(activeIdx)}
+          cy={yAt(currValues[activeIdx])}
+          r="5"
+          fill="#ffffff"
+          stroke="#0c2221"
+          strokeWidth="2.5"
+        />
 
-        {/* Labels axe X + zones cliquables / survolables */}
         {points.map((pt, i) => {
           const x = xAt(i);
           const showLabel =
-            points.length <= 7 || i === 0 || i === points.length - 1 || i % 2 === 0;
+            points.length <= 6 || i === 0 || i === points.length - 1 || i % 2 === 0;
           return (
             <g key={pt.date}>
               {showLabel ? (
@@ -259,18 +270,19 @@ export function DualLineAnalyticsChart({
                 className="cursor-pointer"
                 onMouseEnter={() => setHoveredIdx(i)}
                 onClick={() => setHoveredIdx(i)}
+                onTouchStart={() => setHoveredIdx(i)}
               />
             </g>
           );
         })}
       </svg>
 
-      {/* Tooltip sombre style Forest Emerald */}
-      {activePoint && activeIdx !== null ? (
+      {/* Tooltip flottant sombre sur tablette/desktop */}
+      {activePoint ? (
         <div
-          className="pointer-events-none absolute top-2 z-10 rounded-xl bg-forest-900 px-3.5 py-2.5 text-xs text-white shadow-lg transition-all"
+          className="pointer-events-none absolute top-2 z-10 hidden rounded-xl bg-forest-900 px-3.5 py-2.5 text-xs text-white shadow-lg transition-all sm:block"
           style={{
-            left: `clamp(8px, calc(${(activeIdx / Math.max(1, points.length - 1)) * 75}% + 24px), calc(100% - 175px))`,
+            left: `clamp(8px, calc(${(activeIdx / Math.max(1, points.length - 1)) * 72}% + 24px), calc(100% - 180px))`,
           }}
         >
           <p className="text-[10px] font-medium text-emerald-200/80">{activePoint.label}</p>

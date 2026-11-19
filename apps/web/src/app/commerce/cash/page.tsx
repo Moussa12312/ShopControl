@@ -277,7 +277,7 @@ export default function CashPage() {
                     </div>
                   ) : null}
 
-                  <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4">
+                  <div className="grid grid-cols-1 gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
                     <div>
                       <p className="text-xs text-slate-500">Fond initial</p>
                       <p className="text-lg font-bold text-slate-900">
@@ -296,11 +296,11 @@ export default function CashPage() {
                     <h3 className="text-xs font-bold uppercase text-slate-600">
                       Mouvement manuel motivé
                     </h3>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <select
                         value={mvType}
                         onChange={(e) => setMvType(e.target.value as 'MANUAL_IN' | 'MANUAL_OUT')}
-                        className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs"
+                        className="rounded-lg border border-slate-300 px-2.5 py-2 text-xs sm:py-1.5"
                       >
                         <option value="MANUAL_IN">Encaissement (+)</option>
                         <option value="MANUAL_OUT">Décaissement (-)</option>
@@ -312,21 +312,21 @@ export default function CashPage() {
                         placeholder="Montant XOF"
                         value={mvAmount || ''}
                         onChange={(e) => setMvAmount(Number(e.target.value) || 0)}
-                        className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs"
+                        className="rounded-lg border border-slate-300 px-2.5 py-2 text-xs sm:py-1.5"
                       />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <input
                         required
                         value={mvReason}
                         onChange={(e) => setMvReason(e.target.value)}
                         placeholder="Motif obligatoire…"
-                        className="flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs"
+                        className="flex-1 rounded-lg border border-slate-300 px-2.5 py-2 text-xs sm:py-1.5"
                       />
                       <button
                         type="submit"
                         disabled={busy}
-                        className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white"
+                        className="w-full rounded-lg bg-forest-900 px-3 py-2 text-xs font-semibold text-white sm:w-auto sm:py-1.5"
                       >
                         Ajouter
                       </button>
@@ -389,59 +389,130 @@ export default function CashPage() {
               </div>
             )}
 
-            {/* Historique clôtures */}
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-              <div className="border-b border-slate-100 px-5 py-4">
+            {/* Historique clôtures : cartes mobile + tableau desktop */}
+            <div className="rounded-2xl border border-slate-200 bg-white">
+              <div className="border-b border-slate-100 px-4 py-3.5 sm:px-5 sm:py-4">
                 <h2 className="text-base font-bold text-slate-900">Historique des sessions</h2>
               </div>
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3">Caisse / Dates</th>
-                    <th className="px-4 py-3">Théorique</th>
-                    <th className="px-4 py-3">Compté</th>
-                    <th className="px-4 py-3">Écart</th>
-                    <th className="px-4 py-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {history.map((s) => (
-                    <tr key={s.id}>
-                      <td className="px-4 py-2.5 text-xs">
-                        <p className="font-semibold text-slate-900">{s.registerName}</p>
-                        <p className="text-slate-500">
-                          {formatDateTimeInTimezone(s.openedAt)}
-                          {s.closedAt ? ` → ${formatDateTimeInTimezone(s.closedAt)}` : ' (En cours)'}
-                        </p>
-                      </td>
-                      <td className="px-4 py-2.5 font-mono text-xs">{formatXof(s.theoreticalAmountXof)}</td>
-                      <td className="px-4 py-2.5 font-mono text-xs">
-                        {s.countedAmountXof !== null ? formatXof(s.countedAmountXof) : '—'}
-                      </td>
-                      <td className="px-4 py-2.5 font-mono text-xs font-bold">
-                        {s.discrepancyXof !== null ? (
-                          <span className={s.discrepancyXof === 0 ? 'text-emerald-700' : 'text-red-600'}>
-                            {formatXof(s.discrepancyXof)}
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        {s.status === 'CLOSED' ? (
-                          <button
-                            type="button"
-                            onClick={() => setRegTarget(s)}
-                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+
+              {/* Cartes mobile (< md) */}
+              <div className="divide-y divide-slate-100 md:hidden">
+                {history.length === 0 ? (
+                  <p className="p-4 text-center text-xs text-slate-500">Aucune session enregistrée.</p>
+                ) : (
+                  history.map((s) => (
+                    <div key={`m-${s.id}`} className="space-y-2.5 p-4 text-xs">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-bold text-slate-900">{s.registerName}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {formatDateTimeInTimezone(s.openedAt)}
+                            {s.closedAt ? ` → ${formatDateTimeInTimezone(s.closedAt)}` : ' (En cours)'}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            s.status === 'OPEN'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {s.status === 'OPEN' ? 'OUVERTE' : 'CLÔTURÉE'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-2.5 text-center">
+                        <div>
+                          <p className="text-[10px] text-slate-400">Théorique</p>
+                          <p className="font-mono font-bold text-slate-900">
+                            {formatXof(s.theoreticalAmountXof)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400">Compté</p>
+                          <p className="font-mono font-semibold text-slate-700">
+                            {s.countedAmountXof !== null ? formatXof(s.countedAmountXof) : '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400">Écart</p>
+                          <p
+                            className={`font-mono font-bold ${
+                              s.discrepancyXof === null
+                                ? 'text-slate-400'
+                                : s.discrepancyXof === 0
+                                  ? 'text-emerald-700'
+                                  : 'text-red-600'
+                            }`}
                           >
-                            Régulariser
-                          </button>
-                        ) : null}
-                      </td>
+                            {s.discrepancyXof !== null ? formatXof(s.discrepancyXof) : '—'}
+                          </p>
+                        </div>
+                      </div>
+                      {s.status === 'CLOSED' ? (
+                        <button
+                          type="button"
+                          onClick={() => setRegTarget(s)}
+                          className="w-full rounded-xl border border-slate-300 py-2 text-xs font-semibold text-slate-700"
+                        >
+                          Régulariser
+                        </button>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Tableau desktop (>= md) */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3">Caisse / Dates</th>
+                      <th className="px-4 py-3">Théorique</th>
+                      <th className="px-4 py-3">Compté</th>
+                      <th className="px-4 py-3">Écart</th>
+                      <th className="px-4 py-3 text-right">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {history.map((s) => (
+                      <tr key={s.id}>
+                        <td className="px-4 py-2.5 text-xs">
+                          <p className="font-semibold text-slate-900">{s.registerName}</p>
+                          <p className="text-slate-500">
+                            {formatDateTimeInTimezone(s.openedAt)}
+                            {s.closedAt ? ` → ${formatDateTimeInTimezone(s.closedAt)}` : ' (En cours)'}
+                          </p>
+                        </td>
+                        <td className="px-4 py-2.5 font-mono text-xs">{formatXof(s.theoreticalAmountXof)}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs">
+                          {s.countedAmountXof !== null ? formatXof(s.countedAmountXof) : '—'}
+                        </td>
+                        <td className="px-4 py-2.5 font-mono text-xs font-bold">
+                          {s.discrepancyXof !== null ? (
+                            <span className={s.discrepancyXof === 0 ? 'text-emerald-700' : 'text-red-600'}>
+                              {formatXof(s.discrepancyXof)}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          {s.status === 'CLOSED' ? (
+                            <button
+                              type="button"
+                              onClick={() => setRegTarget(s)}
+                              className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            >
+                              Régulariser
+                            </button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )}

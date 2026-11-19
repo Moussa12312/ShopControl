@@ -218,13 +218,13 @@ export default function ProductsPage() {
 
         {/* Catégories */}
         {shopId ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-4">
-            <Tag className="h-4 w-4 text-brand-700" />
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4">
+            <Tag className="h-4 w-4 shrink-0 text-brand-700" />
             <button
               type="button"
               onClick={() => setCatFilter('')}
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                catFilter === '' ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-700'
+                catFilter === '' ? 'bg-forest-900 text-white' : 'bg-slate-100 text-slate-700'
               }`}
             >
               Toutes
@@ -235,23 +235,26 @@ export default function ProductsPage() {
                 type="button"
                 onClick={() => setCatFilter(c.id)}
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  catFilter === c.id ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-700'
+                  catFilter === c.id ? 'bg-forest-900 text-white' : 'bg-slate-100 text-slate-700'
                 }`}
               >
                 {c.name} ({c.productsCount})
               </button>
             ))}
             {canWrite ? (
-              <form onSubmit={handleCreateCategory} className="ml-auto flex gap-1.5">
+              <form
+                onSubmit={handleCreateCategory}
+                className="flex w-full gap-1.5 pt-1 sm:ml-auto sm:w-auto sm:pt-0"
+              >
                 <input
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
                   placeholder="Nouvelle catégorie…"
-                  className="w-40 rounded-lg border border-slate-300 px-2.5 py-1 text-xs"
+                  className="flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs sm:w-44 sm:flex-none sm:py-1"
                 />
                 <button
                   type="submit"
-                  className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-white"
+                  className="rounded-lg bg-forest-900 px-3 py-1.5 text-xs font-semibold text-white sm:py-1"
                 >
                   +
                 </button>
@@ -260,7 +263,7 @@ export default function ProductsPage() {
           </div>
         ) : null}
 
-        <div className="relative max-w-md">
+        <div className="relative w-full sm:max-w-md">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             type="search"
@@ -281,44 +284,47 @@ export default function ProductsPage() {
             description="Créez votre premier produit ou importez votre catalogue existant en CSV."
           />
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
-                <tr>
-                  <th className="px-4 py-3">Produit</th>
-                  <th className="px-4 py-3">Prix vente</th>
-                  {canReadCost ? <th className="px-4 py-3">Coût (CMP)</th> : null}
-                  <th className="px-4 py-3">Stock dispo</th>
-                  <th className="px-4 py-3">Statut</th>
-                  {canWrite ? <th className="px-4 py-3 text-right">Action</th> : null}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {products.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-900">{p.name}</p>
-                      <p className="text-xs text-slate-500">
-                        SKU : <code className="font-mono">{p.sku}</code>
+          <>
+            {/* Cartes mobile (< md) */}
+            <div className="space-y-3 md:hidden">
+              {products.map((p) => (
+                <div
+                  key={`m-${p.id}`}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-slate-900">{p.name}</p>
+                      <p className="truncate text-xs text-slate-500">
+                        <code className="font-mono">{p.sku}</code>
                         {p.categoryName ? ` · ${p.categoryName}` : ''}
                       </p>
-                    </td>
-                    <td className="px-4 py-3 font-bold text-slate-900">
-                      {formatXof(p.salePriceXof)}
-                    </td>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-700">
+                      {PRODUCT_STATUS_LABELS[p.status]}
+                    </span>
+                  </div>
+
+                  <div
+                    className={`mt-3 grid gap-2 rounded-xl bg-slate-50 p-2.5 text-center text-xs ${
+                      canReadCost ? 'grid-cols-3' : 'grid-cols-2'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-[10px] text-slate-500">Prix vente</p>
+                      <p className="font-bold text-slate-900">{formatXof(p.salePriceXof)}</p>
+                    </div>
                     {canReadCost ? (
-                      <td className="px-4 py-3 text-xs text-slate-600">
-                        {p.costPriceXof !== null ? (
-                          formatXof(p.costPriceXof)
-                        ) : (
-                          <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-800">
-                            Non renseigné (estimé)
-                          </span>
-                        )}
-                      </td>
+                      <div>
+                        <p className="text-[10px] text-slate-500">Coût CMP</p>
+                        <p className="font-semibold text-slate-700">
+                          {p.costPriceXof !== null ? formatXof(p.costPriceXof) : 'Estimé'}
+                        </p>
+                      </div>
                     ) : null}
-                    <td className="px-4 py-3">
-                      <span
+                    <div>
+                      <p className="text-[10px] text-slate-500">Stock (seuil {p.alertThreshold})</p>
+                      <p
                         className={`font-bold ${
                           p.stockAvailable <= 0
                             ? 'text-red-600'
@@ -328,33 +334,100 @@ export default function ProductsPage() {
                         }`}
                       >
                         {p.stockAvailable} {p.unit}
-                      </span>
-                      <span className="ml-1 text-[11px] text-slate-400">
-                        (seuil {p.alertThreshold})
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
-                        {PRODUCT_STATUS_LABELS[p.status]}
-                      </span>
-                    </td>
-                    {canWrite ? (
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(p)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Modifier
-                        </button>
-                      </td>
-                    ) : null}
+                      </p>
+                    </div>
+                  </div>
+
+                  {canWrite ? (
+                    <button
+                      type="button"
+                      onClick={() => openEdit(p)}
+                      className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 py-2 text-xs font-semibold text-slate-700"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Modifier le produit
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+
+            {/* Tableau desktop (>= md) */}
+            <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3">Produit</th>
+                    <th className="px-4 py-3">Prix vente</th>
+                    {canReadCost ? <th className="px-4 py-3">Coût (CMP)</th> : null}
+                    <th className="px-4 py-3">Stock dispo</th>
+                    <th className="px-4 py-3">Statut</th>
+                    {canWrite ? <th className="px-4 py-3 text-right">Action</th> : null}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {products.map((p) => (
+                    <tr key={p.id} className="hover:bg-slate-50/70">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-slate-900">{p.name}</p>
+                        <p className="text-xs text-slate-500">
+                          SKU : <code className="font-mono">{p.sku}</code>
+                          {p.categoryName ? ` · ${p.categoryName}` : ''}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-slate-900">
+                        {formatXof(p.salePriceXof)}
+                      </td>
+                      {canReadCost ? (
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          {p.costPriceXof !== null ? (
+                            formatXof(p.costPriceXof)
+                          ) : (
+                            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-800">
+                              Non renseigné (estimé)
+                            </span>
+                          )}
+                        </td>
+                      ) : null}
+                      <td className="px-4 py-3">
+                        <span
+                          className={`font-bold ${
+                            p.stockAvailable <= 0
+                              ? 'text-red-600'
+                              : p.stockAvailable <= p.alertThreshold
+                                ? 'text-amber-700'
+                                : 'text-emerald-700'
+                          }`}
+                        >
+                          {p.stockAvailable} {p.unit}
+                        </span>
+                        <span className="ml-1 text-[11px] text-slate-400">
+                          (seuil {p.alertThreshold})
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                          {PRODUCT_STATUS_LABELS[p.status]}
+                        </span>
+                      </td>
+                      {canWrite ? (
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openEdit(p)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Modifier
+                          </button>
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {modalOpen ? (

@@ -96,6 +96,7 @@ export default function PosPage() {
   const { shopId, activeShop, selectShop } = useActiveOperationalShop();
 
   const [tab, setTab] = useState<'pos' | 'history'>('pos');
+  const [mobilePosPane, setMobilePosPane] = useState<'catalog' | 'cart'>('catalog');
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [clients, setClients] = useState<ClientItem[]>([]);
   const [sales, setSales] = useState<SaleRow[]>([]);
@@ -324,6 +325,7 @@ export default function PosPage() {
       );
 
       setCart([]);
+      setMobilePosPane('catalog');
       setDiscountPercent(0);
       setAmountPaidXof('');
       setTransactionRef('');
@@ -449,22 +451,22 @@ export default function PosPage() {
   return (
     <AppShell allowedRoles={['OWNER', 'AGENT']}>
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Ventes & Comptoir POS</h1>
-            <p className="text-sm text-slate-600">
+            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Ventes & Comptoir POS</h1>
+            <p className="text-xs text-slate-600 sm:text-sm">
               Validation atomique (stock + caisse + créances) · Montants entiers XOF · Mode dégradé
               Option B.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <ShopPickerInline shopId={shopId} onChange={selectShop} />
-            <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 text-xs font-semibold">
+            <div className="grid w-full grid-cols-2 rounded-xl border border-slate-200 bg-white p-1 text-xs font-semibold sm:inline-flex sm:w-auto">
               <button
                 type="button"
                 onClick={() => setTab('pos')}
-                className={`rounded-lg px-3 py-1.5 ${
-                  tab === 'pos' ? 'bg-brand-700 text-white' : 'text-slate-600'
+                className={`rounded-lg px-3 py-1.5 text-center ${
+                  tab === 'pos' ? 'bg-forest-900 text-white' : 'text-slate-600'
                 }`}
               >
                 Comptoir POS
@@ -472,8 +474,8 @@ export default function PosPage() {
               <button
                 type="button"
                 onClick={() => setTab('history')}
-                className={`rounded-lg px-3 py-1.5 ${
-                  tab === 'history' ? 'bg-brand-700 text-white' : 'text-slate-600'
+                className={`rounded-lg px-3 py-1.5 text-center ${
+                  tab === 'history' ? 'bg-forest-900 text-white' : 'text-slate-600'
                 }`}
               >
                 Historique ({sales.length})
@@ -534,64 +536,109 @@ export default function PosPage() {
             description="Créez ou sélectionnez une boutique pour ouvrir le comptoir de vente."
           />
         ) : tab === 'pos' ? (
-          <div className="grid gap-6 lg:grid-cols-12">
-            {/* Catalogue rapide */}
-            <div className="space-y-4 lg:col-span-7">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={handleBarcodeEnter}
-                  placeholder="Rechercher par nom, SKU ou scanner un code-barres (Entrée)…"
-                  className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm shadow-xs"
-                />
-              </div>
-
-              {filteredProducts.length === 0 ? (
-                <EmptyState
-                  title="Aucun produit trouvé"
-                  description="Ajoutez vos produits dans l’onglet Produits ou via Import CSV."
-                />
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {filteredProducts.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => addToCart(p)}
-                      className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-brand-600 hover:shadow-xs"
-                    >
-                      <div className="min-w-0 pr-2">
-                        <p className="truncate font-semibold text-slate-900">{p.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {p.sku} · Stock dispo :{' '}
-                          <span
-                            className={
-                              p.stockAvailable <= 0
-                                ? 'font-bold text-red-600'
-                                : 'font-semibold text-emerald-700'
-                            }
-                          >
-                            {p.stockAvailable} {p.unit}
-                          </span>
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded-lg bg-brand-50 px-2.5 py-1 text-sm font-bold text-brand-800">
-                        {formatXof(p.salePriceXof)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+          <div className="space-y-4">
+            {/* Switcher mobile Catalogue ↔ Panier (< lg) */}
+            <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-slate-200 bg-white p-1 text-xs font-bold lg:hidden">
+              <button
+                type="button"
+                onClick={() => setMobilePosPane('catalog')}
+                className={`rounded-xl py-2 text-center transition ${
+                  mobilePosPane === 'catalog'
+                    ? 'bg-forest-900 text-white shadow-xs'
+                    : 'text-slate-600'
+                }`}
+              >
+                Catalogue ({filteredProducts.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobilePosPane('cart')}
+                className={`rounded-xl py-2 text-center transition ${
+                  mobilePosPane === 'cart'
+                    ? 'bg-forest-900 text-white shadow-xs'
+                    : 'text-slate-600'
+                }`}
+              >
+                Panier ({cart.reduce((a, b) => a + b.quantity, 0)})
+              </button>
             </div>
 
-            {/* Panier & Encaissement */}
-            <form
-              onSubmit={handleCheckout}
-              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-5"
-            >
+            <div className="grid gap-5 lg:grid-cols-12">
+              {/* Catalogue rapide */}
+              <div
+                className={`min-w-0 space-y-4 lg:col-span-7 xl:col-span-8 ${
+                  mobilePosPane === 'cart' ? 'hidden lg:block' : 'block'
+                }`}
+              >
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={handleBarcodeEnter}
+                    placeholder="Rechercher par nom, SKU ou scanner un code-barres…"
+                    className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm shadow-xs"
+                  />
+                </div>
+
+                {filteredProducts.length === 0 ? (
+                  <EmptyState
+                    title="Aucun produit trouvé"
+                    description="Ajoutez vos produits dans l’onglet Produits ou via Import CSV."
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {filteredProducts.map((p) => {
+                      const inCartQty = cart.find((c) => c.product.id === p.id)?.quantity || 0;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => addToCart(p)}
+                          className={`flex items-center justify-between rounded-2xl border bg-white p-3.5 text-left transition hover:border-forest-800 hover:shadow-xs sm:p-4 ${
+                            inCartQty > 0 ? 'border-forest-900 ring-1 ring-forest-900/15' : 'border-slate-200'
+                          }`}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <div className="flex items-center gap-1.5">
+                              <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
+                              {inCartQty > 0 ? (
+                                <span className="shrink-0 rounded-full bg-forest-900 px-1.5 py-0.5 text-[10px] font-bold text-limeglow-400">
+                                  ×{inCartQty}
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {p.sku} · Stock :{' '}
+                              <span
+                                className={
+                                  p.stockAvailable <= 0
+                                    ? 'font-bold text-red-600'
+                                    : 'font-semibold text-emerald-700'
+                                }
+                              >
+                                {p.stockAvailable} {p.unit}
+                              </span>
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-xl bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-800 sm:text-sm">
+                            {formatXof(p.salePriceXof)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Panier & Encaissement */}
+              <form
+                onSubmit={handleCheckout}
+                className={`min-w-0 flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5 lg:col-span-5 lg:flex xl:col-span-4 ${
+                  mobilePosPane === 'cart' ? 'flex' : 'hidden lg:flex'
+                }`}
+              >
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2 font-bold text-slate-900">
@@ -810,7 +857,7 @@ export default function PosPage() {
                 <button
                   type="submit"
                   disabled={busy || cart.length === 0}
-                  className="mt-2 w-full rounded-xl bg-brand-700 px-4 py-3 text-sm font-bold text-white hover:bg-brand-800 disabled:opacity-50"
+                  className="mt-2 w-full rounded-xl bg-forest-900 px-4 py-3 text-sm font-bold text-white hover:bg-forest-800 disabled:opacity-50"
                 >
                   {busy
                     ? 'Validation…'
@@ -820,55 +867,59 @@ export default function PosPage() {
                 </button>
               </div>
             </form>
+            </div>
+
+            {/* Barre flottante mobile d'accès rapide au panier (au-dessus du dock mobile) */}
+            {mobilePosPane === 'catalog' && cart.length > 0 && totals ? (
+              <div className="fixed inset-x-3 bottom-[68px] z-20 flex items-center justify-between gap-3 rounded-2xl border border-limeglow-400/30 bg-forest-950 px-4 py-3 text-white shadow-2xl lg:hidden">
+                <div className="min-w-0">
+                  <p className="text-[11px] text-emerald-200/80">
+                    {cart.reduce((a, b) => a + b.quantity, 0)} article(s) dans le panier
+                  </p>
+                  <p className="truncate text-base font-bold text-white">
+                    {formatXof(totals.totalXof)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobilePosPane('cart')}
+                  className="shrink-0 rounded-full bg-limeglow-400 px-4 py-2 text-xs font-bold text-forest-950 shadow-sm"
+                >
+                  Encaisser →
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : (
-          /* Historique des ventes */
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
-                <tr>
-                  <th className="px-4 py-3">N° Vente</th>
-                  <th className="px-4 py-3">Date & Opérateur</th>
-                  <th className="px-4 py-3">Total / Payé / Dû</th>
-                  <th className="px-4 py-3">Statut</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+          /* Historique des ventes : cartes mobiles + tableau desktop */
+          sales.length === 0 ? (
+            <EmptyState
+              title="Aucune vente enregistrée"
+              description="Les ventes validées au comptoir POS apparaîtront ici en temps réel."
+            />
+          ) : (
+            <>
+              <div className="space-y-3 md:hidden">
                 {sales.map((sale) => (
-                  <tr key={sale.id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3">
-                      <p className="font-mono text-xs font-bold text-slate-900">{sale.saleNumber}</p>
-                      <p className="text-xs text-slate-500">
-                        {sale.lines.length} ligne(s)
-                        {sale.client ? ` · ${sale.client.fullName}` : ''}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-600">
-                      <p>{formatDateTimeInTimezone(sale.createdAt)}</p>
-                      {sale.declaredOperatorName ? (
-                        <p className="text-slate-400">Opérateur : {sale.declaredOperatorName}</p>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3 text-xs">
-                      <p className="font-bold text-slate-900">{formatXof(sale.totalXof)}</p>
-                      <p className="text-slate-500">
-                        Payé : {formatXof(sale.paidAmountXof)}
-                        {sale.dueAmountXof > 0 ? (
-                          <span className="ml-1 font-semibold text-amber-700">
-                            · Dû : {formatXof(sale.dueAmountXof)}
-                          </span>
+                  <div
+                    key={`m-${sale.id}`}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-xs font-bold text-slate-900">{sale.saleNumber}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {formatDateTimeInTimezone(sale.createdAt)}
+                        </p>
+                        {sale.client || sale.declaredOperatorName ? (
+                          <p className="text-xs text-slate-500">
+                            {sale.client ? sale.client.fullName : 'Client comptoir'}
+                            {sale.declaredOperatorName ? ` · Op. ${sale.declaredOperatorName}` : ''}
+                          </p>
                         ) : null}
-                        {sale.refundedAmountXof > 0 ? (
-                          <span className="ml-1 font-semibold text-red-600">
-                            · Remb. : {formatXof(sale.refundedAmountXof)}
-                          </span>
-                        ) : null}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
+                      </div>
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                           sale.status === 'COMPLETED'
                             ? 'bg-emerald-50 text-emerald-700'
                             : 'bg-red-50 text-red-700'
@@ -876,62 +927,196 @@ export default function PosPage() {
                       >
                         {sale.status === 'COMPLETED' ? 'Validée' : 'Annulée'}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {sale.status === 'COMPLETED' ? (
-                        <div className="inline-flex flex-wrap justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setReturnTarget(sale);
-                              setReturnLineId(sale.lines[0]?.id || '');
-                              setReturnQty(1);
-                              setReturnReason('');
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                          >
-                            <Undo2 className="h-3.5 w-3.5" />
-                            Retour
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setRefundTarget(sale);
-                              setRefundAmount(Math.max(0, sale.paidAmountXof - sale.refundedAmountXof));
-                              setRefundReason('');
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                          >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                            Rembourser
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCancelSaleTarget(sale);
-                              setCancelReason('');
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
-                          >
-                            <XCircle className="h-3.5 w-3.5" />
-                            Annuler
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400">{sale.cancelReason}</span>
-                      )}
-                    </td>
-                  </tr>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-2.5 text-center text-xs">
+                      <div>
+                        <p className="text-[10px] text-slate-500">Total</p>
+                        <p className="font-bold text-slate-900">{formatXof(sale.totalXof)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-500">Payé</p>
+                        <p className="font-semibold text-emerald-700">
+                          {formatXof(sale.paidAmountXof)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-500">Dû / Remb.</p>
+                        <p className="font-semibold text-amber-700">
+                          {sale.dueAmountXof > 0
+                            ? formatXof(sale.dueAmountXof)
+                            : sale.refundedAmountXof > 0
+                              ? `-${formatXof(sale.refundedAmountXof)}`
+                              : '0 F'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {sale.status === 'COMPLETED' ? (
+                      <div className="mt-3 grid grid-cols-3 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReturnTarget(sale);
+                            setReturnLineId(sale.lines[0]?.id || '');
+                            setReturnQty(1);
+                            setReturnReason('');
+                          }}
+                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-300 py-2 text-xs font-semibold text-slate-700"
+                        >
+                          <Undo2 className="h-3.5 w-3.5" />
+                          Retour
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRefundTarget(sale);
+                            setRefundAmount(
+                              Math.max(0, sale.paidAmountXof - sale.refundedAmountXof),
+                            );
+                            setRefundReason('');
+                          }}
+                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-300 py-2 text-xs font-semibold text-slate-700"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Remb.
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCancelSaleTarget(sale);
+                            setCancelReason('');
+                          }}
+                          className="inline-flex items-center justify-center gap-1 rounded-xl bg-red-50 py-2 text-xs font-semibold text-red-700"
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                          Annuler
+                        </button>
+                      </div>
+                    ) : sale.cancelReason ? (
+                      <p className="mt-2 text-xs text-slate-500">Motif : {sale.cancelReason}</p>
+                    ) : null}
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+
+              <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3">N° Vente</th>
+                      <th className="px-4 py-3">Date & Opérateur</th>
+                      <th className="px-4 py-3">Total / Payé / Dû</th>
+                      <th className="px-4 py-3">Statut</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {sales.map((sale) => (
+                      <tr key={sale.id} className="hover:bg-slate-50/60">
+                        <td className="px-4 py-3">
+                          <p className="font-mono text-xs font-bold text-slate-900">
+                            {sale.saleNumber}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {sale.lines.length} ligne(s)
+                            {sale.client ? ` · ${sale.client.fullName}` : ''}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          <p>{formatDateTimeInTimezone(sale.createdAt)}</p>
+                          {sale.declaredOperatorName ? (
+                            <p className="text-slate-400">
+                              Opérateur : {sale.declaredOperatorName}
+                            </p>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <p className="font-bold text-slate-900">{formatXof(sale.totalXof)}</p>
+                          <p className="text-slate-500">
+                            Payé : {formatXof(sale.paidAmountXof)}
+                            {sale.dueAmountXof > 0 ? (
+                              <span className="ml-1 font-semibold text-amber-700">
+                                · Dû : {formatXof(sale.dueAmountXof)}
+                              </span>
+                            ) : null}
+                            {sale.refundedAmountXof > 0 ? (
+                              <span className="ml-1 font-semibold text-red-600">
+                                · Remb. : {formatXof(sale.refundedAmountXof)}
+                              </span>
+                            ) : null}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                              sale.status === 'COMPLETED'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-red-50 text-red-700'
+                            }`}
+                          >
+                            {sale.status === 'COMPLETED' ? 'Validée' : 'Annulée'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {sale.status === 'COMPLETED' ? (
+                            <div className="inline-flex flex-wrap justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setReturnTarget(sale);
+                                  setReturnLineId(sale.lines[0]?.id || '');
+                                  setReturnQty(1);
+                                  setReturnReason('');
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                              >
+                                <Undo2 className="h-3.5 w-3.5" />
+                                Retour
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRefundTarget(sale);
+                                  setRefundAmount(
+                                    Math.max(0, sale.paidAmountXof - sale.refundedAmountXof),
+                                  );
+                                  setRefundReason('');
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                Rembourser
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCancelSaleTarget(sale);
+                                  setCancelReason('');
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
+                              >
+                                <XCircle className="h-3.5 w-3.5" />
+                                Annuler
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">{sale.cancelReason}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )
         )}
 
         {/* Modale Annulation vente */}
         {cancelSaleTarget ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl sm:p-6">
               <h3 className="text-lg font-bold text-slate-900">
                 Annuler la vente {cancelSaleTarget.saleNumber}
               </h3>
@@ -946,11 +1131,11 @@ export default function PosPage() {
                 placeholder="Motif d’annulation obligatoire (5+ caractères)…"
                 className="mt-3 w-full rounded-xl border border-slate-300 p-3 text-sm"
               />
-              <div className="mt-4 flex justify-end gap-2">
+              <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setCancelSaleTarget(null)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 sm:w-auto"
                 >
                   Fermer
                 </button>
@@ -958,7 +1143,7 @@ export default function PosPage() {
                   type="button"
                   disabled={busy || cancelReason.trim().length < 5}
                   onClick={handleCancelSale}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
                 >
                   Confirmer l’annulation
                 </button>
@@ -970,7 +1155,10 @@ export default function PosPage() {
         {/* Modale Retour article */}
         {returnTarget ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-            <form onSubmit={handleReturnSubmit} className="w-full max-w-md space-y-3 rounded-2xl bg-white p-6 shadow-xl">
+            <form
+              onSubmit={handleReturnSubmit}
+              className="max-h-[90dvh] w-full max-w-md space-y-3 overflow-y-auto rounded-2xl bg-white p-5 shadow-xl sm:p-6"
+            >
               <h3 className="text-lg font-bold text-slate-900">
                 Retour article — {returnTarget.saleNumber}
               </h3>
@@ -988,7 +1176,7 @@ export default function PosPage() {
                   ))}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-medium text-slate-700">Quantité</label>
                   <input
@@ -1021,18 +1209,18 @@ export default function PosPage() {
                 placeholder="Motif du retour…"
                 className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"
               />
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setReturnTarget(null)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 sm:w-auto"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={busy}
-                  className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white"
+                  className="w-full rounded-xl bg-forest-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto"
                 >
                   Enregistrer retour
                 </button>
@@ -1044,13 +1232,18 @@ export default function PosPage() {
         {/* Modale Remboursement */}
         {refundTarget ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-            <form onSubmit={handleRefundSubmit} className="w-full max-w-md space-y-3 rounded-2xl bg-white p-6 shadow-xl">
+            <form
+              onSubmit={handleRefundSubmit}
+              className="max-h-[90dvh] w-full max-w-md space-y-3 overflow-y-auto rounded-2xl bg-white p-5 shadow-xl sm:p-6"
+            >
               <h3 className="text-lg font-bold text-slate-900">
                 Remboursement — {refundTarget.saleNumber}
               </h3>
               <p className="text-xs text-slate-600">
                 Maximum remboursable :{' '}
-                <strong>{formatXof(refundTarget.paidAmountXof - refundTarget.refundedAmountXof)}</strong>
+                <strong>
+                  {formatXof(refundTarget.paidAmountXof - refundTarget.refundedAmountXof)}
+                </strong>
               </p>
               <input
                 type="number"
@@ -1069,18 +1262,18 @@ export default function PosPage() {
                 placeholder="Motif obligatoire du remboursement…"
                 className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"
               />
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setRefundTarget(null)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 sm:w-auto"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={busy}
-                  className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white"
+                  className="w-full rounded-xl bg-forest-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto"
                 >
                   Rembourser en espèces
                 </button>

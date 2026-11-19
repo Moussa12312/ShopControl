@@ -221,10 +221,12 @@ export default function OwnerShopsPage() {
                   </div>
 
                   <div className="mt-4 space-y-1.5 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-                    <div className="flex items-center gap-1.5">
-                      <Database className="h-3.5 w-3.5 text-brand-700" />
-                      <span>Base dédiée :</span>
-                      <code className="font-mono font-semibold text-slate-800">{shop.dbName}</code>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <Database className="h-3.5 w-3.5 shrink-0 text-brand-700" />
+                      <span className="shrink-0">Base dédiée :</span>
+                      <code className="truncate font-mono font-semibold text-slate-800">
+                        {shop.dbName}
+                      </code>
                     </div>
                     <p>
                       Devise : <strong>{shop.currency}</strong> · Fuseau :{' '}
