@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "nest start --watch",
-    "build": "nest build",
-    "start": "node dist/main.js",
+    "build": "nest build && node -e \"require('fs').cpSync('src/generated','dist/src/generated',{recursive:true})\"",
+    "start": "node dist/src/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:generate": "prisma generate --schema=prisma/control/schema.prisma && prisma generate --schema=prisma/shop/schema.prisma",
     "db:migrate": "ts-node -r tsconfig-paths/register prisma/control/migrate.ts",
