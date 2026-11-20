@@ -1,10 +1,33 @@
-const CACHE_NAME = 'shopcontrol-shell-v10';
-const STATIC_CACHE_NAME = 'shopcontrol-static-v10';
+const CACHE_NAME = 'shopcontrol-shell-v11';
+const STATIC_CACHE_NAME = 'shopcontrol-static-v11';
 
 const PRECACHE_URLS = [
   '/',
   '/pos',
   '/commerce/stock',
+  '/commerce/products',
+  '/commerce/cash',
+  '/commerce/clients',
+  '/commerce/expenses',
+  '/commerce/orders',
+  '/commerce/purchases',
+  '/commerce/transfers',
+  '/commerce/documents',
+  '/owner',
+  '/owner/settings',
+  '/owner/shops',
+  '/owner/reports',
+  '/owner/operators',
+  '/owner/audit',
+  '/owner/agents',
+  '/admin',
+  '/admin/shops',
+  '/admin/merchants',
+  '/admin/platform',
+  '/admin/security',
+  '/messaging',
+  '/agent',
+  '/agent/profile',
   '/login',
   '/manifest.json',
   '/icon.svg',
@@ -70,17 +93,37 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Pages HTML (Network-First avec Timeout 2s -> Fallback Cache instantané en cas de réseau lent/coupé)
-  if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
+  // 3. Navigation HTML et composants Next.js (RSC payload)
+  const isNavigation =
+    request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html');
+  const isRsc = url.searchParams.has('_rsc');
+
+  if (isNavigation || isRsc) {
+    // Si hors ligne, servir immédiatement depuis le cache sans aucun délai d'attente
+    if (!navigator.onLine) {
+      event.respondWith(
+        caches.match(request, { ignoreSearch: true }).then((cached) => {
+          if (cached) return cached;
+          return caches.match(url.pathname, { ignoreSearch: true }).then((pathCached) => {
+            if (pathCached) return pathCached;
+            return caches
+              .match('/pos')
+              .then((posCached) => posCached || caches.match('/') || new Response('Hors-ligne', { status: 200 }));
+          });
+        }),
+      );
+      return;
+    }
+
     event.respondWith(
       new Promise((resolve) => {
         let didTimeout = false;
         const timer = setTimeout(() => {
           didTimeout = true;
-          caches.match(request).then((cached) => {
+          caches.match(request, { ignoreSearch: true }).then((cached) => {
             if (cached) resolve(cached);
           });
-        }, 2000);
+        }, 1000);
 
         fetch(request)
           .then((networkRes) => {
@@ -93,12 +136,12 @@ self.addEventListener('fetch', (event) => {
           })
           .catch(() => {
             clearTimeout(timer);
-            caches.match(request).then((cached) => {
+            caches.match(request, { ignoreSearch: true }).then((cached) => {
               if (cached) {
                 resolve(cached);
               } else {
-                caches.match('/pos').then((posCached) => {
-                  resolve(posCached || caches.match('/') || new Response('Hors-ligne', { status: 503 }));
+                caches.match(url.pathname, { ignoreSearch: true }).then((pathCached) => {
+                  resolve(pathCached || caches.match('/pos') || caches.match('/') || new Response('Hors-ligne', { status: 200 }));
                 });
               }
             });
@@ -118,6 +161,6 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(request)),
+      .catch(() => caches.match(request, { ignoreSearch: true })),
   );
 });

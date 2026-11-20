@@ -1,5 +1,7 @@
 'use client';
 
+import { getCachedApiResponse, saveCachedApiResponse } from '@/lib/local-db';
+
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
@@ -53,6 +55,8 @@ async function attemptTokenRefresh(): Promise<boolean> {
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
   const method = options.method || 'GET';
   const isMutating = method !== 'GET';
+  const isGet = method === 'GET';
+  const cacheKey = isGet ? `${options.shopId || 'global'}:${path}` : null;
 
   // Option B (Section 14.3) : bloque proprement les opérations qui exigent une connexion active
   if ((options.requiresOnline ?? isMutating) && typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -61,6 +65,20 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
       'OFFLINE_REQUIRED_ONLINE',
       'Connexion requise : cette opération ne peut pas être exécutée hors ligne.',
     );
+  }
+
+  // En mode hors ligne, servir immédiatement depuis le cache local IndexedDB pour les requêtes de lecture
+  if (isGet && cacheKey && typeof navigator !== 'undefined' && !navigator.onLine) {
+    const cached = await getCachedApiResponse<T>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+    if (options.requiresOnline === false) {
+      if (path.includes('products') || path.includes('sales') || path.includes('sessions') || path.includes('movements') || path.includes('clients') || path.includes('expenses') || path.includes('orders') || path.includes('purchases') || path.includes('transfers') || path.includes('categories') || path.includes('alerts')) {
+        return { items: [], total: 0 } as T;
+      }
+      return [] as T;
+    }
   }
 
   const headers: Record<string, string> = {};
@@ -91,6 +109,19 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
   } catch {
+    // Si la requête échoue suite à une coupure réseau, basculer sur le cache local
+    if (isGet && cacheKey) {
+      const cached = await getCachedApiResponse<T>(cacheKey);
+      if (cached !== null) {
+        return cached;
+      }
+      if (options.requiresOnline === false) {
+        if (path.includes('products') || path.includes('sales') || path.includes('sessions') || path.includes('movements') || path.includes('clients') || path.includes('expenses') || path.includes('orders') || path.includes('purchases') || path.includes('transfers') || path.includes('categories') || path.includes('alerts')) {
+          return { items: [], total: 0 } as T;
+        }
+        return [] as T;
+      }
+    }
     throw new ApiError(
       0,
       'NETWORK_ERROR',
@@ -125,6 +156,10 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
         ? (errObj.errors as Array<{ path: string; message: string }>)
         : undefined,
     );
+  }
+
+  if (isGet && cacheKey) {
+    void saveCachedApiResponse(cacheKey, parsed);
   }
 
   return parsed as T;

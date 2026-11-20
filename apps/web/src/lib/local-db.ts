@@ -61,10 +61,17 @@ export interface OfflineOperationItem {
   createdAt: string;
 }
 
+export interface CachedApiResponse {
+  key: string;
+  data: unknown;
+  cachedAt: string;
+}
+
 class ShopControlLocalDatabase extends Dexie {
   terminalState!: Table<LocalTerminalState, string>;
   offlineQueue!: Table<OfflineOperationItem, number>;
   productsCache!: Table<CachedProductItem, string>;
+  apiCache!: Table<CachedApiResponse, string>;
 
   constructor() {
     super('ShopControlLocalDB');
@@ -81,6 +88,12 @@ class ShopControlLocalDatabase extends Dexie {
       terminalState: 'id',
       offlineQueue: '++id, clientOperationId, shopId, status, createdAt',
       productsCache: 'id, shopId, sku, barcode, name',
+    });
+    this.version(4).stores({
+      terminalState: 'id',
+      offlineQueue: '++id, clientOperationId, shopId, status, createdAt',
+      productsCache: 'id, shopId, sku, barcode, name',
+      apiCache: 'key, cachedAt',
     });
   }
 }
@@ -193,4 +206,27 @@ export async function updateOfflineSaleStatus(
   const updates: Partial<OfflineOperationItem> = { status, errorMessage };
   if (retryCount !== undefined) updates.retryCount = retryCount;
   await localDb.offlineQueue.update(id, updates);
+}
+
+export async function getCachedApiResponse<T>(key: string): Promise<T | null> {
+  if (!localDb) return null;
+  try {
+    const entry = await localDb.apiCache.get(key);
+    return (entry?.data as T) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveCachedApiResponse(key: string, data: unknown): Promise<void> {
+  if (!localDb) return;
+  try {
+    await localDb.apiCache.put({
+      key,
+      data,
+      cachedAt: new Date().toISOString(),
+    });
+  } catch {
+    // Ignore storage quota errors
+  }
 }

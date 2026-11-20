@@ -8,7 +8,7 @@ import {
   TenantStatus,
   UserRole,
 } from '@shopcontrol/shared';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, ApiError } from '@/lib/api-client';
 import { getLocalTerminalMeta, saveLocalTerminalMeta } from '@/lib/local-db';
 
 export type OwnerWorkspaceMode = 'supervision' | 'management';
@@ -139,10 +139,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const storedGrant =
         typeof window !== 'undefined' ? sessionStorage.getItem('sc_support_grant_id') : null;
-      const data = await apiFetch<AuthMeResponse>('/auth/me', {
-        supportGrantId: storedGrant,
-        requiresOnline: false,
-      });
+      let data: AuthMeResponse | null = null;
+      try {
+        data = await apiFetch<AuthMeResponse>('/auth/me', {
+          supportGrantId: storedGrant,
+          requiresOnline: false,
+        });
+        if (typeof window !== 'undefined' && data) {
+          window.localStorage.setItem('sc_cached_auth_me', JSON.stringify(data));
+        }
+      } catch (fetchErr) {
+        if (typeof window !== 'undefined') {
+          const cachedRaw = window.localStorage.getItem('sc_cached_auth_me');
+          if (cachedRaw) {
+            try {
+              data = JSON.parse(cachedRaw) as AuthMeResponse;
+            } catch {
+              data = null;
+            }
+          }
+        }
+        if (!data) {
+          throw fetchErr;
+        }
+      }
+
       setUser(data.user);
       setMerchant(data.merchant);
       setShops(data.shops);
@@ -172,10 +193,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setActiveOperatorState(null);
       }
-    } catch {
-      setUser(null);
-      setMerchant(null);
-      setShops([]);
+    } catch (err) {
+      if (err instanceof ApiError && err.statusCode === 401) {
+        setUser(null);
+        setMerchant(null);
+        setShops([]);
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem('sc_cached_auth_me');
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -196,6 +222,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setShops([]);
     setActiveOperator(null);
     setSupportGrantId(null);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('sc_cached_auth_me');
+    }
   }, [setActiveOperator, setSupportGrantId]);
 
   return (
