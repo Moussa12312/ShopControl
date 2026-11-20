@@ -129,6 +129,7 @@ interface StorefrontData {
       pickupEnabled: boolean;
       deliveryEnabled: boolean;
       defaultDeliveryFeeXof: number;
+      deliveryZones?: Array<{ name: string; feeXof: number }>;
       whatsappNumber?: string;
       allowOutOfHoursOrders: boolean;
       outOfHoursMessage?: string;
@@ -518,7 +519,13 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
     (a, i) => a + resolveProductUnitPrice(i.product, i.soldInBulk) * i.qty,
     0,
   );
-  const deliveryFeeXof = fulfillmentMode === 'DELIVERY' ? deliveryCfg.defaultDeliveryFeeXof : 0;
+  const matchedZone = (deliveryCfg.deliveryZones || []).find(
+    (z) => z.name.trim().toLowerCase() === deliveryDistrict.trim().toLowerCase(),
+  );
+  const deliveryFeeXof =
+    fulfillmentMode === 'DELIVERY'
+      ? (matchedZone ? matchedZone.feeXof : deliveryCfg.defaultDeliveryFeeXof)
+      : 0;
   const grandTotalXof = subtotalXof + deliveryFeeXof;
   const totalItems = cart.reduce((a, i) => a + i.qty, 0);
 
@@ -1840,7 +1847,11 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                         <Truck className="h-4 w-4" />
                         <span>Livraison</span>
                         <span className="text-[10px] opacity-75">
-                          +{formatXof(deliveryCfg.defaultDeliveryFeeXof)}
+                          {deliveryDistrict.trim() && matchedZone
+                            ? `+${formatXof(matchedZone.feeXof)}`
+                            : deliveryCfg.deliveryZones && deliveryCfg.deliveryZones.length > 0
+                              ? `dès ${formatXof(Math.min(...deliveryCfg.deliveryZones.map((z) => z.feeXof)))}`
+                              : `+${formatXof(deliveryCfg.defaultDeliveryFeeXof)}`}
                         </span>
                       </button>
                     ) : null}
@@ -1869,18 +1880,86 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                     />
                     {fulfillmentMode === 'DELIVERY' ? (
                       <>
-                        <input
-                          required
-                          value={deliveryDistrict}
-                          onChange={(e) => setDeliveryDistrict(e.target.value)}
-                          placeholder="Quartier / Zone de livraison *"
-                          className="sc-input"
-                        />
+                        {deliveryCfg.deliveryZones && deliveryCfg.deliveryZones.length > 0 ? (
+                          <div className="space-y-1.5">
+                            <label className="block text-xs font-semibold text-slate-700">
+                              Quartier / Zone de livraison *
+                            </label>
+                            <select
+                              required
+                              value={
+                                deliveryCfg.deliveryZones.some(
+                                  (z) => z.name.toLowerCase() === deliveryDistrict.toLowerCase(),
+                                )
+                                  ? deliveryDistrict
+                                  : deliveryDistrict.trim()
+                                    ? '__OTHER__'
+                                    : ''
+                              }
+                              onChange={(e) => {
+                                if (e.target.value === '__OTHER__') {
+                                  setDeliveryDistrict('');
+                                } else {
+                                  setDeliveryDistrict(e.target.value);
+                                }
+                              }}
+                              className="sc-input font-medium"
+                            >
+                              <option value="">-- Choisir votre quartier --</option>
+                              {deliveryCfg.deliveryZones.map((z) => (
+                                <option key={z.name} value={z.name}>
+                                  {z.name} — {formatXof(z.feeXof)}
+                                </option>
+                              ))}
+                              <option value="__OTHER__">
+                                Autre quartier (Tarif standard : {formatXof(deliveryCfg.defaultDeliveryFeeXof)})...
+                              </option>
+                            </select>
+
+                            {(!deliveryDistrict ||
+                              !deliveryCfg.deliveryZones.some(
+                                (z) => z.name.toLowerCase() === deliveryDistrict.toLowerCase(),
+                              )) && (
+                              <input
+                                required
+                                value={deliveryDistrict}
+                                onChange={(e) => setDeliveryDistrict(e.target.value)}
+                                placeholder="Précisez le nom de votre quartier *"
+                                className="sc-input mt-1.5"
+                              />
+                            )}
+
+                            <div className="flex items-center justify-between rounded-xl bg-forest-50 px-3 py-2 text-xs font-bold text-forest-900">
+                              <span className="flex items-center gap-1.5">
+                                <Truck className="h-3.5 w-3.5 text-forest-700" />
+                                Frais de livraison appliqués :
+                              </span>
+                              <span className="rounded-md bg-forest-900 px-2 py-0.5 text-limeglow-400">
+                                {formatXof(deliveryFeeXof)}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            <input
+                              required
+                              value={deliveryDistrict}
+                              onChange={(e) => setDeliveryDistrict(e.target.value)}
+                              placeholder="Quartier / Zone de livraison *"
+                              className="sc-input"
+                            />
+                            <div className="flex items-center justify-between rounded-xl bg-forest-50 px-3 py-1.5 text-xs font-semibold text-forest-900">
+                              <span>Frais de livraison standard :</span>
+                              <span className="font-bold">{formatXof(deliveryFeeXof)}</span>
+                            </div>
+                          </div>
+                        )}
+
                         <input
                           required
                           value={deliveryAddress}
                           onChange={(e) => setDeliveryAddress(e.target.value)}
-                          placeholder="Adresse précise / Repère *"
+                          placeholder="Adresse précise / Repère (ex: Pharmacie du carrefour...) *"
                           className="sc-input"
                         />
                       </>

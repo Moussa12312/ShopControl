@@ -83,7 +83,7 @@ export class InventoryService {
     private readonly shopDbManager: ShopDatabaseManagerService,
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
-  ) {}
+  ) { }
 
   /**
    * Point d'entrée UNIQUE pour toute variation de stock dans la base dédiée d'une boutique.
@@ -1418,7 +1418,7 @@ export class InventoryService {
 @Controller('shops/:shopId/stock')
 @UseGuards(ShopScopeGuard, PermissionsGuard, OperatorGuard)
 export class InventoryController {
-  constructor(private readonly inventoryService: InventoryService) {}
+  constructor(private readonly inventoryService: InventoryService) { }
 
   @Get('valuation')
   @Roles('OWNER', 'AGENT')
@@ -1573,4 +1573,4 @@ export class InventoryController {
   providers: [InventoryService],
   exports: [InventoryService],
 })
-export class InventoryModule {}
+export class InventoryModule { }

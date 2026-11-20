@@ -18,6 +18,9 @@ import {
   ShieldCheck,
   Store,
   Truck,
+  MapPin,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import {
   BusinessProfileConfig,
@@ -171,12 +174,45 @@ export default function OwnerSettingsPage() {
     pickupEnabled: true,
     deliveryEnabled: true,
     defaultDeliveryFeeXof: 1000,
+    deliveryZones: [] as Array<{ name: string; feeXof: number }>,
     whatsappNumber: '',
     allowOutOfHoursOrders: true,
     outOfHoursMessage: DEFAULT_DELIVERY_CONFIG.outOfHoursMessage,
     maxOrderQty: 100,
     maxOrderAmountXof: 5_000_000,
   });
+
+  const [newZoneName, setNewZoneName] = useState('');
+  const [newZoneFee, setNewZoneFee] = useState<number | ''>('');
+
+  const addDeliveryZone = () => {
+    if (!newZoneName.trim() || newZoneFee === '' || Number(newZoneFee) < 0) return;
+    const trimmed = newZoneName.trim();
+    if (shopForm.deliveryZones.some((z) => z.name.toLowerCase() === trimmed.toLowerCase())) {
+      return;
+    }
+    setShopForm((prev) => ({
+      ...prev,
+      deliveryZones: [...prev.deliveryZones, { name: trimmed, feeXof: Math.round(Number(newZoneFee)) }],
+    }));
+    setNewZoneName('');
+    setNewZoneFee('');
+  };
+
+  const removeDeliveryZone = (index: number) => {
+    setShopForm((prev) => ({
+      ...prev,
+      deliveryZones: prev.deliveryZones.filter((_, i) => i !== index),
+    }));
+  };
+
+  const quickAddPresetZone = (name: string, feeXof: number) => {
+    if (shopForm.deliveryZones.some((z) => z.name.toLowerCase() === name.toLowerCase())) return;
+    setShopForm((prev) => ({
+      ...prev,
+      deliveryZones: [...prev.deliveryZones, { name, feeXof }],
+    }));
+  };
 
   // Nouveau ticket support
   const [ticketForm, setTicketForm] = useState({ subject: '', priority: 'INFO', message: '' });
@@ -203,6 +239,9 @@ export default function OwnerSettingsPage() {
       pickupEnabled: d.pickupEnabled !== false,
       deliveryEnabled: d.deliveryEnabled !== false,
       defaultDeliveryFeeXof: Number(d.defaultDeliveryFeeXof ?? 1000),
+      deliveryZones: Array.isArray(d.deliveryZones)
+        ? d.deliveryZones.map((z: any) => ({ name: String(z.name || ''), feeXof: Number(z.feeXof || 0) }))
+        : [],
       whatsappNumber: d.whatsappNumber || '',
       allowOutOfHoursOrders: d.allowOutOfHoursOrders !== false,
       outOfHoursMessage: d.outOfHoursMessage || DEFAULT_DELIVERY_CONFIG.outOfHoursMessage,
@@ -292,7 +331,12 @@ export default function OwnerSettingsPage() {
             pickupEnabled: shopForm.pickupEnabled,
             deliveryEnabled: shopForm.deliveryEnabled,
             defaultDeliveryFeeXof: Math.max(0, Math.round(Number(shopForm.defaultDeliveryFeeXof) || 0)),
-            deliveryZones: [],
+            deliveryZones: shopForm.deliveryZones
+              .filter((z) => z.name.trim())
+              .map((z) => ({
+                name: z.name.trim(),
+                feeXof: Math.max(0, Math.round(Number(z.feeXof) || 0)),
+              })),
             allowOutOfHoursOrders: shopForm.allowOutOfHoursOrders,
             outOfHoursMessage: shopForm.outOfHoursMessage.trim(),
             whatsappNumber: shopForm.whatsappNumber.trim(),
@@ -823,6 +867,137 @@ export default function OwnerSettingsPage() {
                         />
                       </div>
                     </div>
+
+                    {/* Tarifs par Quartier / Zone de livraison */}
+                    {shopForm.deliveryEnabled ? (
+                      <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <h4 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-800">
+                              <MapPin className="h-4 w-4 text-emerald-700" />
+                              Tarifs de livraison par Quartier / Commune
+                            </h4>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              Définissez les frais de livraison pour chaque emplacement. Si un client renseigne un autre quartier, le montant par défaut ({formatXof(shopForm.defaultDeliveryFeeXof)}) sera appliqué.
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                            {shopForm.deliveryZones.length} quartier{shopForm.deliveryZones.length > 1 ? 's' : ''} configuré{shopForm.deliveryZones.length > 1 ? 's' : ''}
+                          </span>
+                        </div>
+
+                        {/* Suggestions rapides en 1 clic */}
+                        <div>
+                          <p className="mb-1.5 text-[11px] font-semibold text-slate-600">Ajout rapide de quartiers courants :</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[
+                              { name: 'Cocody', fee: 1500 },
+                              { name: 'Plateau', fee: 1000 },
+                              { name: 'Marcory', fee: 1500 },
+                              { name: 'Yopougon', fee: 2000 },
+                              { name: 'Treichville', fee: 1000 },
+                              { name: 'Koumassi', fee: 1500 },
+                              { name: 'Port-Bouët', fee: 2000 },
+                              { name: 'Riviera', fee: 2000 },
+                              { name: 'Adjamé', fee: 1500 },
+                              { name: 'Abobo', fee: 2500 },
+                              { name: 'Angré', fee: 2000 },
+                              { name: 'Zone 4', fee: 1500 },
+                              { name: 'Bingerville', fee: 2500 },
+                              { name: 'Grand-Bassam', fee: 3500 },
+                            ].map((preset) => {
+                              const already = shopForm.deliveryZones.some(
+                                (z) => z.name.toLowerCase() === preset.name.toLowerCase(),
+                              );
+                              return (
+                                <button
+                                  key={preset.name}
+                                  type="button"
+                                  disabled={already}
+                                  onClick={() => quickAddPresetZone(preset.name, preset.fee)}
+                                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                                    already
+                                      ? 'cursor-not-allowed bg-slate-200 text-slate-400'
+                                      : 'border border-slate-300 bg-white text-slate-700 hover:border-emerald-600 hover:text-emerald-800'
+                                  }`}
+                                >
+                                  + {preset.name} ({formatXof(preset.fee)})
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Formulaire ajout personnalisé */}
+                        <div className="grid gap-2 sm:grid-cols-12">
+                          <div className="sm:col-span-6">
+                            <input
+                              type="text"
+                              placeholder="Nom du quartier / commune (ex: Deux-Plateaux...)"
+                              value={newZoneName}
+                              onChange={(e) => setNewZoneName(e.target.value)}
+                              className="sc-input text-xs"
+                            />
+                          </div>
+                          <div className="sm:col-span-4">
+                            <input
+                              type="number"
+                              min={0}
+                              step={100}
+                              placeholder="Tarif livraison (XOF)"
+                              value={newZoneFee}
+                              onChange={(e) => setNewZoneFee(e.target.value === '' ? '' : Number(e.target.value))}
+                              className="sc-input text-xs tabular"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <button
+                              type="button"
+                              onClick={addDeliveryZone}
+                              disabled={!newZoneName.trim() || newZoneFee === ''}
+                              className="sc-btn-primary w-full py-2.5 text-xs disabled:opacity-40"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              Ajouter
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Liste des quartiers */}
+                        {shopForm.deliveryZones.length > 0 ? (
+                          <div className="max-h-60 divide-y divide-slate-200 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                            {shopForm.deliveryZones.map((zone, idx) => (
+                              <div
+                                key={`${zone.name}_${idx}`}
+                                className="flex items-center justify-between p-2.5 text-xs"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                                  <span className="font-bold text-slate-900">{zone.name}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="rounded-lg bg-emerald-50 px-2.5 py-1 font-extrabold text-emerald-800">
+                                    {formatXof(zone.feeXof)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeDeliveryZone(idx)}
+                                    className="rounded-lg p-1 text-rose-500 hover:bg-rose-50"
+                                    title="Supprimer ce quartier"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="rounded-xl border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400">
+                            Aucun quartier spécifique configuré. Le tarif standard de {formatXof(shopForm.defaultDeliveryFeeXof)} s’appliquera pour toutes les livraisons.
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
 
                     <div className="flex justify-end pt-2">
                       {!supportGrantId ? (
