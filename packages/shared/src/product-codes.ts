@@ -123,3 +123,97 @@ export function generateProductBarcodeEan13(params: ProductCodeParams): string {
   const body12 = `20${shopDigits}${catDigits}${itemDigits}`;
   return `${body12}${computeEan13CheckDigit(body12)}`;
 }
+
+const EAN13_L_CODES = [
+  '0001101', // 0
+  '0011001', // 1
+  '0010011', // 2
+  '0111101', // 3
+  '0100011', // 4
+  '0110001', // 5
+  '0101111', // 6
+  '0111011', // 7
+  '0110111', // 8
+  '0001011', // 9
+];
+
+const EAN13_G_CODES = [
+  '0100111', // 0
+  '0110011', // 1
+  '0011011', // 2
+  '0100001', // 3
+  '0011101', // 4
+  '0111001', // 5
+  '0000101', // 6
+  '0010001', // 7
+  '0001001', // 8
+  '0010111', // 9
+];
+
+const EAN13_R_CODES = [
+  '1110010', // 0
+  '1100110', // 1
+  '1101100', // 2
+  '1000010', // 3
+  '1011100', // 4
+  '1001110', // 5
+  '1010000', // 6
+  '1000100', // 7
+  '1001000', // 8
+  '1110100', // 9
+];
+
+const EAN13_PARITY = [
+  'LLLLLL', // 0
+  'LLGLGG', // 1
+  'LLGGLG', // 2
+  'LLGGGL', // 3
+  'LGLLGG', // 4
+  'LGGLLG', // 5
+  'LGGGLL', // 6
+  'LGLGLG', // 7
+  'LGLGGL', // 8
+  'LGGLGL', // 9
+];
+
+/**
+ * Encode un code-barres EAN-13 valide en chaîne binaire exacte de 95 modules GS1 (0 et 1).
+ * Retourne null si le code n'est pas un EAN-13 valide (13 chiffres avec checksum correct).
+ *
+ * Structure des 95 modules :
+ * - 3 bits : Guard de départ (101)
+ * - 42 bits : 6 chiffres de gauche (tables L ou G selon parité du 1er chiffre)
+ * - 5 bits : Guard central (01010)
+ * - 42 bits : 6 chiffres de droite (table R)
+ * - 3 bits : Guard de fin (101)
+ */
+export function encodeEan13Bits(rawCode: string): string | null {
+  const code = (rawCode || '').trim();
+  if (!isValidEan13(code)) return null;
+
+  const firstDigit = Number(code[0]);
+  const parity = EAN13_PARITY[firstDigit];
+  if (!parity) return null;
+
+  let bits = '101'; // Start guard
+
+  // 6 chiffres de gauche (indices 1 à 6)
+  for (let i = 1; i <= 6; i += 1) {
+    const digit = Number(code[i]);
+    const pattern = parity[i - 1];
+    bits += pattern === 'G' ? EAN13_G_CODES[digit] : EAN13_L_CODES[digit];
+  }
+
+  bits += '01010'; // Center guard
+
+  // 6 chiffres de droite (indices 7 à 12)
+  for (let i = 7; i <= 12; i += 1) {
+    const digit = Number(code[i]);
+    bits += EAN13_R_CODES[digit];
+  }
+
+  bits += '101'; // End guard
+
+  return bits.length === 95 ? bits : null;
+}
+

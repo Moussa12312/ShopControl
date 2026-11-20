@@ -53,6 +53,16 @@ import {
 import { ReceiptModal, SaleDocumentView } from '@/components/commerce/ReceiptModal';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateViews';
 
+interface ProductVariant {
+  id: string;
+  name: string;
+  sku?: string;
+  barcode?: string | null;
+  salePriceXof?: number | null;
+  stockAvailable?: number;
+  isActive?: boolean;
+}
+
 interface ProductItem {
   id: string;
   name: string;
@@ -73,6 +83,7 @@ interface ProductItem {
   allowFractionalSale?: boolean;
   warrantyMonths?: number | null;
   trackSerialNumber?: boolean;
+  variants?: ProductVariant[];
 }
 
 interface ClientItem {
@@ -90,6 +101,8 @@ interface CartItem {
   soldInBulk: boolean;
   customAmountXof: number | null;
   serialNumber: string;
+  variantId: string | null;
+  variantName: string | null;
 }
 
 interface SaleRow {
@@ -125,6 +138,8 @@ export default function PosPage() {
   const { shopId, activeShop, selectShop } = useActiveOperationalShop();
   const shopType = normalizeShopType(activeShop?.shopType);
   const profile = normalizeBusinessProfile(shopType, activeShop?.businessProfile);
+
+  const [variantTarget, setVariantTarget] = useState<ProductItem | null>(null);
 
   const [tab, setTab] = useState<'pos' | 'history'>('pos');
   const [mobilePosPane, setMobilePosPane] = useState<'catalog' | 'cart'>('catalog');
@@ -310,7 +325,7 @@ export default function PosPage() {
     );
   }, [sales, historySearch]);
 
-  const addToCart = (product: ProductItem, soldInBulk = false) => {
+  const addToCart = (product: ProductItem, soldInBulk = false, variant?: ProductVariant) => {
     setFeedback(null);
     setCart((prev) => {
       // Si l'article nécessite un IMEI/N° de série, chaque unité peut être une ligne ou incrémentée
@@ -318,6 +333,7 @@ export default function PosPage() {
         (i) =>
           i.product.id === product.id &&
           i.soldInBulk === soldInBulk &&
+          i.variantId === (variant?.id ?? null) &&
           i.customAmountXof === null &&
           !product.trackSerialNumber,
       );
@@ -326,15 +342,18 @@ export default function PosPage() {
           i === idx ? { ...item, quantity: item.quantity + 1 } : item,
         );
       }
+      const effectivePrice = variant?.salePriceXof ?? product.salePriceXof;
       return [
         ...prev,
         {
-          key: `${product.id}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          product,
+          key: `${product.id}_${variant?.id ?? 'base'}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          product: { ...product, salePriceXof: effectivePrice },
           quantity: 1,
           soldInBulk,
           customAmountXof: null,
           serialNumber: '',
+          variantId: variant?.id ?? null,
+          variantName: variant?.name ?? null,
         },
       ];
     });
@@ -385,6 +404,7 @@ export default function PosPage() {
     (code: string): boolean => {
       const clean = code.trim().toLowerCase();
       if (!clean) return false;
+      // Chercher d'abord sur le produit de base
       const exact = products.find(
         (p) => p.barcode?.toLowerCase() === clean || p.sku.toLowerCase() === clean,
       );
@@ -392,6 +412,18 @@ export default function PosPage() {
         addToCart(exact);
         setFeedback({ type: 'ok', msg: `Article scanné : ${exact.name}` });
         return true;
+      }
+      // Chercher dans les variantes
+      for (const p of products) {
+        if (!p.variants?.length) continue;
+        const matchVariant = p.variants.find(
+          (v) => v.barcode?.toLowerCase() === clean || v.sku?.toLowerCase() === clean,
+        );
+        if (matchVariant) {
+          addToCart(p, false, matchVariant);
+          setFeedback({ type: 'ok', msg: `Article scanné : ${p.name} — ${matchVariant.name}` });
+          return true;
+        }
       }
       return false;
     },
@@ -476,6 +508,7 @@ export default function PosPage() {
       clientId: selectedClientId || null,
       lines: cart.map((c) => ({
         productId: c.product.id,
+        ...(c.variantId ? { variantId: c.variantId } : {}),
         quantity: c.customAmountXof && c.customAmountXof > 0 ? 1 : c.quantity,
         soldInBulk: c.soldInBulk,
         ...(c.customAmountXof && c.customAmountXof > 0
@@ -891,7 +924,13 @@ export default function PosPage() {
                         >
                           <button
                             type="button"
-                            onClick={() => addToCart(p, false)}
+                            onClick={() => {
+                              if (p.variants && p.variants.filter(v => v.isActive !== false).length > 0) {
+                                setVariantTarget(p);
+                              } else {
+                                addToCart(p, false);
+                              }
+                            }}
                             className="flex w-full items-center justify-between gap-2.5 text-left"
                           >
                             <div className="flex min-w-0 items-center gap-2.5">
@@ -935,9 +974,14 @@ export default function PosPage() {
                             </span>
                           </button>
 
-                          {(hasBulk || p.allowFractionalSale || p.warrantyMonths) && (
+                          {(hasBulk || p.allowFractionalSale || p.warrantyMonths || (p.variants && p.variants.length > 0)) && (
                             <div className="flex flex-wrap items-center justify-between gap-1.5 border-t border-slate-100 pt-2">
                               <div className="flex flex-wrap gap-1">
+                                {p.variants && p.variants.length > 0 ? (
+                                  <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-800">
+                                    {p.variants.length} variante{p.variants.length > 1 ? 's' : ''}
+                                  </span>
+                                ) : null}
                                 {p.allowFractionalSale ? (
                                   <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">
                                     Vente au montant
@@ -1028,6 +1072,11 @@ export default function PosPage() {
                                   ? ` [${item.product.bulkUnitLabel || 'carton'} ×${item.product.unitsPerBulk}]`
                                   : ''}
                               </p>
+                              {item.variantName ? (
+                                <span className="inline-flex items-center rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800">
+                                  {item.variantName}
+                                </span>
+                              ) : null}
                               <p className="text-xs text-slate-500">
                                 {computedFractionQty ? (
                                   <span>
@@ -1674,6 +1723,55 @@ export default function PosPage() {
             )}
           </div>
         )}
+
+        {/* Modal Sélecteur de Variante */}
+        {variantTarget ? (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-forest-950/70 p-4 backdrop-blur-xs sm:items-center">
+            <div className="w-full max-w-sm space-y-4 rounded-3xl bg-white p-5 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">{variantTarget.name}</h3>
+                  <p className="text-xs text-slate-500">Choisissez une variante</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVariantTarget(null)}
+                  className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(variantTarget.variants ?? [])
+                  .filter((v) => v.isActive !== false)
+                  .map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => {
+                        addToCart(variantTarget, false, v);
+                        setVariantTarget(null);
+                        setFeedback({ type: 'ok', msg: `${variantTarget.name} — ${v.name} ajouté.` });
+                      }}
+                      className="flex flex-col items-start rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-forest-900 hover:bg-forest-50"
+                    >
+                      <span className="font-bold text-slate-900 text-sm">{v.name}</span>
+                      {v.salePriceXof != null ? (
+                        <span className="mt-1 rounded-lg bg-limeglow-100 px-2 py-0.5 text-xs font-extrabold text-forest-900">
+                          {formatXof(v.salePriceXof)}
+                        </span>
+                      ) : null}
+                      {v.stockAvailable != null ? (
+                        <span className={`mt-1 text-[10px] font-semibold ${v.stockAvailable <= 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                          Stock : {v.stockAvailable}
+                        </span>
+                      ) : null}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Modale Scanner Code-Barres (Caméra + Lecteur USB/Saisie rapide) */}
         {scannerOpen ? (

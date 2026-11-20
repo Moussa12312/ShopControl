@@ -30,6 +30,7 @@ export const productVariantInputSchema = z.object({
   salePriceXof: xofInt.nullable().optional(),
   costPriceXof: xofInt.nullable().optional(),
   alertThreshold: z.number().int().min(0).default(5),
+  initialStockQty: z.number().int().min(0).optional(),
   isActive: z.boolean().default(true),
 });
 

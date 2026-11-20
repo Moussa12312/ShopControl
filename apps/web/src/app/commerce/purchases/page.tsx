@@ -137,6 +137,31 @@ export default function PurchasesPage() {
     void load();
   }, [load]);
 
+  // Prefill depuis l'URL (ex: depuis les alertes de réapprovisionnement du stock)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const pId = params.get('productId');
+    const q = params.get('qty');
+    if (pId) {
+      setPoProductId(pId);
+      if (q) {
+        const parsed = parseInt(q, 10);
+        if (!isNaN(parsed) && parsed > 0) setPoQty(parsed);
+      }
+      setShowNewPo(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (poProductId && products.length > 0) {
+      const found = products.find((p) => p.id === poProductId);
+      if (found && found.costPriceXof && found.costPriceXof > 0) {
+        setPoUnitCost(found.costPriceXof);
+      }
+    }
+  }, [poProductId, products]);
+
   const handleCreateSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!shopId) return;

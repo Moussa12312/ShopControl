@@ -202,6 +202,13 @@ export class OrdersService {
       stockAvailable: number;
       stockAvailableDecimal: number;
       inStock: boolean;
+      variants?: Array<{
+        id: string;
+        name: string;
+        salePriceXof: number;
+        stockAvailable: number;
+        inStock: boolean;
+      }>;
     }> = [];
 
     if (shop.dbStatus === 'READY') {
@@ -217,18 +224,40 @@ export class OrdersService {
           orderBy: [{ isPinnedPos: 'desc' }, { name: 'asc' }],
           include: {
             category: { select: { name: true } },
-            stockBalances: { where: { variantKey: 'BASE' } },
+            variants: { where: { isActive: true }, select: { id: true, name: true, salePriceXof: true } },
+            stockBalances: true,
           },
         }),
       ]);
       categories = cats;
       products = prods.map((p) => {
-        const bal = p.stockBalances[0];
-        const available = Math.max(0, (bal?.physicalQty ?? 0) - (bal?.reservedQty ?? 0));
-        const rem = bal?.fractionalRemainderMilli ?? 0;
-        const availableDecimal = Number(
-          (Math.max(0, available * 1000 + rem) / 1000).toFixed(3),
-        );
+        const activeVariants = (p.variants || []).map((v) => {
+          const bal = p.stockBalances.find((b) => b.variantKey === v.id);
+          const avail = Math.max(0, (bal?.physicalQty ?? 0) - (bal?.reservedQty ?? 0));
+          return {
+            id: v.id,
+            name: v.name,
+            salePriceXof: v.salePriceXof ?? p.salePriceXof,
+            stockAvailable: avail,
+            inStock: avail > 0,
+          };
+        });
+
+        let available = 0;
+        let availableDecimal = 0;
+
+        if (activeVariants.length > 0) {
+          available = activeVariants.reduce((acc, v) => acc + v.stockAvailable, 0);
+          availableDecimal = available;
+        } else {
+          const bal = p.stockBalances.find((b) => b.variantKey === 'BASE');
+          available = Math.max(0, (bal?.physicalQty ?? 0) - (bal?.reservedQty ?? 0));
+          const rem = bal?.fractionalRemainderMilli ?? 0;
+          availableDecimal = Number(
+            (Math.max(0, available * 1000 + rem) / 1000).toFixed(3),
+          );
+        }
+
         return {
           id: p.id,
           name: p.name,
@@ -253,6 +282,7 @@ export class OrdersService {
           stockAvailable: available,
           stockAvailableDecimal: availableDecimal,
           inStock: available > 0 || availableDecimal > 0,
+          variants: activeVariants,
         };
       });
     }
@@ -439,7 +469,10 @@ export class OrdersService {
     for (const item of input.items) {
       const prod = await shopClient.product.findUnique({
         where: { id: item.productId },
-        include: { stockBalances: { where: { variantKey: 'BASE' } } },
+        include: {
+          variants: { where: { isActive: true } },
+          stockBalances: true,
+        },
       });
       if (!prod || prod.status !== 'PUBLISHED') {
         throw new BadRequestException({
@@ -447,14 +480,26 @@ export class OrdersService {
           message: 'Un produit de votre panier n’est plus disponible.',
         });
       }
-      const bal = prod.stockBalances[0];
+
+      let matchedVariant = null;
+      if (item.variantId) {
+        matchedVariant = prod.variants.find((v) => v.id === item.variantId) || null;
+      } else if (item.selectedSize || item.selectedColor) {
+        const needle = [item.selectedSize, item.selectedColor].filter(Boolean).join(' ').toLowerCase();
+        matchedVariant =
+          prod.variants.find((v) => v.name.toLowerCase().includes(needle)) || null;
+      }
+
+      const variantKey = matchedVariant?.id ?? 'BASE';
+      const bal = prod.stockBalances.find((b) => b.variantKey === variantKey);
       const available = Math.max(0, (bal?.physicalQty ?? 0) - (bal?.reservedQty ?? 0));
 
       let soldInBulk = false;
       let bulkMultiplier = 1;
       let unitLabel = prod.unit || 'unité';
-      let unitPriceXof = prod.salePriceXof;
-      let productName = prod.name;
+      let unitPriceXof = matchedVariant?.salePriceXof ?? prod.salePriceXof;
+      let productName = matchedVariant ? `${prod.name} (${matchedVariant.name})` : prod.name;
+      let sku = matchedVariant?.sku || prod.sku;
 
       if (item.soldInBulk) {
         if (!prod.unitsPerBulk || prod.unitsPerBulk < 2) {
@@ -466,24 +511,24 @@ export class OrdersService {
         soldInBulk = true;
         bulkMultiplier = prod.unitsPerBulk;
         unitLabel = prod.bulkUnitLabel || 'carton';
-        unitPriceXof = prod.bulkSalePriceXof ?? prod.salePriceXof * bulkMultiplier;
-        productName = `${prod.name} [${unitLabel} ×${bulkMultiplier}]`;
+        unitPriceXof = prod.bulkSalePriceXof ?? unitPriceXof * bulkMultiplier;
+        productName = `${productName} [${unitLabel} ×${bulkMultiplier}]`;
       }
 
       const requiredUnits = item.quantity * bulkMultiplier;
       if (requiredUnits > available) {
         throw new BadRequestException({
           code: 'INSUFFICIENT_STOCK',
-          message: `Stock insuffisant pour « ${prod.name} » (disponible : ${available} ${prod.unit}, demandé : ${requiredUnits} ${prod.unit}).`,
+          message: `Stock insuffisant pour « ${productName} » (disponible : ${available} ${prod.unit}, demandé : ${requiredUnits} ${prod.unit}).`,
         });
       }
       const lineTotal = unitPriceXof * item.quantity;
       subtotalXof += lineTotal;
       resolvedLines.push({
         productId: prod.id,
-        variantId: null,
+        variantId: matchedVariant?.id ?? null,
         productName,
-        sku: prod.sku,
+        sku,
         selectedSize: item.selectedSize?.trim() || null,
         selectedColor: item.selectedColor?.trim() || null,
         soldInBulk,
@@ -813,15 +858,16 @@ export class OrdersService {
       }
 
       for (const line of order.lines) {
+        const vKey = line.variantId ?? 'BASE';
         await tx.$executeRaw`
           INSERT INTO stock_balances (id, product_id, variant_id, variant_key, physical_qty, reserved_qty, updated_at)
-          VALUES (gen_random_uuid(), ${line.productId}::uuid, NULL, 'BASE', 0, 0, CURRENT_TIMESTAMP)
+          VALUES (gen_random_uuid(), ${line.productId}::uuid, ${line.variantId ?? null}::uuid, ${vKey}, 0, 0, CURRENT_TIMESTAMP)
           ON CONFLICT (product_id, variant_key) DO NOTHING
         `;
         const rows = await tx.$queryRaw<Array<{ id: string; physical_qty: number; reserved_qty: number }>>`
           SELECT id, physical_qty, reserved_qty
           FROM stock_balances
-          WHERE product_id = ${line.productId}::uuid AND variant_key = 'BASE'
+          WHERE product_id = ${line.productId}::uuid AND variant_key = ${vKey}
           FOR UPDATE
         `;
         const bal = rows[0];
@@ -923,9 +969,10 @@ export class OrdersService {
 
       if (wasReserved && releasesReservation) {
         for (const line of order.lines) {
+          const vKey = line.variantId ?? 'BASE';
           const rows = await tx.$queryRaw<Array<{ id: string; reserved_qty: number }>>`
             SELECT id, reserved_qty FROM stock_balances
-            WHERE product_id = ${line.productId}::uuid AND variant_key = 'BASE'
+            WHERE product_id = ${line.productId}::uuid AND variant_key = ${vKey}
             FOR UPDATE
           `;
           if (rows[0]) {
@@ -1060,6 +1107,7 @@ export class OrdersService {
 
       const saleLinesData: Array<{
         productId: string;
+        variantId?: string | null;
         productName: string;
         sku: string;
         quantity: number;
@@ -1076,10 +1124,11 @@ export class OrdersService {
           ? Math.min(line.orderedQty, Math.max(0, deliveredMap.get(line.id)!))
           : line.orderedQty;
         const multiplier = line.bulkMultiplier && line.bulkMultiplier > 1 ? line.bulkMultiplier : 1;
+        const vKey = line.variantId ?? 'BASE';
 
         const rows = await tx.$queryRaw<Array<{ id: string; reserved_qty: number }>>`
           SELECT id, reserved_qty FROM stock_balances
-          WHERE product_id = ${line.productId}::uuid AND variant_key = 'BASE'
+          WHERE product_id = ${line.productId}::uuid AND variant_key = ${vKey}
           FOR UPDATE
         `;
         if (rows[0]) {
@@ -1095,10 +1144,17 @@ export class OrdersService {
         });
 
         if (deliveredQty > 0) {
-          const prod = await tx.product.findUnique({ where: { id: line.productId } });
+          const prod = await tx.product.findUnique({
+            where: { id: line.productId },
+            include: { variants: true },
+          });
+          const matchedVariant = line.variantId
+            ? prod?.variants.find((v) => v.id === line.variantId)
+            : null;
           const variantTag = [line.selectedSize, line.selectedColor].filter(Boolean).join(' · ');
           saleLinesData.push({
             productId: line.productId,
+            variantId: line.variantId,
             productName: variantTag ? `${line.productName} (${variantTag})` : line.productName,
             sku: line.sku,
             quantity: deliveredQty,
@@ -1106,7 +1162,10 @@ export class OrdersService {
             soldInBulk: Boolean(line.soldInBulk),
             bulkMultiplier: multiplier,
             unitPriceXof: line.unitPriceXof,
-            unitCostXof: prod?.costPriceXof != null ? prod.costPriceXof * multiplier : null,
+            unitCostXof:
+              (matchedVariant?.costPriceXof ?? prod?.costPriceXof) != null
+                ? (matchedVariant?.costPriceXof ?? prod!.costPriceXof)! * multiplier
+                : null,
           });
         }
       }
@@ -1148,6 +1207,7 @@ export class OrdersService {
         const unitsToDeduct = l.quantity * (l.bulkMultiplier || 1);
         await this.inventoryService.applyMovementInTx(tx, {
           productId: l.productId,
+          variantId: l.variantId ?? null,
           movementType: 'SALE_OUT',
           quantityDelta: -unitsToDeduct,
           unitCostXof: l.unitCostXof != null ? Math.round(l.unitCostXof / (l.bulkMultiplier || 1)) : null,

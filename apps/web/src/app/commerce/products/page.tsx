@@ -15,6 +15,7 @@ import {
   Pencil,
   Pin,
   Plus,
+  Printer,
   RefreshCw,
   Ruler,
   Scale,
@@ -23,6 +24,7 @@ import {
   ShieldCheck,
   Sparkles,
   Tag,
+  Trash2,
   Upload,
   X,
 } from 'lucide-react';
@@ -50,6 +52,7 @@ import {
   ShopPickerInline,
   useActiveOperationalShop,
 } from '@/components/commerce/ActiveShopHeader';
+import { BarcodeLabelsModal } from '@/components/commerce/BarcodeLabelsModal';
 import { ImageUploader, MultiImageUploader } from '@/components/ui/ImageUploader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateViews';
 
@@ -101,6 +104,20 @@ interface CategoryRow {
   productsCount: number;
 }
 
+export interface ProductVariantItem {
+  id?: string;
+  name: string;
+  sku?: string;
+  barcode?: string | null;
+  salePriceXof: number;
+  costPriceXof?: number | null;
+  alertThreshold: number;
+  initialStockQty?: number;
+  stockPhysical?: number;
+  stockAvailable?: number;
+  isActive?: boolean;
+}
+
 interface ProductRow {
   id: string;
   name: string;
@@ -129,6 +146,7 @@ interface ProductRow {
   expiryDate?: string | null;
   warrantyMonths?: number | null;
   trackSerialNumber?: boolean;
+  variants?: ProductVariantItem[];
   stockPhysical: number;
   stockRemainderMilli?: number;
   stockPhysicalDecimal?: number;
@@ -181,6 +199,7 @@ export default function ProductsPage() {
   const [skuManual, setSkuManual] = useState(false);
   const [barcodeManual, setBarcodeManual] = useState(false);
   const [codeSeed, setCodeSeed] = useState(() => Math.floor(1000 + Math.random() * 9000));
+  const [barcodeTarget, setBarcodeTarget] = useState<ProductRow | null>(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -197,6 +216,7 @@ export default function ProductsPage() {
     imageUrls: [] as string[],
     availableSizes: [] as string[],
     availableColors: [] as string[],
+    variants: [] as ProductVariantItem[],
     brand: '',
     modelName: '',
     volumeLabel: '',
@@ -391,6 +411,7 @@ export default function ProductsPage() {
       imageUrls: [],
       availableSizes: [],
       availableColors: [],
+      variants: [],
       brand: '',
       modelName: '',
       volumeLabel: '',
@@ -430,6 +451,20 @@ export default function ProductsPage() {
       imageUrls: Array.isArray(p.imageUrls) ? p.imageUrls : [],
       availableSizes: Array.isArray(p.availableSizes) ? p.availableSizes : [],
       availableColors: Array.isArray(p.availableColors) ? p.availableColors : [],
+      variants: Array.isArray(p.variants)
+        ? p.variants.map((v) => ({
+            id: v.id,
+            name: v.name,
+            sku: v.sku,
+            barcode: v.barcode || '',
+            salePriceXof: v.salePriceXof,
+            costPriceXof: v.costPriceXof,
+            alertThreshold: v.alertThreshold,
+            initialStockQty: 0,
+            stockPhysical: v.stockPhysical,
+            stockAvailable: v.stockAvailable,
+          }))
+        : [],
       brand: p.brand || '',
       modelName: p.modelName || '',
       volumeLabel: p.volumeLabel || '',
@@ -530,6 +565,97 @@ export default function ProductsPage() {
     setCustomColor('');
   };
 
+  const generateVariantCombinations = () => {
+    const sizes = form.availableSizes.length > 0 ? form.availableSizes : ['Unique'];
+    const colors = form.availableColors.length > 0 ? form.availableColors : ['Unique'];
+
+    const newVars: ProductVariantItem[] = [];
+    let idx = 1;
+
+    for (const s of sizes) {
+      for (const c of colors) {
+        let vName = '';
+        if (s !== 'Unique' && c !== 'Unique') {
+          vName = `${s} / ${c}`;
+        } else if (s !== 'Unique') {
+          vName = `Taille ${s}`;
+        } else if (c !== 'Unique') {
+          vName = `Couleur ${c}`;
+        } else {
+          vName = `Standard`;
+        }
+
+        const existing = form.variants.find((v) => v.name.toLowerCase() === vName.toLowerCase());
+        if (existing) {
+          newVars.push(existing);
+        } else {
+          const varSku = `${form.sku || 'SKU'}-${s !== 'Unique' ? s.slice(0, 3).toUpperCase() : 'VAR'}-${c !== 'Unique' ? c.slice(0, 3).toUpperCase() : idx}`;
+          const varBarcode = generateProductBarcodeEan13({
+            shopName: activeShop?.shopName,
+            categoryName: selectedCategory?.name,
+            productName: `${form.name} ${vName}`,
+            uniqueSeed: codeSeed + idx,
+          });
+
+          newVars.push({
+            name: vName,
+            sku: varSku,
+            barcode: varBarcode,
+            salePriceXof: form.salePriceXof || 0,
+            costPriceXof: form.costPriceXof ? Number(form.costPriceXof) : null,
+            alertThreshold: form.alertThreshold || 2,
+            initialStockQty: 0,
+          });
+          idx++;
+        }
+      }
+    }
+
+    setForm((f) => ({ ...f, variants: newVars }));
+  };
+
+  const addManualVariant = () => {
+    const idx = form.variants.length + 1;
+    const vName = `Variante ${idx}`;
+    const varSku = `${form.sku || 'SKU'}-VAR-${idx}`;
+    const varBarcode = generateProductBarcodeEan13({
+      shopName: activeShop?.shopName,
+      categoryName: selectedCategory?.name,
+      productName: `${form.name} ${vName}`,
+      uniqueSeed: codeSeed + idx + 50,
+    });
+    setForm((f) => ({
+      ...f,
+      variants: [
+        ...f.variants,
+        {
+          name: vName,
+          sku: varSku,
+          barcode: varBarcode,
+          salePriceXof: form.salePriceXof || 0,
+          costPriceXof: form.costPriceXof ? Number(form.costPriceXof) : null,
+          alertThreshold: form.alertThreshold || 2,
+          initialStockQty: 0,
+        },
+      ],
+    }));
+  };
+
+  const updateVariant = (index: number, patch: Partial<ProductVariantItem>) => {
+    setForm((f) => {
+      const next = [...f.variants];
+      next[index] = { ...next[index], ...patch };
+      return { ...f, variants: next };
+    });
+  };
+
+  const removeVariant = (index: number) => {
+    setForm((f) => ({
+      ...f,
+      variants: f.variants.filter((_, i) => i !== index),
+    }));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!shopId) return;
@@ -592,6 +718,22 @@ export default function ProductsPage() {
         ...(!editing && form.initialStockQty > 0
           ? { initialStockQty: form.initialStockQty }
           : {}),
+        variants:
+          form.variants.length > 0
+            ? form.variants.map((v) => ({
+                id: v.id,
+                name: v.name.trim(),
+                sku: v.sku?.trim() || undefined,
+                barcode: v.barcode?.trim() || undefined,
+                salePriceXof: Math.round(Number(v.salePriceXof) || form.salePriceXof || 0),
+                costPriceXof:
+                  v.costPriceXof !== undefined && v.costPriceXof !== null && String(v.costPriceXof).trim() !== ''
+                    ? Math.round(Number(v.costPriceXof))
+                    : null,
+                alertThreshold: Math.round(Number(v.alertThreshold) || form.alertThreshold || 0),
+                initialStockQty: Math.max(0, Math.round(Number(v.initialStockQty) || 0)),
+              }))
+            : undefined,
       };
 
       if (editing) {
@@ -731,137 +873,192 @@ export default function ProductsPage() {
           </div>
         ) : null}
 
-        {/* Ligne 3 : Panneau repliable de gestion des types, catégories et création rapide */}
-        {shopId && (manageCategoriesOpen || (!loading && categories.length === 0)) ? (
-          <div className="sc-card space-y-3 p-3.5 sm:p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
-                  Type(s) de boutique :
-                </span>
-                {enabledShopTypes.map((st) => (
-                  <span
-                    key={st}
-                    className="rounded-full bg-forest-900 px-2.5 py-0.5 text-[11px] font-bold text-limeglow-400"
-                  >
-                    {SHOP_TYPE_SHORT_LABELS[st]}
-                  </span>
-                ))}
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {canWrite ? (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={handleSeedCategories}
-                    className="inline-flex items-center gap-1 rounded-xl border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-[11px] font-bold text-brand-800 hover:bg-brand-100"
-                    title="Générer les catégories recommandées pour votre type de boutique"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Générer recommandées
-                  </button>
-                ) : null}
-                {isOwner ? (
-                  <button
-                    type="button"
-                    onClick={openRequestTypeModal}
-                    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-porcelain-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:border-brand-300 hover:text-brand-800"
-                    title="Demander au Super Admin d’ajouter un autre secteur (ex: Mode, Cosmétique, Quincaillerie…)"
-                  >
-                    <Layers className="h-3.5 w-3.5 text-brand-700" />
-                    + Autre type (Super Admin)
-                  </button>
-                ) : null}
-                {canWrite ? (
-                  <Link
-                    href="/commerce/import"
-                    className="hidden items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:border-brand-300 hover:text-brand-800 md:inline-flex"
-                    title="Importer un fichier catalogue CSV depuis un ordinateur"
-                  >
-                    <Upload className="h-3.5 w-3.5" />
-                    Import CSV (PC)
-                  </Link>
-                ) : null}
-              </div>
+        {/* Compact banner when no categories exist */}
+        {shopId && !loading && categories.length === 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50/60 p-4">
+            <div>
+              <p className="text-xs font-bold text-brand-950">Aucune catégorie créée pour l'instant</p>
+              <p className="text-[11px] text-brand-800/80">Créez vos rayons ou générez automatiquement ceux conseillés pour votre boutique.</p>
             </div>
-
-            {canWrite ? (
-              <form
-                onSubmit={(e) => handleCreateCategory(e, false)}
-                className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-porcelain-50 p-3 sm:flex-row sm:items-center"
-              >
-                <span className="shrink-0 text-xs font-extrabold text-slate-700">
-                  Nouvelle catégorie :
-                </span>
-                <input
-                  value={newCatName}
-                  onChange={(e) => handleCatNameInput(e.target.value)}
-                  placeholder="Nom (ex: Pommades & Crèmes, Robes, Sucre & Riz…)"
-                  className="sc-input flex-1 py-1.5 text-xs"
-                />
-                <select
-                  value={newCatSellingMode}
-                  onChange={(e) => {
-                    setNewCatSellingMode(e.target.value as CategorySellingMode);
-                    setManualModeSelected(true);
-                  }}
-                  className="sc-input py-1.5 text-xs font-semibold text-slate-800 sm:max-w-xs"
-                  title="Comment se vendent les produits de cette catégorie ?"
-                >
-                  {allowedSellingModes.map((m) => (
-                    <option key={m} value={m}>
-                      Manière de vendre : {CATEGORY_SELLING_MODE_SPECS[m].shortLabel}
-                    </option>
-                  ))}
-                </select>
+            <div className="flex items-center gap-2">
+              {canWrite ? (
                 <button
-                  type="submit"
-                  disabled={busy || !newCatName.trim()}
-                  className="sc-btn-primary shrink-0 py-1.5 text-xs"
+                  type="button"
+                  disabled={busy}
+                  onClick={handleSeedCategories}
+                  className="sc-btn-primary py-1.5 text-xs"
                 >
-                  <Plus className="h-3.5 w-3.5" />
-                  Créer catégorie
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Générer catégories recommandées
                 </button>
-              </form>
-            ) : null}
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
-            {categories.length > 0 ? (
-              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                {categories.map((c) => {
-                  const mode = normalizeCategorySellingMode(c.sellingMode, shopType, c.name);
-                  const spec = CATEGORY_SELLING_MODE_SPECS[mode];
-                  const active = catFilter === c.id;
-                  return (
-                    <button
-                      key={`mgr-${c.id}`}
-                      type="button"
-                      onClick={() => setCatFilter(active ? '' : c.id)}
-                      className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs transition ${
-                        active
-                          ? 'border-forest-900 bg-forest-900 text-white'
-                          : 'border-slate-200/80 bg-porcelain-50 text-slate-800 hover:border-brand-300'
-                      }`}
+        {/* Modal dédié Gestion des Catégories & Rayons (évite d'encombrer la page sur mobile) */}
+        {manageCategoriesOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/65 p-4 backdrop-blur-xs">
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-5 w-5 text-brand-700" />
+                  <h2 className="text-base font-extrabold text-slate-900">
+                    Catégories & Rayons ({categories.length})
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setManageCategoriesOpen(false)}
+                  className="rounded-xl p-1 text-slate-400 hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
+                    Type(s) de boutique :
+                  </span>
+                  {enabledShopTypes.map((st) => (
+                    <span
+                      key={st}
+                      className="rounded-full bg-forest-900 px-2.5 py-0.5 text-[11px] font-bold text-limeglow-400"
                     >
-                      <span className="min-w-0 truncate font-bold">{c.name}</span>
-                      <span className="flex shrink-0 items-center gap-1.5">
-                        <span
-                          className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
+                      {SHOP_TYPE_SHORT_LABELS[st]}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {canWrite ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={handleSeedCategories}
+                      className="inline-flex items-center gap-1 rounded-xl border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-[11px] font-bold text-brand-800 hover:bg-brand-100"
+                      title="Générer les catégories recommandées pour votre type de boutique"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Générer recommandées
+                    </button>
+                  ) : null}
+                  {isOwner ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManageCategoriesOpen(false);
+                        openRequestTypeModal();
+                      }}
+                      className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-porcelain-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:border-brand-300 hover:text-brand-800"
+                      title="Demander au Super Admin d’ajouter un autre secteur"
+                    >
+                      <Layers className="h-3.5 w-3.5 text-brand-700" />
+                      + Autre type (Super Admin)
+                    </button>
+                  ) : null}
+                  {canWrite ? (
+                    <Link
+                      href="/commerce/import"
+                      className="hidden items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:border-brand-300 hover:text-brand-800 md:inline-flex"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      Import CSV
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+
+              {canWrite ? (
+                <form
+                  onSubmit={(e) => handleCreateCategory(e, false)}
+                  className="space-y-2.5 rounded-2xl border border-slate-200 bg-porcelain-50 p-3.5"
+                >
+                  <span className="block text-xs font-extrabold text-slate-800">
+                    + Ajouter une nouvelle catégorie :
+                  </span>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input
+                      value={newCatName}
+                      onChange={(e) => handleCatNameInput(e.target.value)}
+                      placeholder="Nom (ex: Robes, Chaussures, Huile...)"
+                      className="sc-input bg-white py-2 text-xs"
+                    />
+                    <select
+                      value={newCatSellingMode}
+                      onChange={(e) => {
+                        setNewCatSellingMode(e.target.value as CategorySellingMode);
+                        setManualModeSelected(true);
+                      }}
+                      className="sc-input bg-white py-2 text-xs font-semibold text-slate-800"
+                    >
+                      {allowedSellingModes.map((m) => (
+                        <option key={m} value={m}>
+                          {CATEGORY_SELLING_MODE_SPECS[m].shortLabel}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <p className="text-[11px] text-slate-500">
+                      {CATEGORY_SELLING_MODE_SPECS[newCatSellingMode].description}
+                    </p>
+                    <button
+                      type="submit"
+                      disabled={busy || !newCatName.trim()}
+                      className="sc-btn-primary shrink-0 py-1.5 text-xs"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Créer la catégorie
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+
+              {categories.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-slate-700">Catégories existantes :</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 max-h-60 overflow-y-auto">
+                    {categories.map((c) => {
+                      const mode = normalizeCategorySellingMode(c.sellingMode, shopType, c.name);
+                      const spec = CATEGORY_SELLING_MODE_SPECS[mode];
+                      const active = catFilter === c.id;
+                      return (
+                        <button
+                          key={`mgr-${c.id}`}
+                          type="button"
+                          onClick={() => {
+                            setCatFilter(active ? '' : c.id);
+                            setManageCategoriesOpen(false);
+                          }}
+                          className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs transition ${
                             active
-                              ? 'bg-white/15 text-limeglow-400'
-                              : 'bg-white text-slate-500 ring-1 ring-slate-200/70'
+                              ? 'border-forest-900 bg-forest-900 text-white'
+                              : 'border-slate-200/80 bg-porcelain-50 text-slate-800 hover:border-brand-300'
                           }`}
                         >
-                          {spec.shortLabel}
-                        </span>
-                        <span className="text-[11px] font-bold opacity-80 tabular">
-                          ({c.productsCount})
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
+                          <span className="min-w-0 truncate font-bold">{c.name}</span>
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            <span
+                              className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
+                                active
+                                  ? 'bg-white/15 text-limeglow-400'
+                                  : 'bg-white text-slate-500 ring-1 ring-slate-200/70'
+                              }`}
+                            >
+                              {spec.shortLabel}
+                            </span>
+                            <span className="text-[11px] font-bold opacity-80 tabular">
+                              ({c.productsCount})
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -915,6 +1112,11 @@ export default function ProductsPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <p className="truncate font-bold text-slate-900">{p.name}</p>
+                          {p.variants && p.variants.length > 0 ? (
+                            <span className="shrink-0 rounded-full bg-forest-900 px-2 py-0.5 text-[9px] font-extrabold text-limeglow-400">
+                              {p.variants.length} variantes
+                            </span>
+                          ) : null}
                           {p.isPinnedPos ? (
                             <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-extrabold text-amber-800">
                               Favori POS
@@ -1002,16 +1204,27 @@ export default function ProductsPage() {
                       </div>
                     </div>
 
-                    {canWrite ? (
+                    <div className="mt-3 flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => openEdit(p)}
-                        className="sc-btn-ghost mt-3 w-full py-2 text-xs"
+                        onClick={() => setBarcodeTarget(p)}
+                        className="sc-btn-ghost flex-1 py-2 text-xs"
+                        title="Imprimer ou prévisualiser les étiquettes code-barres"
                       >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Modifier ce produit
+                        <Printer className="h-3.5 w-3.5" />
+                        Étiquettes
                       </button>
-                    ) : null}
+                      {canWrite ? (
+                        <button
+                          type="button"
+                          onClick={() => openEdit(p)}
+                          className="sc-btn-ghost flex-1 py-2 text-xs"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Modifier
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 );
               })}
@@ -1062,6 +1275,11 @@ export default function ProductsPage() {
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <p className="font-bold text-slate-900">{p.name}</p>
+                                {p.variants && p.variants.length > 0 ? (
+                                  <span className="rounded-full bg-forest-900 px-2 py-0.5 text-[9px] font-extrabold text-limeglow-400">
+                                    {p.variants.length} variantes
+                                  </span>
+                                ) : null}
                                 {p.isPinnedPos ? (
                                   <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-800">
                                     ★ POS
@@ -1193,16 +1411,38 @@ export default function ProductsPage() {
                         </td>
                         {canWrite ? (
                           <td className="px-4 py-3 text-right">
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setBarcodeTarget(p)}
+                                className="sc-btn-ghost px-2.5 py-1.5 text-xs"
+                                title="Imprimer les étiquettes code-barres"
+                              >
+                                <Printer className="h-3.5 w-3.5" />
+                                Étiquettes
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openEdit(p)}
+                                className="sc-btn-ghost px-3 py-1.5 text-xs"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Modifier
+                              </button>
+                            </div>
+                          </td>
+                        ) : (
+                          <td className="px-4 py-3 text-right">
                             <button
                               type="button"
-                              onClick={() => openEdit(p)}
-                              className="sc-btn-ghost px-3 py-1.5 text-xs"
+                              onClick={() => setBarcodeTarget(p)}
+                              className="sc-btn-ghost px-2.5 py-1.5 text-xs"
                             >
-                              <Pencil className="h-3.5 w-3.5" />
-                              Modifier
+                              <Printer className="h-3.5 w-3.5" />
+                              Étiquettes
                             </button>
                           </td>
-                        ) : null}
+                        )}
                       </tr>
                     );
                   })}
@@ -1812,6 +2052,137 @@ export default function ProductsPage() {
                     ) : null}
                   </div>
 
+                  {/* Section Variantes & Stock par Taille / Couleur */}
+                  <div className="space-y-3 rounded-2xl border border-slate-200 bg-porcelain-50 p-3.5 sm:p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5">
+                      <div>
+                        <span className="flex items-center gap-1.5 text-xs font-extrabold text-slate-900">
+                          <Tag className="h-4 w-4 text-brand-700" />
+                          Variantes & Stock par Taille / Couleur ({form.variants.length})
+                        </span>
+                        <p className="text-[11px] text-slate-500">
+                          Gérez un stock distinct, un prix et un code-barres pour chaque taille, pointure ou couleur.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {form.availableSizes.length > 0 || form.availableColors.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={generateVariantCombinations}
+                            className="inline-flex items-center gap-1 rounded-xl bg-forest-900 px-3 py-1.5 text-xs font-bold text-limeglow-400 hover:bg-forest-800"
+                            title="Générer automatiquement toutes les combinaisons Tailles × Couleurs"
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            ⚡ Générer ({form.availableSizes.length || 1} × {form.availableColors.length || 1})
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={addManualVariant}
+                          className="inline-flex items-center gap-1 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          + Variante manuelle
+                        </button>
+                      </div>
+                    </div>
+
+                    {form.variants.length === 0 ? (
+                      <p className="py-1 text-xs italic text-slate-500">
+                        Aucune variante créée (le stock et le code-barres s'appliquent au produit principal).
+                      </p>
+                    ) : (
+                      <div className="space-y-2 overflow-x-auto">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs">
+                          <thead>
+                            <tr className="text-left font-bold uppercase tracking-wider text-slate-500">
+                              <th className="py-2 pr-2">Nom variante</th>
+                              {!editing ? <th className="py-2 px-2 text-center w-24">Stock init.</th> : null}
+                              <th className="py-2 px-2 w-28">Prix vente (XOF)</th>
+                              <th className="py-2 px-2">Code-barres EAN-13</th>
+                              <th className="py-2 px-2 text-center w-20">Seuil</th>
+                              <th className="py-2 pl-2 text-right">Suppr.</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {form.variants.map((v, vIdx) => (
+                              <tr key={`v-${vIdx}`}>
+                                <td className="py-2 pr-2">
+                                  <input
+                                    value={v.name}
+                                    onChange={(e) => updateVariant(vIdx, { name: e.target.value })}
+                                    placeholder="Ex: Taille M / Noir"
+                                    className="sc-input bg-white py-1 text-xs"
+                                  />
+                                </td>
+                                {!editing ? (
+                                  <td className="py-2 px-2 w-24">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={v.initialStockQty ?? 0}
+                                      onChange={(e) =>
+                                        updateVariant(vIdx, {
+                                          initialStockQty: Number(e.target.value) || 0,
+                                        })
+                                      }
+                                      className="sc-input bg-white py-1 text-center text-xs tabular"
+                                    />
+                                  </td>
+                                ) : null}
+                                <td className="py-2 px-2 w-28">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={v.salePriceXof}
+                                    onChange={(e) =>
+                                      updateVariant(vIdx, {
+                                        salePriceXof: Number(e.target.value) || 0,
+                                      })
+                                    }
+                                    className="sc-input bg-white py-1 text-xs tabular"
+                                  />
+                                </td>
+                                <td className="py-2 px-2">
+                                  <input
+                                    value={v.barcode || ''}
+                                    onChange={(e) =>
+                                      updateVariant(vIdx, { barcode: e.target.value })
+                                    }
+                                    placeholder="EAN-13 auto..."
+                                    className="sc-input bg-white py-1 text-xs font-mono"
+                                  />
+                                </td>
+                                <td className="py-2 px-2 w-20">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={v.alertThreshold}
+                                    onChange={(e) =>
+                                      updateVariant(vIdx, {
+                                        alertThreshold: Number(e.target.value) || 0,
+                                      })
+                                    }
+                                    className="sc-input bg-white py-1 text-center text-xs tabular"
+                                  />
+                                </td>
+                                <td className="py-2 pl-2 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => removeVariant(vIdx)}
+                                    className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Conditionnement Gros ↔ Détail (uniquement si activeSpec.showBulkPackaging) */}
                   {activeSpec.showBulkPackaging ? (
                     <div className="space-y-2.5 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3.5">
@@ -2094,6 +2465,37 @@ export default function ProductsPage() {
               </form>
             </div>
           </div>
+        ) : null}
+        {/* Modal d'impression et prévisualisation d'étiquettes code-barres EAN-13 */}
+        {barcodeTarget ? (
+          <BarcodeLabelsModal
+            open={true}
+            shopName={activeShop?.shopName ?? ''}
+            onClose={() => setBarcodeTarget(null)}
+            items={[
+              // Produit de base s'il a un code-barres
+              ...(barcodeTarget.barcode
+                ? [{
+                    id: barcodeTarget.id,
+                    name: barcodeTarget.name,
+                    sku: barcodeTarget.sku,
+                    barcode: barcodeTarget.barcode,
+                    salePriceXof: barcodeTarget.salePriceXof,
+                  }]
+                : []),
+              // Variantes avec code-barres
+              ...(barcodeTarget.variants ?? [])
+                .filter((v) => v.barcode)
+                .map((v) => ({
+                  id: v.id ?? `${barcodeTarget.id}_${v.name}`,
+                  name: barcodeTarget.name,
+                  variantName: v.name,
+                  sku: v.sku ?? barcodeTarget.sku,
+                  barcode: v.barcode!,
+                  salePriceXof: v.salePriceXof ?? barcodeTarget.salePriceXof,
+                })),
+            ]}
+          />
         ) : null}
       </div>
     </AppShell>

@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import { Response } from 'express';
 import {
   Body,
   ConflictException,
@@ -12,6 +13,7 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -599,9 +601,223 @@ export class InventoryService {
     };
   }
 
+  canReadCosts(user: AuthenticatedUser, shopId: string): boolean {
+    if (user.role === 'SUPER_ADMIN' || user.role === 'OWNER') return true;
+    const grant = user.shopGrants?.find((g) => g.shopId === shopId);
+    return Boolean(grant?.permissions?.['finance:read_margins']);
+  }
+
+  async getStockValuation(
+    shopId: string,
+    user: AuthenticatedUser,
+    query: { search?: string; categoryId?: string; stockStatus?: string },
+  ) {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+    const canReadCost = this.canReadCosts(user, shopId);
+    const q = query.search?.trim().toLowerCase();
+
+    const [categories, products] = await Promise.all([
+      client.category.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      client.product.findMany({
+        where: {
+          status: { not: 'ARCHIVED' },
+          ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+        },
+        include: {
+          category: { select: { id: true, name: true } },
+          variants: { where: { isActive: true }, orderBy: { name: 'asc' } },
+          stockBalances: true,
+        },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+
+    let totalProductsCount = 0;
+    let totalVariantsCount = 0;
+    let totalUnitsPhysical = 0;
+    let totalUnitsReserved = 0;
+    let totalUnitsAvailable = 0;
+    let totalRetailValueXof = 0;
+    let totalCostValueXof = 0;
+    let hasAnyCost = false;
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+
+    const items: Array<any> = [];
+
+    for (const p of products) {
+      const activeVariants = p.variants || [];
+      const hasVariants = activeVariants.length > 0;
+
+      if (q) {
+        const matchesProduct =
+          p.name.toLowerCase().includes(q) ||
+          p.sku.toLowerCase().includes(q) ||
+          Boolean(p.barcode && p.barcode.toLowerCase().includes(q));
+        const matchesVariant = activeVariants.some(
+          (v) =>
+            v.name.toLowerCase().includes(q) ||
+            Boolean(v.sku && v.sku.toLowerCase().includes(q)) ||
+            Boolean(v.barcode && v.barcode.toLowerCase().includes(q)),
+        );
+        if (!matchesProduct && !matchesVariant) continue;
+      }
+
+      let pPhysical = 0;
+      let pReserved = 0;
+      let pRetailValue = 0;
+      let pCostValue = 0;
+      let pHasCost = false;
+
+      const variantsBreakdown = activeVariants.map((v) => {
+        const bal = p.stockBalances.find((b) => b.variantKey === v.id);
+        const physical = bal?.physicalQty ?? 0;
+        const reserved = bal?.reservedQty ?? 0;
+        const available = physical - reserved;
+        const salePrice = v.salePriceXof ?? p.salePriceXof;
+        const costPrice = canReadCost ? (v.costPriceXof ?? p.costPriceXof) : null;
+        const retailVal = Math.max(0, physical) * salePrice;
+        const costVal = canReadCost && costPrice != null ? Math.max(0, physical) * costPrice : null;
+
+        pPhysical += physical;
+        pReserved += reserved;
+        pRetailValue += retailVal;
+        if (costVal !== null) {
+          pCostValue += costVal;
+          pHasCost = true;
+        }
+
+        const vStatus =
+          physical < 0
+            ? 'NEGATIVE_CONFLICT'
+            : available <= 0
+              ? 'OUT_OF_STOCK'
+              : available <= v.alertThreshold
+                ? 'LOW_STOCK'
+                : 'IN_STOCK';
+
+        totalVariantsCount += 1;
+
+        return {
+          id: v.id,
+          name: v.name,
+          sku: v.sku,
+          barcode: v.barcode,
+          salePriceXof: salePrice,
+          costPriceXof: costPrice,
+          alertThreshold: v.alertThreshold,
+          stockPhysical: physical,
+          stockReserved: reserved,
+          stockAvailable: available,
+          stockStatus: vStatus,
+          retailValueXof: retailVal,
+          costValueXof: costVal,
+          estimatedMarginXof:
+            costVal !== null ? Math.max(0, retailVal - costVal) : null,
+        };
+      });
+
+      if (!hasVariants) {
+        const baseBal = p.stockBalances.find((b) => b.variantKey === 'BASE');
+        pPhysical = baseBal?.physicalQty ?? 0;
+        pReserved = baseBal?.reservedQty ?? 0;
+        pRetailValue = Math.max(0, pPhysical) * p.salePriceXof;
+        if (canReadCost && p.costPriceXof != null) {
+          pCostValue = Math.max(0, pPhysical) * p.costPriceXof;
+          pHasCost = true;
+        }
+      }
+
+      const pAvailable = pPhysical - pReserved;
+      const pStatus =
+        pPhysical < 0
+          ? 'NEGATIVE_CONFLICT'
+          : pAvailable <= 0
+            ? 'OUT_OF_STOCK'
+            : pAvailable <= p.alertThreshold
+              ? 'LOW_STOCK'
+              : 'IN_STOCK';
+
+      if (query.stockStatus) {
+        if (
+          query.stockStatus === 'OUT_OF_STOCK' &&
+          pStatus !== 'OUT_OF_STOCK' &&
+          pStatus !== 'NEGATIVE_CONFLICT'
+        )
+          continue;
+        if (query.stockStatus === 'LOW_STOCK' && pStatus !== 'LOW_STOCK') continue;
+        if (
+          query.stockStatus === 'IN_STOCK' &&
+          (pStatus === 'OUT_OF_STOCK' || pStatus === 'NEGATIVE_CONFLICT')
+        )
+          continue;
+      }
+
+      totalProductsCount += 1;
+      totalUnitsPhysical += pPhysical;
+      totalUnitsReserved += pReserved;
+      totalUnitsAvailable += pAvailable;
+      totalRetailValueXof += pRetailValue;
+      if (pHasCost) {
+        totalCostValueXof += pCostValue;
+        hasAnyCost = true;
+      }
+      if (pStatus === 'OUT_OF_STOCK' || pStatus === 'NEGATIVE_CONFLICT') outOfStockCount += 1;
+      if (pStatus === 'LOW_STOCK') lowStockCount += 1;
+
+      items.push({
+        productId: p.id,
+        name: p.name,
+        sku: p.sku,
+        barcode: p.barcode,
+        categoryId: p.categoryId,
+        categoryName: p.category?.name ?? null,
+        unit: p.unit,
+        salePriceXof: p.salePriceXof,
+        costPriceXof: canReadCost ? p.costPriceXof : null,
+        alertThreshold: p.alertThreshold,
+        stockPhysical: pPhysical,
+        stockReserved: pReserved,
+        stockAvailable: pAvailable,
+        stockStatus: pStatus,
+        retailValueXof: pRetailValue,
+        costValueXof: canReadCost && pHasCost ? pCostValue : null,
+        estimatedMarginXof:
+          canReadCost && pHasCost ? Math.max(0, pRetailValue - pCostValue) : null,
+        hasVariants,
+        variants: variantsBreakdown,
+      });
+    }
+
+    return {
+      canReadCost,
+      categories,
+      summary: {
+        totalProductsCount,
+        totalVariantsCount,
+        totalUnitsPhysical,
+        totalUnitsReserved,
+        totalUnitsAvailable,
+        totalRetailValueXof,
+        totalCostValueXof: canReadCost && hasAnyCost ? totalCostValueXof : null,
+        totalEstimatedMarginXof:
+          canReadCost && hasAnyCost
+            ? Math.max(0, totalRetailValueXof - totalCostValueXof)
+            : null,
+        lowStockCount,
+        outOfStockCount,
+      },
+      items,
+    };
+  }
+
   async listMovements(
     shopId: string,
-    params: { productId?: string; movementType?: string; page?: number; limit?: number },
+    params: { productId?: string; movementType?: string; search?: string; page?: number; limit?: number },
   ) {
     const client = await this.shopDbManager.getClientForShop(shopId);
     const page = Math.max(1, params.page || 1);
@@ -610,6 +826,15 @@ export class InventoryService {
     const where: Record<string, unknown> = {};
     if (params.productId) where.productId = params.productId;
     if (params.movementType) where.movementType = params.movementType;
+    if (params.search?.trim()) {
+      const q = params.search.trim();
+      where.OR = [
+        { reason: { contains: q, mode: 'insensitive' } },
+        { referenceId: { contains: q, mode: 'insensitive' } },
+        { product: { name: { contains: q, mode: 'insensitive' } } },
+        { product: { sku: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
 
     const [total, items] = await Promise.all([
       client.stockMovement.count({ where }),
@@ -618,29 +843,44 @@ export class InventoryService {
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-        include: { product: { select: { name: true, sku: true, unit: true } } },
+        include: {
+          product: {
+            select: {
+              name: true,
+              sku: true,
+              unit: true,
+              variants: { select: { id: true, name: true, sku: true } },
+            },
+          },
+        },
       }),
     ]);
 
     return {
-      items: items.map((m) => ({
-        id: m.id,
-        productId: m.productId,
-        productName: m.product.name,
-        sku: m.product.sku,
-        unit: m.product.unit,
-        variantId: m.variantId,
-        movementType: m.movementType,
-        quantityDelta: m.quantityDelta,
-        qtyBefore: m.qtyBefore,
-        qtyAfter: m.qtyAfter,
-        unitCostXof: m.unitCostXof,
-        referenceType: m.referenceType,
-        referenceId: m.referenceId,
-        reason: m.reason,
-        declaredOperatorName: m.declaredOperatorName,
-        createdAt: m.createdAt.toISOString(),
-      })),
+      items: items.map((m) => {
+        const variant = m.variantId
+          ? m.product.variants.find((v) => v.id === m.variantId)
+          : null;
+        return {
+          id: m.id,
+          productId: m.productId,
+          productName: m.product.name,
+          variantId: m.variantId,
+          variantName: variant?.name ?? null,
+          sku: variant?.sku || m.product.sku,
+          unit: m.product.unit,
+          movementType: m.movementType,
+          quantityDelta: m.quantityDelta,
+          qtyBefore: m.qtyBefore,
+          qtyAfter: m.qtyAfter,
+          unitCostXof: m.unitCostXof,
+          referenceType: m.referenceType,
+          referenceId: m.referenceId,
+          reason: m.reason,
+          declaredOperatorName: m.declaredOperatorName,
+          createdAt: m.createdAt.toISOString(),
+        };
+      }),
       total,
       page,
       limit,
@@ -651,15 +891,24 @@ export class InventoryService {
     const client = await this.shopDbManager.getClientForShop(shopId);
     const products = await client.product.findMany({
       where: { status: { not: 'ARCHIVED' } },
-      include: { stockBalances: true, category: { select: { name: true } } },
+      include: {
+        variants: { where: { isActive: true } },
+        stockBalances: true,
+        category: { select: { name: true } },
+      },
       orderBy: { name: 'asc' },
     });
 
     const alerts: Array<{
       productId: string;
+      variantId?: string | null;
+      variantName?: string | null;
       name: string;
       sku: string;
       categoryName: string | null;
+      unit: string;
+      costPriceXof: number | null;
+      salePriceXof: number;
       physicalQty: number;
       reservedQty: number;
       availableQty: number;
@@ -668,47 +917,122 @@ export class InventoryService {
     }> = [];
 
     for (const p of products) {
-      const base = p.stockBalances.find((b) => b.variantKey === 'BASE');
-      const physicalQty = base?.physicalQty ?? 0;
-      const reservedQty = base?.reservedQty ?? 0;
-      const availableQty = physicalQty - reservedQty;
+      const activeVariants = p.variants || [];
+      if (activeVariants.length > 0) {
+        for (const v of activeVariants) {
+          const bal = p.stockBalances.find((b) => b.variantKey === v.id);
+          const physicalQty = bal?.physicalQty ?? 0;
+          const reservedQty = bal?.reservedQty ?? 0;
+          const availableQty = physicalQty - reservedQty;
+          const costPriceXof = v.costPriceXof ?? p.costPriceXof;
+          const salePriceXof = v.salePriceXof ?? p.salePriceXof;
+          const sku = v.sku || p.sku;
 
-      if (physicalQty < 0) {
-        alerts.push({
-          productId: p.id,
-          name: p.name,
-          sku: p.sku,
-          categoryName: p.category?.name ?? null,
-          physicalQty,
-          reservedQty,
-          availableQty,
-          alertThreshold: p.alertThreshold,
-          severity: 'NEGATIVE_CONFLICT',
-        });
-      } else if (availableQty <= 0) {
-        alerts.push({
-          productId: p.id,
-          name: p.name,
-          sku: p.sku,
-          categoryName: p.category?.name ?? null,
-          physicalQty,
-          reservedQty,
-          availableQty,
-          alertThreshold: p.alertThreshold,
-          severity: 'OUT_OF_STOCK',
-        });
-      } else if (availableQty <= p.alertThreshold) {
-        alerts.push({
-          productId: p.id,
-          name: p.name,
-          sku: p.sku,
-          categoryName: p.category?.name ?? null,
-          physicalQty,
-          reservedQty,
-          availableQty,
-          alertThreshold: p.alertThreshold,
-          severity: 'LOW_STOCK',
-        });
+          if (physicalQty < 0) {
+            alerts.push({
+              productId: p.id,
+              variantId: v.id,
+              variantName: v.name,
+              name: `${p.name} (${v.name})`,
+              sku,
+              categoryName: p.category?.name ?? null,
+              unit: p.unit,
+              costPriceXof,
+              salePriceXof,
+              physicalQty,
+              reservedQty,
+              availableQty,
+              alertThreshold: v.alertThreshold,
+              severity: 'NEGATIVE_CONFLICT',
+            });
+          } else if (availableQty <= 0) {
+            alerts.push({
+              productId: p.id,
+              variantId: v.id,
+              variantName: v.name,
+              name: `${p.name} (${v.name})`,
+              sku,
+              categoryName: p.category?.name ?? null,
+              unit: p.unit,
+              costPriceXof,
+              salePriceXof,
+              physicalQty,
+              reservedQty,
+              availableQty,
+              alertThreshold: v.alertThreshold,
+              severity: 'OUT_OF_STOCK',
+            });
+          } else if (availableQty <= v.alertThreshold) {
+            alerts.push({
+              productId: p.id,
+              variantId: v.id,
+              variantName: v.name,
+              name: `${p.name} (${v.name})`,
+              sku,
+              categoryName: p.category?.name ?? null,
+              unit: p.unit,
+              costPriceXof,
+              salePriceXof,
+              physicalQty,
+              reservedQty,
+              availableQty,
+              alertThreshold: v.alertThreshold,
+              severity: 'LOW_STOCK',
+            });
+          }
+        }
+      } else {
+        const base = p.stockBalances.find((b) => b.variantKey === 'BASE');
+        const physicalQty = base?.physicalQty ?? 0;
+        const reservedQty = base?.reservedQty ?? 0;
+        const availableQty = physicalQty - reservedQty;
+
+        if (physicalQty < 0) {
+          alerts.push({
+            productId: p.id,
+            name: p.name,
+            sku: p.sku,
+            categoryName: p.category?.name ?? null,
+            unit: p.unit,
+            costPriceXof: p.costPriceXof,
+            salePriceXof: p.salePriceXof,
+            physicalQty,
+            reservedQty,
+            availableQty,
+            alertThreshold: p.alertThreshold,
+            severity: 'NEGATIVE_CONFLICT',
+          });
+        } else if (availableQty <= 0) {
+          alerts.push({
+            productId: p.id,
+            name: p.name,
+            sku: p.sku,
+            categoryName: p.category?.name ?? null,
+            unit: p.unit,
+            costPriceXof: p.costPriceXof,
+            salePriceXof: p.salePriceXof,
+            physicalQty,
+            reservedQty,
+            availableQty,
+            alertThreshold: p.alertThreshold,
+            severity: 'OUT_OF_STOCK',
+          });
+        } else if (availableQty <= p.alertThreshold) {
+          alerts.push({
+            productId: p.id,
+            name: p.name,
+            sku: p.sku,
+            categoryName: p.category?.name ?? null,
+            unit: p.unit,
+            costPriceXof: p.costPriceXof,
+            salePriceXof: p.salePriceXof,
+            physicalQty,
+            reservedQty,
+            availableQty,
+            alertThreshold: p.alertThreshold,
+            severity: 'LOW_STOCK',
+          });
+        }
       }
     }
 
@@ -790,45 +1114,126 @@ export class InventoryService {
     meta: RequestMeta,
   ) {
     const client = await this.shopDbManager.getClientForShop(shopId);
-    const discrepancies: Array<{
-      productId: string;
-      productName: string;
-      theoreticalQty: number;
-      countedQty: number;
-      delta: number;
-    }> = [];
 
-    await client.$transaction(async (tx) => {
+    const result = await client.$transaction(async (tx) => {
+      const seqRows = await tx.$queryRaw<Array<{ nextval: bigint }>>`SELECT nextval('inventory_number_seq')`;
+      const sessionNumber = `INV-${String(Number(seqRows[0].nextval)).padStart(6, '0')}`;
+
+      const sessionItemsData: Array<{
+        productId: string;
+        variantId: string | null;
+        productName: string;
+        sku: string;
+        expectedQty: number;
+        countedQty: number;
+        varianceQty: number;
+        unitCostXof: number | null;
+        varianceValueXof: number | null;
+      }> = [];
+
+      let totalLossXof = 0;
+      let totalGainXof = 0;
+      const discrepancies: Array<{
+        productId: string;
+        productName: string;
+        theoreticalQty: number;
+        countedQty: number;
+        delta: number;
+      }> = [];
+
       for (const item of input.items) {
         const variantKey = item.variantId ?? 'BASE';
+        const product = await tx.product.findUniqueOrThrow({
+          where: { id: item.productId },
+          include: { variants: true },
+        });
+
+        let displayName = product.name;
+        let sku = product.sku;
+        let unitCostXof = product.costPriceXof;
+
+        if (item.variantId) {
+          const v = product.variants.find((x) => x.id === item.variantId);
+          if (v) {
+            displayName = `${product.name} (${v.name})`;
+            sku = v.sku || product.sku;
+            unitCostXof = v.costPriceXof ?? product.costPriceXof;
+          }
+        }
+
         const balance = await tx.stockBalance.findUnique({
           where: { productId_variantKey: { productId: item.productId, variantKey } },
         });
         const theoreticalQty = balance?.physicalQty ?? 0;
         const delta = item.countedQty - theoreticalQty;
-        if (delta === 0) continue;
 
-        const applied = await this.applyMovementInTx(tx, {
+        const varianceValue = unitCostXof != null ? delta * unitCostXof : null;
+        if (delta < 0) {
+          totalLossXof += Math.abs(varianceValue ?? 0);
+        } else if (delta > 0) {
+          totalGainXof += varianceValue ?? 0;
+        }
+
+        if (delta !== 0) {
+          await this.applyMovementInTx(tx, {
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            movementType: 'INVENTORY_ADJUSTMENT',
+            quantityDelta: delta,
+            unitCostXof,
+            referenceType: 'PHYSICAL_INVENTORY',
+            referenceId: sessionNumber,
+            reason: `${input.reason} (${sessionNumber})`,
+            actorUserId: actor.userId,
+            declaredOperatorId: operator?.id ?? null,
+            declaredOperatorName: operator?.firstName ?? null,
+            allowNegativeStock: false,
+          });
+
+          discrepancies.push({
+            productId: item.productId,
+            productName: displayName,
+            theoreticalQty,
+            countedQty: item.countedQty,
+            delta,
+          });
+        }
+
+        sessionItemsData.push({
           productId: item.productId,
           variantId: item.variantId ?? null,
-          movementType: 'INVENTORY_ADJUSTMENT',
-          quantityDelta: delta,
-          referenceType: 'PHYSICAL_INVENTORY',
-          reason: input.reason,
-          actorUserId: actor.userId,
-          declaredOperatorId: operator?.id ?? null,
-          declaredOperatorName: operator?.firstName ?? null,
-          allowNegativeStock: false,
-        });
-
-        discrepancies.push({
-          productId: item.productId,
-          productName: applied.productName,
-          theoreticalQty,
+          productName: displayName,
+          sku,
+          expectedQty: theoreticalQty,
           countedQty: item.countedQty,
-          delta,
+          varianceQty: delta,
+          unitCostXof,
+          varianceValueXof: varianceValue,
         });
       }
+
+      const netVarianceXof = totalGainXof - totalLossXof;
+
+      const session = await tx.stockInventorySession.create({
+        data: {
+          sessionNumber,
+          reason: input.reason,
+          status: 'COMPLETED',
+          totalItemsChecked: input.items.length,
+          discrepanciesCount: discrepancies.length,
+          totalLossXof,
+          totalGainXof,
+          netVarianceXof,
+          actorUserId: actor.userId,
+          declaredOperatorName: operator?.firstName ?? actor.fullName,
+          items: {
+            create: sessionItemsData,
+          },
+        },
+        include: { items: true },
+      });
+
+      return { session, discrepancies };
     });
 
     await this.auditService.recordShop({
@@ -838,11 +1243,15 @@ export class InventoryService {
       declaredOperatorId: operator?.id ?? null,
       declaredOperatorName: operator?.firstName ?? null,
       action: 'STOCK_INVENTORY_SUBMITTED',
-      entityType: 'StockInventory',
+      entityType: 'StockInventorySession',
+      entityId: result.session.id,
       afterData: {
+        sessionNumber: result.session.sessionNumber,
         checkedCount: input.items.length,
-        discrepanciesCount: discrepancies.length,
-        discrepancies,
+        discrepanciesCount: result.discrepancies.length,
+        totalLossXof: result.session.totalLossXof,
+        totalGainXof: result.session.totalGainXof,
+        netVarianceXof: result.session.netVarianceXof,
       },
       reason: input.reason,
       ipAddress: meta.ipAddress,
@@ -850,22 +1259,157 @@ export class InventoryService {
       correlationId: meta.correlationId,
     });
 
-    if (actor.merchantId && discrepancies.length > 0) {
+    if (actor.merchantId && result.discrepancies.length > 0) {
       await this.notificationsService.notifyMerchantOwners(actor.merchantId, {
         shopId,
         type: 'STOCK',
         priority: 'WARNING',
-        title: `Inventaire avec ${discrepancies.length} écart(s)`,
-        message: `Un inventaire physique (${input.reason}) a corrigé ${discrepancies.length} écart(s) de stock.`,
+        title: `Inventaire ${result.session.sessionNumber} (${result.discrepancies.length} écarts)`,
+        message: `Inventaire physique clôturé : ${result.discrepancies.length} écart(s) ajustés. Perte : ${result.session.totalLossXof} XOF, Gain : ${result.session.totalGainXof} XOF.`,
         targetPath: '/commerce/stock',
       });
     }
 
     return {
+      sessionNumber: result.session.sessionNumber,
       checkedCount: input.items.length,
-      discrepanciesCount: discrepancies.length,
-      discrepancies,
+      discrepanciesCount: result.discrepancies.length,
+      totalLossXof: result.session.totalLossXof,
+      totalGainXof: result.session.totalGainXof,
+      netVarianceXof: result.session.netVarianceXof,
+      discrepancies: result.discrepancies,
     };
+  }
+
+  async listInventorySessions(shopId: string, user: AuthenticatedUser) {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+    const canReadCost = this.canReadCosts(user, shopId);
+
+    const sessions = await client.stockInventorySession.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: {
+        items: {
+          orderBy: [{ varianceQty: 'asc' }, { productName: 'asc' }],
+        },
+      },
+    });
+
+    return sessions.map((s) => ({
+      id: s.id,
+      sessionNumber: s.sessionNumber,
+      reason: s.reason,
+      status: s.status,
+      totalItemsChecked: s.totalItemsChecked,
+      discrepanciesCount: s.discrepanciesCount,
+      totalLossXof: canReadCost ? s.totalLossXof : null,
+      totalGainXof: canReadCost ? s.totalGainXof : null,
+      netVarianceXof: canReadCost ? s.netVarianceXof : null,
+      declaredOperatorName: s.declaredOperatorName,
+      createdAt: s.createdAt.toISOString(),
+      items: s.items.map((i) => ({
+        id: i.id,
+        productId: i.productId,
+        variantId: i.variantId,
+        productName: i.productName,
+        sku: i.sku,
+        expectedQty: i.expectedQty,
+        countedQty: i.countedQty,
+        varianceQty: i.varianceQty,
+        unitCostXof: canReadCost ? i.unitCostXof : null,
+        varianceValueXof: canReadCost ? i.varianceValueXof : null,
+      })),
+    }));
+  }
+
+  async exportStockCsv(shopId: string, user: AuthenticatedUser, res: Response) {
+    const valuation = await this.getStockValuation(shopId, user, {});
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `inventaire-stock-${dateStr}.csv`;
+
+    const headers = [
+      'Référence (SKU)',
+      'Produit',
+      'Variante',
+      'Code-barres',
+      'Catégorie',
+      'Unité',
+      'Prix Vente (XOF)',
+      ...(valuation.canReadCost ? ['Coût CMP (XOF)'] : []),
+      'Stock Physique',
+      'Stock Réservé',
+      'Stock Disponible',
+      'Seuil Alerte',
+      'Statut Stock',
+      'Valeur Vente (XOF)',
+      ...(valuation.canReadCost ? ['Valeur Coût (XOF)', 'Marge Potentielle (XOF)'] : []),
+    ];
+
+    const rows: string[][] = [];
+
+    for (const item of valuation.items) {
+      if (item.hasVariants && item.variants.length > 0) {
+        for (const v of item.variants) {
+          rows.push([
+            v.sku || item.sku,
+            item.name,
+            v.name,
+            v.barcode || item.barcode || '',
+            item.categoryName || 'Général',
+            item.unit,
+            String(v.salePriceXof),
+            ...(valuation.canReadCost ? [String(v.costPriceXof ?? '')] : []),
+            String(v.stockPhysical),
+            String(v.stockReserved),
+            String(v.stockAvailable),
+            String(v.alertThreshold),
+            v.stockStatus,
+            String(v.retailValueXof),
+            ...(valuation.canReadCost
+              ? [String(v.costValueXof ?? ''), String(v.estimatedMarginXof ?? '')]
+              : []),
+          ]);
+        }
+      } else {
+        rows.push([
+          item.sku,
+          item.name,
+          '-',
+          item.barcode || '',
+          item.categoryName || 'Général',
+          item.unit,
+          String(item.salePriceXof),
+          ...(valuation.canReadCost ? [String(item.costPriceXof ?? '')] : []),
+          String(item.stockPhysical),
+          String(item.stockReserved),
+          String(item.stockAvailable),
+          String(item.alertThreshold),
+          item.stockStatus,
+          String(item.retailValueXof),
+          ...(valuation.canReadCost
+            ? [String(item.costValueXof ?? ''), String(item.estimatedMarginXof ?? '')]
+            : []),
+        ]);
+      }
+    }
+
+    const escapeCsv = (val: string) => {
+      if (val.includes(';') || val.includes('"') || val.includes('\n')) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    };
+
+    const csvContent =
+      '\uFEFF' +
+      [
+        headers.map(escapeCsv).join(';'),
+        ...rows.map((r) => r.map(escapeCsv).join(';')),
+      ].join('\r\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csvContent);
   }
 }
 
@@ -875,6 +1419,40 @@ export class InventoryService {
 @UseGuards(ShopScopeGuard, PermissionsGuard, OperatorGuard)
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
+
+  @Get('valuation')
+  @Roles('OWNER', 'AGENT')
+  @RequirePermissions('stock:read')
+  @ApiOperation({ summary: 'État et valorisation financière complète du stock' })
+  valuation(
+    @Param('shopId') shopId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('search') search?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('stockStatus') stockStatus?: string,
+  ) {
+    return this.inventoryService.getStockValuation(shopId, user, { search, categoryId, stockStatus });
+  }
+
+  @Get('inventories')
+  @Roles('OWNER', 'AGENT')
+  @RequirePermissions('stock:read')
+  @ApiOperation({ summary: 'Historique des sessions d’inventaire passées' })
+  inventories(@Param('shopId') shopId: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.inventoryService.listInventorySessions(shopId, user);
+  }
+
+  @Get('export.csv')
+  @Roles('OWNER', 'AGENT')
+  @RequirePermissions('stock:read')
+  @ApiOperation({ summary: 'Exporter l’état et la valorisation du stock en CSV UTF-8' })
+  exportCsv(
+    @Param('shopId') shopId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    return this.inventoryService.exportStockCsv(shopId, user, res);
+  }
 
   @Get('movements')
   @Roles('OWNER', 'AGENT')

@@ -55,7 +55,7 @@ export class CatalogService {
     private readonly shopDbManager: ShopDatabaseManagerService,
     private readonly inventoryService: InventoryService,
     private readonly auditService: AuditService,
-  ) {}
+  ) { }
 
   private canReadCosts(user: AuthenticatedUser, shopId: string): boolean {
     if (user.role === 'OWNER' || user.role === 'SUPER_ADMIN') return true;
@@ -337,9 +337,9 @@ export class CatalogService {
 
     const category = input.categoryId
       ? await client.category.findUnique({
-          where: { id: input.categoryId },
-          select: { name: true },
-        })
+        where: { id: input.categoryId },
+        select: { name: true },
+      })
       : null;
 
     let finalSku = typeof input.sku === 'string' ? input.sku.trim() : '';
@@ -392,6 +392,32 @@ export class CatalogService {
       }
     }
 
+    // Préparation des variantes avec SKU et code-barres EAN-13 automatiques si non fournis
+    const preparedVariants = (input.variants || []).map((v: any, idx: number) => {
+      const vName = (v.name || '').trim();
+      const vSku =
+        v.sku?.trim() ||
+        `${finalSku}-${vName.slice(0, 3).toUpperCase().replace(/[^A-Z0-9]/g, 'X') || 'VAR'}-${idx + 1}`;
+      const vBarcode =
+        v.barcode?.trim() ||
+        generateProductBarcodeEan13({
+          shopName: shop?.name,
+          categoryName: category?.name,
+          productName: `${input.name} ${vName}`,
+          uniqueSeed: `${Date.now()}-${idx + 1}`,
+        });
+      return {
+        name: vName,
+        sku: vSku,
+        barcode: vBarcode,
+        salePriceXof: v.salePriceXof ?? null,
+        costPriceXof: v.costPriceXof ?? null,
+        alertThreshold: v.alertThreshold ?? 5,
+        isActive: v.isActive ?? true,
+        initialStockQty: v.initialStockQty && v.initialStockQty > 0 ? v.initialStockQty : 0,
+      };
+    });
+
     const created = await client.$transaction(async (tx) => {
       const parsedExpiry = input.expiryDate ? new Date(input.expiryDate) : null;
       const product = await tx.product.create({
@@ -420,26 +446,47 @@ export class CatalogService {
           expiryDate: parsedExpiry,
           warrantyMonths: input.warrantyMonths ?? null,
           trackSerialNumber: Boolean(input.trackSerialNumber),
-          ...(input.variants?.length
+          ...(preparedVariants.length
             ? {
-                variants: {
-                  create: input.variants.map((v: any) => ({
-                    name: v.name,
-                    sku: v.sku || null,
-                    barcode: v.barcode || null,
-                    salePriceXof: v.salePriceXof ?? null,
-                    costPriceXof: v.costPriceXof ?? null,
-                    alertThreshold: v.alertThreshold ?? 5,
-                    isActive: v.isActive ?? true,
-                  })),
-                },
-              }
+              variants: {
+                create: preparedVariants.map((v) => ({
+                  name: v.name,
+                  sku: v.sku,
+                  barcode: v.barcode,
+                  salePriceXof: v.salePriceXof,
+                  costPriceXof: v.costPriceXof,
+                  alertThreshold: v.alertThreshold,
+                  isActive: v.isActive,
+                })),
+              },
+            }
             : {}),
         },
         include: { variants: true },
       });
 
-      if (input.initialStockQty && input.initialStockQty > 0) {
+      // Stock initial par variante ou global
+      if (product.variants?.length) {
+        for (let idx = 0; idx < product.variants.length; idx += 1) {
+          const createdVar = product.variants[idx];
+          const prep = preparedVariants[idx];
+          if (prep?.initialStockQty && prep.initialStockQty > 0) {
+            await this.inventoryService.applyMovementInTx(tx, {
+              productId: product.id,
+              variantId: createdVar.id,
+              movementType: 'INITIAL_IMPORT',
+              quantityDelta: prep.initialStockQty,
+              unitCostXof: createdVar.costPriceXof ?? product.costPriceXof,
+              referenceType: 'PRODUCT_CREATE_VARIANT',
+              referenceId: createdVar.id,
+              reason: `Stock initial variante « ${createdVar.name} »`,
+              actorUserId: user.userId,
+              declaredOperatorId: operator?.id ?? null,
+              declaredOperatorName: operator?.firstName ?? null,
+            });
+          }
+        }
+      } else if (input.initialStockQty && input.initialStockQty > 0) {
         await this.inventoryService.applyMovementInTx(tx, {
           productId: product.id,
           movementType: 'INITIAL_IMPORT',
@@ -518,40 +565,123 @@ export class CatalogService {
       }
     }
 
-    const updated = await client.product.update({
-      where: { id: productId },
-      data: {
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.sku !== undefined ? { sku: input.sku } : {}),
-        ...(input.barcode !== undefined ? { barcode: input.barcode || null } : {}),
-        ...(input.description !== undefined ? { description: input.description || null } : {}),
-        ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
-        ...(input.unit !== undefined ? { unit: input.unit } : {}),
-        ...(input.salePriceXof !== undefined ? { salePriceXof: input.salePriceXof } : {}),
-        ...(input.costPriceXof !== undefined ? { costPriceXof: input.costPriceXof } : {}),
-        ...(input.alertThreshold !== undefined ? { alertThreshold: input.alertThreshold } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
-        ...(input.imageUrls !== undefined ? { imageUrls: input.imageUrls } : {}),
-        ...(input.availableSizes !== undefined ? { availableSizes: input.availableSizes } : {}),
-        ...(input.availableColors !== undefined ? { availableColors: input.availableColors } : {}),
-        ...(input.brand !== undefined ? { brand: input.brand?.trim() || null } : {}),
-        ...(input.modelName !== undefined ? { modelName: input.modelName?.trim() || null } : {}),
-        ...(input.volumeLabel !== undefined ? { volumeLabel: input.volumeLabel?.trim() || null } : {}),
-        ...(input.isPinnedPos !== undefined ? { isPinnedPos: Boolean(input.isPinnedPos) } : {}),
-        ...(input.bulkUnitLabel !== undefined ? { bulkUnitLabel: input.bulkUnitLabel?.trim() || null } : {}),
-        ...(input.unitsPerBulk !== undefined ? { unitsPerBulk: input.unitsPerBulk } : {}),
-        ...(input.bulkSalePriceXof !== undefined ? { bulkSalePriceXof: input.bulkSalePriceXof } : {}),
-        ...(input.allowFractionalSale !== undefined
-          ? { allowFractionalSale: Boolean(input.allowFractionalSale) }
-          : {}),
-        ...(input.expiryDate !== undefined
-          ? { expiryDate: input.expiryDate ? new Date(input.expiryDate) : null }
-          : {}),
-        ...(input.warrantyMonths !== undefined ? { warrantyMonths: input.warrantyMonths } : {}),
-        ...(input.trackSerialNumber !== undefined
-          ? { trackSerialNumber: Boolean(input.trackSerialNumber) }
-          : {}),
-      },
+    const updated = await client.$transaction(async (tx) => {
+      const prod = await tx.product.update({
+        where: { id: productId },
+        data: {
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.sku !== undefined ? { sku: input.sku } : {}),
+          ...(input.barcode !== undefined ? { barcode: input.barcode || null } : {}),
+          ...(input.description !== undefined ? { description: input.description || null } : {}),
+          ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
+          ...(input.unit !== undefined ? { unit: input.unit } : {}),
+          ...(input.salePriceXof !== undefined ? { salePriceXof: input.salePriceXof } : {}),
+          ...(input.costPriceXof !== undefined ? { costPriceXof: input.costPriceXof } : {}),
+          ...(input.alertThreshold !== undefined ? { alertThreshold: input.alertThreshold } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+          ...(input.imageUrls !== undefined ? { imageUrls: input.imageUrls } : {}),
+          ...(input.availableSizes !== undefined ? { availableSizes: input.availableSizes } : {}),
+          ...(input.availableColors !== undefined ? { availableColors: input.availableColors } : {}),
+          ...(input.brand !== undefined ? { brand: input.brand?.trim() || null } : {}),
+          ...(input.modelName !== undefined ? { modelName: input.modelName?.trim() || null } : {}),
+          ...(input.volumeLabel !== undefined ? { volumeLabel: input.volumeLabel?.trim() || null } : {}),
+          ...(input.isPinnedPos !== undefined ? { isPinnedPos: Boolean(input.isPinnedPos) } : {}),
+          ...(input.bulkUnitLabel !== undefined ? { bulkUnitLabel: input.bulkUnitLabel?.trim() || null } : {}),
+          ...(input.unitsPerBulk !== undefined ? { unitsPerBulk: input.unitsPerBulk } : {}),
+          ...(input.bulkSalePriceXof !== undefined ? { bulkSalePriceXof: input.bulkSalePriceXof } : {}),
+          ...(input.allowFractionalSale !== undefined
+            ? { allowFractionalSale: Boolean(input.allowFractionalSale) }
+            : {}),
+          ...(input.expiryDate !== undefined
+            ? { expiryDate: input.expiryDate ? new Date(input.expiryDate) : null }
+            : {}),
+          ...(input.warrantyMonths !== undefined ? { warrantyMonths: input.warrantyMonths } : {}),
+          ...(input.trackSerialNumber !== undefined
+            ? { trackSerialNumber: Boolean(input.trackSerialNumber) }
+            : {}),
+        },
+      });
+
+      if (Array.isArray(input.variants)) {
+        const dbVariants = await tx.productVariant.findMany({ where: { productId } });
+        const keptIds: string[] = [];
+
+        for (let idx = 0; idx < input.variants.length; idx += 1) {
+          const v = input.variants[idx];
+          const vName = (v.name || '').trim();
+          if (!vName) continue;
+
+          if (v.id && dbVariants.some((dbV) => dbV.id === v.id)) {
+            keptIds.push(v.id);
+            await tx.productVariant.update({
+              where: { id: v.id },
+              data: {
+                name: vName,
+                sku: v.sku?.trim() || null,
+                barcode: v.barcode?.trim() || null,
+                salePriceXof: v.salePriceXof ?? null,
+                costPriceXof: v.costPriceXof ?? null,
+                alertThreshold: v.alertThreshold ?? 5,
+                isActive: v.isActive ?? true,
+              },
+            });
+          } else {
+            const vSku =
+              v.sku?.trim() ||
+              `${prod.sku}-${vName.slice(0, 3).toUpperCase().replace(/[^A-Z0-9]/g, 'X') || 'VAR'}-${idx + 1}`;
+            const vBarcode =
+              v.barcode?.trim() ||
+              generateProductBarcodeEan13({
+                shopName: null,
+                categoryName: null,
+                productName: `${prod.name} ${vName}`,
+                uniqueSeed: `${Date.now()}-${idx + 1}`,
+              });
+            const createdVar = await tx.productVariant.create({
+              data: {
+                productId,
+                name: vName,
+                sku: vSku,
+                barcode: vBarcode,
+                salePriceXof: v.salePriceXof ?? null,
+                costPriceXof: v.costPriceXof ?? null,
+                alertThreshold: v.alertThreshold ?? 5,
+                isActive: v.isActive ?? true,
+              },
+            });
+            keptIds.push(createdVar.id);
+
+            if (v.initialStockQty && v.initialStockQty > 0) {
+              await this.inventoryService.applyMovementInTx(tx, {
+                productId,
+                variantId: createdVar.id,
+                movementType: 'INITIAL_IMPORT',
+                quantityDelta: v.initialStockQty,
+                unitCostXof: createdVar.costPriceXof ?? prod.costPriceXof,
+                referenceType: 'PRODUCT_ADD_VARIANT',
+                referenceId: createdVar.id,
+                reason: `Stock initial nouvelle variante « ${createdVar.name} »`,
+                actorUserId: user.userId,
+                declaredOperatorId: operator?.id ?? null,
+                declaredOperatorName: operator?.firstName ?? null,
+              });
+            }
+          }
+        }
+
+        // Désactive en douceur les variantes supprimées de l'interface
+        if (dbVariants.length > 0) {
+          const removedIds = dbVariants.filter((dbV) => !keptIds.includes(dbV.id)).map((dbV) => dbV.id);
+          if (removedIds.length > 0) {
+            await tx.productVariant.updateMany({
+              where: { id: { in: removedIds } },
+              data: { isActive: false },
+            });
+          }
+        }
+      }
+
+      return prod;
     });
 
     await this.auditService.recordShop({
@@ -587,7 +717,7 @@ export class CatalogService {
 @Controller('shops/:shopId')
 @UseGuards(ShopScopeGuard, PermissionsGuard, OperatorGuard)
 export class CatalogController {
-  constructor(private readonly catalogService: CatalogService) {}
+  constructor(private readonly catalogService: CatalogService) { }
 
   @Get('categories')
   @Roles('OWNER', 'AGENT')
@@ -693,4 +823,4 @@ export class CatalogController {
   providers: [CatalogService],
   exports: [CatalogService],
 })
-export class CatalogModule {}
+export class CatalogModule { }

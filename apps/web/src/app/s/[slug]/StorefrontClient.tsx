@@ -71,6 +71,16 @@ function swatchHex(name: string): string {
   return COLOR_HEX_MAP[name.trim().toLowerCase()] || '#0f766e';
 }
 
+interface StorefrontProductVariant {
+  id: string;
+  name: string;
+  sku?: string;
+  barcode?: string | null;
+  salePriceXof?: number | null;
+  stockAvailable?: number;
+  isActive?: boolean;
+}
+
 interface StorefrontProduct {
   id: string;
   name: string;
@@ -95,6 +105,7 @@ interface StorefrontProduct {
   stockAvailable: number;
   stockAvailableDecimal?: number;
   inStock: boolean;
+  variants?: StorefrontProductVariant[];
 }
 
 interface StorefrontData {
@@ -134,6 +145,8 @@ interface CartItem {
   selectedColor: string;
   soldInBulk: boolean;
   qty: number;
+  variantId: string | null;
+  variantName: string | null;
 }
 
 interface OrderConfirmation {
@@ -206,6 +219,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   const [detailColor, setDetailColor] = useState('');
   const [detailSoldInBulk, setDetailSoldInBulk] = useState(false);
   const [detailQty, setDetailQty] = useState(1);
+  const [detailVariant, setDetailVariant] = useState<StorefrontProductVariant | null>(null);
 
   // Formulaire commande sans compte
   const [clientName, setClientName] = useState('');
@@ -413,13 +427,16 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
     color = '',
     qtyToAdd = 1,
     soldInBulk = false,
+    variant?: StorefrontProductVariant,
   ) => {
     if (!product.inStock) return;
     const maxQty = getMaxOrderableQty(product, soldInBulk);
     if (maxQty <= 0) return;
     const chosenSize = size || product.availableSizes?.[0] || '';
     const chosenColor = color || product.availableColors?.[0] || '';
-    const key = `${product.id}__${chosenSize}__${chosenColor}__${soldInBulk ? 'BULK' : 'UNIT'}`;
+    const variantSuffix = variant ? `__v_${variant.id}` : '';
+    const key = `${product.id}__${chosenSize}__${chosenColor}__${soldInBulk ? 'BULK' : 'UNIT'}${variantSuffix}`;
+    const effectivePrice = variant?.salePriceXof ?? product.salePriceXof;
     setCart((prev) => {
       const existing = prev.find((i) => i.key === key);
       if (existing) {
@@ -433,11 +450,13 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         ...prev,
         {
           key,
-          product,
+          product: { ...product, salePriceXof: effectivePrice },
           selectedSize: chosenSize,
           selectedColor: chosenColor,
           soldInBulk,
           qty: Math.min(maxQty, qtyToAdd),
+          variantId: variant?.id ?? null,
+          variantName: variant?.name ?? null,
         },
       ];
     });
@@ -525,6 +544,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
             soldInBulk: c.soldInBulk,
             selectedSize: c.selectedSize || null,
             selectedColor: c.selectedColor || null,
+            ...(c.variantId ? { variantId: c.variantId } : {}),
           })),
         },
       });
@@ -1397,6 +1417,41 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                 </p>
               </div>
 
+              {/* Sélection de la variante (si le produit a des variantes) */}
+              {(detailProduct.variants?.length || 0) > 0 ? (
+                <div className="space-y-2">
+                  <p className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+                    <Boxes className="h-3.5 w-3.5 text-brand-700" />
+                    Choisir une variante :{' '}
+                    <span className="text-brand-700">{detailVariant?.name || 'Sélectionner'}</span>
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {detailProduct.variants!.filter(v => v.isActive !== false).map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => setDetailVariant(detailVariant?.id === v.id ? null : v)}
+                        className={`flex flex-col items-start rounded-xl border p-2.5 text-left text-xs transition ${
+                          detailVariant?.id === v.id
+                            ? 'border-forest-900 bg-forest-50 ring-1 ring-forest-900/20'
+                            : 'border-slate-200 bg-white hover:border-forest-800'
+                        }`}
+                      >
+                        <span className="font-bold text-slate-900">{v.name}</span>
+                        {v.salePriceXof != null ? (
+                          <span className="mt-0.5 font-extrabold text-brand-700">{formatXof(v.salePriceXof)}</span>
+                        ) : null}
+                        {v.stockAvailable != null ? (
+                          <span className={`mt-0.5 font-semibold ${v.stockAvailable <= 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                            {v.stockAvailable <= 0 ? 'Rupture' : `${v.stockAvailable} en stock`}
+                          </span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               {/* Sélection de la taille */}
               {(detailProduct.availableSizes?.length || 0) > 0 ? (
                 <div className="space-y-2">
@@ -1492,8 +1547,10 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                       detailColor,
                       detailQty,
                       detailSoldInBulk,
+                      detailVariant ?? undefined,
                     );
                     setDetailProduct(null);
+                    setDetailVariant(null);
                     setCartOpen(true);
                   }}
                   className="sc-btn-lime w-full py-3 text-sm sm:flex-1"

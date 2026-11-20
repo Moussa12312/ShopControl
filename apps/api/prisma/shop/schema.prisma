@@ -284,6 +284,48 @@ model ProductCostHistory {
   @@map("product_cost_history")
 }
 
+model StockInventorySession {
+  id                   String    @id @default(uuid()) @db.Uuid
+  sessionNumber        String    @unique @map("session_number") @db.VarChar(40)
+  reason               String    @db.VarChar(300)
+  status               String    @default("COMPLETED") @db.VarChar(24)
+  totalItemsChecked    Int       @map("total_items_checked")
+  discrepanciesCount   Int       @map("discrepancies_count")
+  totalLossXof         Int       @default(0) @map("total_loss_xof")
+  totalGainXof         Int       @default(0) @map("total_gain_xof")
+  netVarianceXof       Int       @default(0) @map("net_variance_xof")
+  actorUserId          String?   @map("actor_user_id") @db.Uuid
+  declaredOperatorName String?   @map("declared_operator_name") @db.VarChar(80)
+  notes                String?   @db.VarChar(500)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  items StockInventorySessionItem[]
+
+  @@index([createdAt])
+  @@map("stock_inventory_sessions")
+}
+
+model StockInventorySessionItem {
+  id               String   @id @default(uuid()) @db.Uuid
+  sessionId        String   @map("session_id") @db.Uuid
+  productId        String   @map("product_id") @db.Uuid
+  variantId        String?  @map("variant_id") @db.Uuid
+  productName      String   @map("product_name") @db.VarChar(160)
+  sku              String   @db.VarChar(64)
+  expectedQty      Int      @map("expected_qty")
+  countedQty       Int      @map("counted_qty")
+  varianceQty      Int      @map("variance_qty")
+  unitCostXof      Int?     @map("unit_cost_xof")
+  varianceValueXof Int?     @map("variance_value_xof")
+
+  session StockInventorySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([productId])
+  @@map("stock_inventory_session_items")
+}
+
+
 model Supplier {
   id               String   @id @default(uuid()) @db.Uuid
   name             String   @db.VarChar(120)
