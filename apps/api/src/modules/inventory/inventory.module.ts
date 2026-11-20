@@ -603,8 +603,8 @@ export class InventoryService {
 
   canReadCosts(user: AuthenticatedUser, shopId: string): boolean {
     if (user.role === 'SUPER_ADMIN' || user.role === 'OWNER') return true;
-    const grant = user.shopGrants?.find((g) => g.shopId === shopId);
-    return Boolean(grant?.permissions?.['finance:read_margins']);
+    const access = user.shopAccesses?.find((s) => s.shopId === shopId);
+    return Boolean(access?.permissions?.['finance:read_margins']);
   }
 
   async getStockValuation(

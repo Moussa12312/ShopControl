@@ -449,7 +449,7 @@ export class CatalogService {
           ...(preparedVariants.length
             ? {
               variants: {
-                create: preparedVariants.map((v) => ({
+                create: preparedVariants.map((v: any) => ({
                   name: v.name,
                   sku: v.sku,
                   barcode: v.barcode,

@@ -277,7 +277,10 @@ export class SalesService {
           (reqLine.customAmountXof !== undefined && reqLine.customAmountXof !== null) ||
           (reqLine.fractionalQtyMilli !== undefined && reqLine.fractionalQtyMilli !== null)
         ) {
-          if (!product.allowFractionalSale) {
+          const isWeightOrVolumeUnit = ['kg', 'g', 'l', 'litre', 'cl', 'ml', 'tonne', 't'].includes(
+            (product.unit || '').trim().toLowerCase(),
+          );
+          if (!product.allowFractionalSale && !isWeightOrVolumeUnit) {
             throw new BadRequestException({
               code: 'FRACTIONAL_SALE_DISABLED',
               message: `La vente au montant / fraction n’est pas activée sur « ${product.name} ».`,

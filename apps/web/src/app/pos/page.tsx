@@ -103,6 +103,10 @@ interface CartItem {
   serialNumber: string;
   variantId: string | null;
   variantName: string | null;
+  /** Pour la vente au poids/volume : quantité décimale (ex: 0.5 kg). Le prix = round(weightQty × salePriceXof) */
+  weightQty: number | null;
+  /** Label affiché dans le panier pour la vente au poids (ex: "½ kg", "250g") */
+  weightLabel: string | null;
 }
 
 interface SaleRow {
@@ -140,6 +144,8 @@ export default function PosPage() {
   const profile = normalizeBusinessProfile(shopType, activeShop?.businessProfile);
 
   const [variantTarget, setVariantTarget] = useState<ProductItem | null>(null);
+  const [fractionTarget, setFractionTarget] = useState<ProductItem | null>(null);
+  const [fractionCustom, setFractionCustom] = useState('');
 
   const [tab, setTab] = useState<'pos' | 'history'>('pos');
   const [mobilePosPane, setMobilePosPane] = useState<'catalog' | 'cart'>('catalog');
@@ -325,6 +331,86 @@ export default function PosPage() {
     );
   }, [sales, historySearch]);
 
+  // ─── Vente au poids / volume ───────────────────────────────────────────────
+  const WEIGHT_UNITS = new Set(['kg', 'Kg', 'KG', 'g', 'G', 'litre', 'Litre', 'l', 'L', 'cl', 'CL', 'ml', 'mL', 'tonne', 't', 'T']);
+
+  const isWeightUnit = (unit: string) => WEIGHT_UNITS.has(unit.trim());
+
+  interface WeightPreset { qty: number; label: string; }
+
+  const getWeightPresets = (unit: string): WeightPreset[] => {
+    const u = unit.trim().toLowerCase();
+    if (u === 'g') {
+      return [
+        { qty: 100,  label: '100 g'  },
+        { qty: 250,  label: '250 g'  },
+        { qty: 500,  label: '½ kg'   },
+        { qty: 750,  label: '750 g'  },
+        { qty: 1000, label: '1 kg'   },
+      ];
+    }
+    if (u === 'cl' || u === 'ml') {
+      return [
+        { qty: 25,   label: '25 cl'  },
+        { qty: 50,   label: '50 cl'  },
+        { qty: 75,   label: '75 cl'  },
+        { qty: 100,  label: '1 L'    },
+      ];
+    }
+    if (u === 'tonne' || u === 't') {
+      return [
+        { qty: 0.5,  label: '½ tonne'  },
+        { qty: 1,    label: '1 tonne'  },
+        { qty: 2,    label: '2 tonnes' },
+        { qty: 5,    label: '5 tonnes' },
+      ];
+    }
+    // kg, L, litre (par défaut)
+    return [
+      { qty: 0.25, label: `¼ ${unit}`  },
+      { qty: 0.5,  label: `½ ${unit}`  },
+      { qty: 0.75, label: `¾ ${unit}`  },
+      { qty: 1,    label: `1 ${unit}`  },
+      { qty: 1.5,  label: `1½ ${unit}` },
+      { qty: 2,    label: `2 ${unit}`  },
+      { qty: 3,    label: `3 ${unit}`  },
+      { qty: 5,    label: `5 ${unit}`  },
+    ];
+  };
+
+  const addWeightToCart = (product: ProductItem, weightQty: number, weightLabel: string) => {
+    const amountXof = Math.round(weightQty * product.salePriceXof);
+    setFeedback(null);
+    setCart((prev) => {
+      // Cherche une ligne existante avec le même poids pour incrémenter
+      const idx = prev.findIndex(
+        (i) => i.product.id === product.id && i.weightQty === weightQty && i.variantId === null,
+      );
+      if (idx >= 0) {
+        return prev.map((item, i) =>
+          i === idx
+            ? { ...item, quantity: item.quantity + 1, customAmountXof: (item.customAmountXof ?? 0) + amountXof }
+            : item,
+        );
+      }
+      return [
+        ...prev,
+        {
+          key: `${product.id}_w${weightQty}_${Date.now()}`,
+          product,
+          quantity: 1,
+          soldInBulk: false,
+          customAmountXof: amountXof,
+          serialNumber: '',
+          variantId: null,
+          variantName: null,
+          weightQty,
+          weightLabel,
+        },
+      ];
+    });
+  };
+
   const addToCart = (product: ProductItem, soldInBulk = false, variant?: ProductVariant) => {
     setFeedback(null);
     setCart((prev) => {
@@ -354,6 +440,8 @@ export default function PosPage() {
           serialNumber: '',
           variantId: variant?.id ?? null,
           variantName: variant?.name ?? null,
+          weightQty: null,
+          weightLabel: null,
         },
       ];
     });
@@ -362,7 +450,15 @@ export default function PosPage() {
   const updateCartQty = (cartKey: string, delta: number) => {
     setCart((prev) =>
       prev
-        .map((i) => (i.key === cartKey ? { ...i, quantity: i.quantity + delta } : i))
+        .map((i) => {
+          if (i.key !== cartKey) return i;
+          const nextQty = i.quantity + delta;
+          if (nextQty <= 0) return { ...i, quantity: 0 };
+          const nextCustom = i.weightQty
+            ? Math.round(i.weightQty * nextQty * i.product.salePriceXof)
+            : i.customAmountXof;
+          return { ...i, quantity: nextQty, customAmountXof: nextCustom };
+        })
         .filter((i) => i.quantity > 0),
     );
   };
@@ -511,9 +607,14 @@ export default function PosPage() {
         ...(c.variantId ? { variantId: c.variantId } : {}),
         quantity: c.customAmountXof && c.customAmountXof > 0 ? 1 : c.quantity,
         soldInBulk: c.soldInBulk,
-        ...(c.customAmountXof && c.customAmountXof > 0
-          ? { customAmountXof: c.customAmountXof }
-          : {}),
+        ...(c.weightQty && c.weightQty > 0
+          ? {
+              fractionalQtyMilli: Math.max(1, Math.round(c.weightQty * c.quantity * 1000)),
+              customAmountXof: Math.round(c.weightQty * c.quantity * c.product.salePriceXof),
+            }
+          : c.customAmountXof && c.customAmountXof > 0
+            ? { customAmountXof: c.customAmountXof }
+            : {}),
         ...(c.serialNumber.trim() ? { serialNumber: c.serialNumber.trim() } : {}),
       })),
       globalDiscountType: discountPercent > 0 ? 'PERCENT' : 'NONE',
@@ -927,6 +1028,9 @@ export default function PosPage() {
                             onClick={() => {
                               if (p.variants && p.variants.filter(v => v.isActive !== false).length > 0) {
                                 setVariantTarget(p);
+                              } else if (isWeightUnit(p.unit)) {
+                                setFractionCustom('');
+                                setFractionTarget(p);
                               } else {
                                 addToCart(p, false);
                               }
@@ -974,9 +1078,14 @@ export default function PosPage() {
                             </span>
                           </button>
 
-                          {(hasBulk || p.allowFractionalSale || p.warrantyMonths || (p.variants && p.variants.length > 0)) && (
+                          {(hasBulk || p.allowFractionalSale || p.warrantyMonths || (p.variants && p.variants.length > 0) || isWeightUnit(p.unit)) && (
                             <div className="flex flex-wrap items-center justify-between gap-1.5 border-t border-slate-100 pt-2">
                               <div className="flex flex-wrap gap-1">
+                                {isWeightUnit(p.unit) ? (
+                                  <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                                    ⚖️ Vente ¼·½·¾ {p.unit}
+                                  </span>
+                                ) : null}
                                 {p.variants && p.variants.length > 0 ? (
                                   <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-800">
                                     {p.variants.length} variante{p.variants.length > 1 ? 's' : ''}
@@ -1077,8 +1186,19 @@ export default function PosPage() {
                                   {item.variantName}
                                 </span>
                               ) : null}
+                              {item.weightLabel ? (
+                                <span className="inline-flex items-center rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                                  ⚖️ {item.weightLabel}
+                                </span>
+                              ) : null}
                               <p className="text-xs text-slate-500">
-                                {computedFractionQty ? (
+                                {item.weightLabel ? (
+                                  <span>
+                                    Poids : <strong>{item.weightLabel}</strong> ({item.weightQty} {item.product.unit})
+                                    {item.quantity > 1 ? ` × ${item.quantity}` : ''} ={' '}
+                                    <strong>{formatXof(unitPrice)}</strong>
+                                  </span>
+                                ) : computedFractionQty ? (
                                   <span>
                                     Montant libre : <strong>{formatXof(unitPrice)}</strong> ({computedFractionQty}{' '}
                                     {item.product.unit})
@@ -1092,7 +1212,7 @@ export default function PosPage() {
                               </p>
                             </div>
                             <div className="flex items-center gap-1">
-                              {!computedFractionQty ? (
+                              {!computedFractionQty || item.weightLabel ? (
                                 <>
                                   <button
                                     type="button"
@@ -1723,6 +1843,103 @@ export default function PosPage() {
             )}
           </div>
         )}
+
+        {/* Modal Sélecteur de Poids / Fraction */}
+        {fractionTarget ? (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-forest-950/70 p-4 backdrop-blur-xs sm:items-center">
+            <div className="w-full max-w-sm space-y-4 rounded-3xl bg-white p-5 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">⚖️ {fractionTarget.name}</h3>
+                  <p className="text-xs text-slate-500">
+                    {formatXof(fractionTarget.salePriceXof)} / {fractionTarget.unit} — Choisissez la quantité
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFractionTarget(null)}
+                  className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Presets rapides */}
+              <div className="grid grid-cols-4 gap-2">
+                {getWeightPresets(fractionTarget.unit).map((preset) => {
+                  const price = Math.round(preset.qty * fractionTarget.salePriceXof);
+                  return (
+                    <button
+                      key={preset.qty}
+                      type="button"
+                      onClick={() => {
+                        addWeightToCart(fractionTarget, preset.qty, preset.label);
+                        setFractionTarget(null);
+                        setFeedback({ type: 'ok', msg: `${fractionTarget.name} · ${preset.label} → ${formatXof(price)} ajouté.` });
+                      }}
+                      className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-center transition hover:border-forest-900 hover:bg-forest-50 active:scale-95"
+                    >
+                      <span className="text-sm font-extrabold text-slate-900">{preset.label}</span>
+                      <span className="mt-0.5 text-[10px] font-semibold text-emerald-700">{formatXof(price)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Saisie libre */}
+              <div className="border-t border-slate-100 pt-3">
+                <p className="mb-2 text-xs font-semibold text-slate-600">Quantité libre :</p>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      min="0.001"
+                      step="0.001"
+                      value={fractionCustom}
+                      onChange={(e) => setFractionCustom(e.target.value)}
+                      placeholder={`Ex: 1.75`}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-forest-900 focus:outline-none"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && fractionCustom) {
+                          const qty = parseFloat(fractionCustom);
+                          if (qty > 0) {
+                            addWeightToCart(fractionTarget, qty, `${qty} ${fractionTarget.unit}`);
+                            setFractionTarget(null);
+                            setFractionCustom('');
+                          }
+                        }
+                      }}
+                    />
+                    <span className="pointer-events-none absolute right-3 top-2.5 text-sm font-bold text-slate-500">
+                      {fractionTarget.unit}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!fractionCustom || parseFloat(fractionCustom) <= 0}
+                    onClick={() => {
+                      const qty = parseFloat(fractionCustom);
+                      if (qty > 0) {
+                        addWeightToCart(fractionTarget, qty, `${qty} ${fractionTarget.unit}`);
+                        setFractionTarget(null);
+                        setFractionCustom('');
+                        setFeedback({ type: 'ok', msg: `${fractionTarget.name} · ${qty} ${fractionTarget.unit} → ${formatXof(Math.round(qty * fractionTarget.salePriceXof))} ajouté.` });
+                      }
+                    }}
+                    className="shrink-0 rounded-xl bg-forest-900 px-4 py-2.5 text-sm font-bold text-limeglow-400 disabled:opacity-40 hover:bg-forest-800"
+                  >
+                    + Ajouter
+                  </button>
+                </div>
+                {fractionCustom && parseFloat(fractionCustom) > 0 ? (
+                  <p className="mt-1 text-xs font-semibold text-emerald-700">
+                    → {formatXof(Math.round(parseFloat(fractionCustom) * fractionTarget.salePriceXof))}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Modal Sélecteur de Variante */}
         {variantTarget ? (
