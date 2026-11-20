@@ -10,12 +10,16 @@ import {
   NotFoundException,
   Param,
   Post,
+  Req,
   Res,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { uploadImageSchema } from '@shopcontrol/shared';
 import { Public, Roles } from '../../common/auth/auth.decorators';
+import { RequestWithAuth } from '../../common/auth/request-context.types';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 Mo (Section 14.1)
@@ -69,11 +73,22 @@ function detectImageTypeFromMagicBytes(buf: Buffer): { mime: string; ext: 'jpg' 
 export class UploadsController {
   @Post('image')
   @Public()
+  @Throttle({ default: { limit: 12, ttl: 60_000 } })
   @ApiOperation({ summary: 'Téléverser une image sécurisée (produit, logo boutique ou pièce jointe photo)' })
   uploadImage(
     @Body(new ZodValidationPipe(uploadImageSchema))
     body: { dataUrl: string; purpose: 'product' | 'logo' | 'message' },
+    @Req() req: RequestWithAuth,
   ) {
+    const isAuth = Boolean(req.user);
+    // Les uploads de produits et de messages nécessitent une session active
+    if (!isAuth && body.purpose !== 'logo') {
+      throw new UnauthorizedException({
+        code: 'AUTH_REQUIRED_FOR_UPLOAD',
+        message: 'Une authentification active est obligatoire pour téléverser des images de produits ou de messages.',
+      });
+    }
+
     const match = body.dataUrl.match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
     if (!match) {
       throw new BadRequestException({

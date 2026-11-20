@@ -110,12 +110,19 @@ export class AuthService {
   ) {}
 
   async registerMerchant(input: RegisterMerchantInput, meta: RequestMeta) {
+    if (input.websiteHp && input.websiteHp.trim().length > 0) {
+      throw new BadRequestException({
+        code: 'BOT_DETECTED',
+        message: 'Requête d’inscription invalide.',
+      });
+    }
+
     const ownerEmail = input.ownerEmail.trim().toLowerCase();
     const dupOwner = await this.controlPrisma.user.findUnique({ where: { email: ownerEmail } });
     if (dupOwner) {
       throw new ConflictException({
-        code: 'EMAIL_ALREADY_USED',
-        message: 'Cette adresse e-mail est déjà utilisée par un compte existant.',
+        code: 'REGISTRATION_REJECTED',
+        message: 'Impossible de finaliser l’inscription avec ces identifiants. Si vous avez déjà un compte, veuillez vous connecter.',
       });
     }
 

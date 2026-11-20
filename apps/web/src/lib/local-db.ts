@@ -22,8 +22,28 @@ export interface CachedProductItem {
   barcode: string | null;
   salePriceXof: number;
   stockAvailable: number;
+  stockAvailableDecimal?: number;
   status: string;
   unit: string;
+  imageUrls?: string[];
+  brand?: string | null;
+  modelName?: string | null;
+  isPinnedPos?: boolean;
+  bulkUnitLabel?: string | null;
+  unitsPerBulk?: number | null;
+  bulkSalePriceXof?: number | null;
+  allowFractionalSale?: boolean;
+  warrantyMonths?: number | null;
+  trackSerialNumber?: boolean;
+  variants?: Array<{
+    id: string;
+    name: string;
+    sku?: string;
+    barcode?: string | null;
+    salePriceXof?: number | null;
+    stockAvailable?: number;
+    isActive?: boolean;
+  }>;
   cachedAt: string;
 }
 
@@ -35,8 +55,9 @@ export interface OfflineOperationItem {
   offlineSaleNumber?: string;
   totalXof?: number;
   payload: unknown;
-  status: 'PENDING' | 'SYNCED' | 'CONFLICT' | 'ERROR';
+  status: 'PENDING' | 'SYNCED' | 'CONFLICT' | 'ERROR' | 'FAILED_FATAL';
   errorMessage?: string;
+  retryCount?: number;
   createdAt: string;
 }
 
@@ -55,6 +76,11 @@ class ShopControlLocalDatabase extends Dexie {
       terminalState: 'id',
       offlineQueue: '++id, clientOperationId, shopId, status, createdAt',
       productsCache: 'id, shopId, sku, barcode',
+    });
+    this.version(3).stores({
+      terminalState: 'id',
+      offlineQueue: '++id, clientOperationId, shopId, status, createdAt',
+      productsCache: 'id, shopId, sku, barcode, name',
     });
   }
 }
@@ -153,7 +179,7 @@ export async function getPendingOfflineSales(shopId: string): Promise<OfflineOpe
   return localDb.offlineQueue
     .where('shopId')
     .equals(shopId)
-    .filter((i) => i.status === 'PENDING' || i.status === 'ERROR')
+    .filter((i) => i.status === 'PENDING' || (i.status === 'ERROR' && (i.retryCount ?? 0) < 5))
     .toArray();
 }
 
@@ -161,7 +187,10 @@ export async function updateOfflineSaleStatus(
   id: number,
   status: OfflineOperationItem['status'],
   errorMessage?: string,
+  retryCount?: number,
 ): Promise<void> {
   if (!localDb) return;
-  await localDb.offlineQueue.update(id, { status, errorMessage });
+  const updates: Partial<OfflineOperationItem> = { status, errorMessage };
+  if (retryCount !== undefined) updates.retryCount = retryCount;
+  await localDb.offlineQueue.update(id, updates);
 }

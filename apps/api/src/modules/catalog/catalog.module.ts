@@ -205,7 +205,7 @@ export class CatalogService {
   ) {
     const client = await this.shopDbManager.getClientForShop(shopId);
     const page = Math.max(1, params.page || 1);
-    const limit = Math.min(200, Math.max(1, params.limit || 50));
+    const limit = Math.min(1000, Math.max(1, params.limit || 50));
     const showCost = this.canReadCosts(user, shopId);
 
     const where: Record<string, unknown> = {};

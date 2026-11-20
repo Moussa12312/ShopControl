@@ -17,7 +17,8 @@
     "db:generate": "npm run db:generate --workspace=apps/api",
     "db:migrate": "npm run db:migrate --workspace=apps/api",
     "db:migrate:shops": "npm run db:migrate:shops --workspace=apps/api",
-    "db:seed": "npm run db:seed --workspace=apps/api"
+    "db:seed": "npm run db:seed --workspace=apps/api",
+    "archive:clean": "git archive --format=zip --output=ShopControl-clean.zip HEAD"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

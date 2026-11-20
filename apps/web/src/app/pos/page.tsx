@@ -212,7 +212,7 @@ export default function PosPage() {
           taxMode: TaxMode;
           defaultTaxRateBps: number;
         }>(`/shops/${shopId}`, { shopId, requiresOnline: false }),
-        apiFetch<{ items: ProductItem[] }>(`/shops/${shopId}/products?limit=200`, {
+        apiFetch<{ items: ProductItem[] }>(`/shops/${shopId}/products?limit=1000`, {
           shopId,
           requiresOnline: false,
         }),
@@ -690,13 +690,14 @@ export default function PosPage() {
     }
   };
 
-  const handleSyncOfflineQueue = async () => {
-    if (!shopId || pendingOffline.length === 0) return;
+  const handleSyncOfflineQueue = useCallback(async () => {
+    if (!shopId || pendingOffline.length === 0 || busy) return;
     setBusy(true);
     let syncedCount = 0;
     let conflictsCount = 0;
 
     for (const item of pendingOffline) {
+      const currentRetries = item.retryCount ?? 0;
       try {
         const res = await apiFetch<{ stockConflict?: boolean }>(`/shops/${shopId}/sales/sync`, {
           method: 'POST',
@@ -704,27 +705,44 @@ export default function PosPage() {
           operatorId: activeOperator?.id,
           body: item.payload,
         });
-        await updateOfflineSaleStatus(item.id!, res.stockConflict ? 'CONFLICT' : 'SYNCED');
+        await updateOfflineSaleStatus(item.id!, res.stockConflict ? 'CONFLICT' : 'SYNCED', undefined, currentRetries);
         syncedCount += 1;
         if (res.stockConflict) conflictsCount += 1;
       } catch (err) {
+        const isFatal =
+          err instanceof ApiError &&
+          err.statusCode >= 400 &&
+          err.statusCode < 500 &&
+          err.statusCode !== 408 &&
+          err.statusCode !== 429;
+        const newStatus = isFatal || currentRetries >= 4 ? 'FAILED_FATAL' : 'ERROR';
         await updateOfflineSaleStatus(
           item.id!,
-          'ERROR',
+          newStatus,
           err instanceof ApiError ? err.message : 'Échec de synchronisation',
+          currentRetries + 1,
         );
       }
     }
 
     await loadData();
     setBusy(false);
-    setFeedback({
-      type: conflictsCount > 0 ? 'warn' : 'ok',
-      msg: `${syncedCount} vente(s) locale(s) synchronisée(s)${
-        conflictsCount > 0 ? ` (${conflictsCount} conflit(s) de stock signalé(s) au propriétaire)` : ''
-      }.`,
-    });
-  };
+    if (syncedCount > 0 || conflictsCount > 0) {
+      setFeedback({
+        type: conflictsCount > 0 ? 'warn' : 'ok',
+        msg: `${syncedCount} vente(s) locale(s) synchronisée(s)${
+          conflictsCount > 0 ? ` (${conflictsCount} conflit(s) de stock signalé(s) au propriétaire)` : ''
+        }.`,
+      });
+    }
+  }, [shopId, pendingOffline, busy, activeOperator?.id, loadData]);
+
+  // Synchronisation automatique en arrière-plan dès le rétablissement de la connectivité réseau
+  useEffect(() => {
+    if (isOnline && apiReachable && pendingOffline.length > 0 && !busy) {
+      void handleSyncOfflineQueue();
+    }
+  }, [isOnline, apiReachable, pendingOffline.length, busy, handleSyncOfflineQueue]);
 
   const openSaleDocument = async (saleId: string, preferredType: 'SALE_RECEIPT' | 'CREDIT_NOTE' = 'SALE_RECEIPT') => {
     if (!shopId) return;

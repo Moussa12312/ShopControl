@@ -148,7 +148,10 @@ export class OrdersService {
    * - Affiche UNIQUEMENT les produits `PUBLISHED` de cette boutique
    * - Calcule `stockAvailable = physicalQty - reservedQty` en temps réel (les stocks réservés disparaissent immédiatement !)
    */
-  async getPublicStorefront(slug: string) {
+  async getPublicStorefront(
+    slug: string,
+    query?: { page?: number; limit?: number; categoryId?: string; search?: string },
+  ) {
     const resolved = await this.resolveShopBySlug(slug);
     if (resolved.redirectToSlug) {
       return { redirectToSlug: resolved.redirectToSlug, available: false, status: 'REDIRECT' };
@@ -211,17 +214,38 @@ export class OrdersService {
       }>;
     }> = [];
 
+    const page = Math.max(1, query?.page || 1);
+    const limit = Math.min(200, Math.max(1, query?.limit || 100));
+    let totalProducts = 0;
+
     if (shop.dbStatus === 'READY') {
       const client = await this.shopDbManager.getClientForShop(shop.id);
-      const [cats, prods] = await Promise.all([
+      const productWhere: Record<string, unknown> = { status: 'PUBLISHED' };
+      if (query?.categoryId) {
+        productWhere.categoryId = query.categoryId;
+      }
+      if (query?.search?.trim()) {
+        const q = query.search.trim();
+        productWhere.OR = [
+          { name: { contains: q, mode: 'insensitive' } },
+          { sku: { contains: q, mode: 'insensitive' } },
+          { brand: { contains: q, mode: 'insensitive' } },
+          { modelName: { contains: q, mode: 'insensitive' } },
+        ];
+      }
+
+      const [cats, totalCount, prods] = await Promise.all([
         client.category.findMany({
           where: { isActive: true },
           orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
           select: { id: true, name: true },
         }),
+        client.product.count({ where: productWhere }),
         client.product.findMany({
-          where: { status: 'PUBLISHED' },
+          where: productWhere,
           orderBy: [{ isPinnedPos: 'desc' }, { name: 'asc' }],
+          skip: (page - 1) * limit,
+          take: limit,
           include: {
             category: { select: { name: true } },
             variants: { where: { isActive: true }, select: { id: true, name: true, salePriceXof: true } },
@@ -230,6 +254,7 @@ export class OrdersService {
         }),
       ]);
       categories = cats;
+      totalProducts = totalCount;
       products = prods.map((p) => {
         const activeVariants = (p.variants || []).map((v) => {
           const bal = p.stockBalances.find((b) => b.variantKey === v.id);
@@ -311,6 +336,12 @@ export class OrdersService {
       },
       categories,
       products,
+      pagination: {
+        page,
+        limit,
+        total: totalProducts,
+        hasMore: page * limit < totalProducts,
+      },
     };
   }
 
@@ -1757,8 +1788,19 @@ export class OrdersController {
   @Get('public/shops/:slug/storefront')
   @Public()
   @ApiOperation({ summary: 'Catalogue public temps réel de la boutique (produits publiés & stock disponible)' })
-  storefront(@Param('slug') slug: string) {
-    return this.ordersService.getPublicStorefront(slug);
+  storefront(
+    @Param('slug') slug: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.ordersService.getPublicStorefront(slug, {
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 100,
+      categoryId,
+      search,
+    });
   }
 
   @Get('public/shops/:slug/qr')

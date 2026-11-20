@@ -135,6 +135,8 @@ export const registerMerchantSchema = z.object({
   shopPhone: z.string().trim().max(30).optional(),
   currency: z.string().trim().min(3).max(5).default(DEFAULT_CURRENCY),
   defaultTimezone: z.string().trim().min(3).max(60).default(DEFAULT_TIMEZONE),
+  // Protection Honeypot anti-bot
+  websiteHp: z.string().trim().max(100).optional(),
   // Modes d'encaissement acceptés en boutique (POS & Vitrine)
   shopPaymentMethodCodes: z
     .array(z.enum(['CASH', 'ORANGE_MONEY', 'WAVE', 'MOOV_MONEY', 'CARD']))

@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import {
   changePasswordSchema,
   confirmTwoFactorSchema,
@@ -38,6 +39,7 @@ export class AuthController {
 
   @Post('register-merchant')
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 3600_000 } })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary:
@@ -62,6 +64,7 @@ export class AuthController {
 
   @Post('login')
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Connexion par e-mail et mot de passe (avec défi 2FA si activé)' })
   async login(
@@ -86,6 +89,7 @@ export class AuthController {
 
   @Post('2fa/verify-login')
   @Public()
+  @Throttle({ default: { limit: 6, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Valider le code TOTP 2FA lors de la connexion' })
   async verifyTwoFactorLogin(
