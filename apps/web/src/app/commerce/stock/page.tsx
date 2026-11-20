@@ -699,7 +699,8 @@ export default function StockPage() {
       subtitle="Valorisation financière CMP, stock par variante, scan code-barres et réapprovisionnement pro."
       headerActions={<ShopPickerInline shopId={shopId} onChange={selectShop} />}
     >
-      <div className="space-y-4">
+      {/* Wrapper sombre : toute la page stock est conçue en dark theme */}
+      <div className="min-h-[calc(100vh-5rem)] space-y-4 rounded-2xl bg-[#071615] p-3 sm:p-4 -mx-3 sm:-mx-5 lg:-mx-6 -mt-0">
         {/* Barre d'onglets principale horizontale swipeable (< md & desktop) */}
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 border-b border-[#1b3d3b]/80">
           <button
@@ -708,7 +709,7 @@ export default function StockPage() {
             className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
               tab === 'valuation'
                 ? 'bg-[#a3e635] text-[#051413] shadow'
-                : 'bg-white/5 text-white/70 hover:text-white hover:bg-white/10'
+                : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
             }`}
           >
             <Boxes className="w-4 h-4" />
@@ -877,7 +878,7 @@ export default function StockPage() {
                     <span className="text-2xl font-black text-[#a3e635] font-mono">
                       {valuationData.summary.totalUnitsAvailable}
                     </span>
-                    <span className="text-xs text-white/60">unités dispo</span>
+                    <span className="text-xs text-white/60">articles dispo</span>
                   </div>
                   <div className="mt-1 text-[11px] text-white/45 flex items-center gap-2 font-mono">
                     <span>{valuationData.summary.totalProductsCount} prods</span>

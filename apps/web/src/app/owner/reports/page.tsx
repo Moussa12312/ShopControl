@@ -174,7 +174,7 @@ export default function OwnerReportsPage() {
       title="Bilans Financiers & Exports"
       subtitle="Somme exacte multi-boutiques · Dépenses entreprise distinctes · Stock en transit compté une seule fois."
       headerActions={
-        <>
+        <div className="flex flex-wrap items-center gap-2">
           <a
             href={`${API_BASE_URL}/merchant/reports/export.csv?from=${from}&to=${to}`}
             target="_blank"
@@ -193,7 +193,7 @@ export default function OwnerReportsPage() {
             <Download className="h-3.5 w-3.5" />
             Exporter PDF
           </a>
-        </>
+        </div>
       }
     >
       <div className="space-y-5">

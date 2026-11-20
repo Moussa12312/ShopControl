@@ -345,8 +345,8 @@ export default function OwnerShopsPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                  <span>
+                <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <span className="shrink-0">
                     {shop.activeAgentsCount} agent(s) · {shop.activeOperatorsCount} opérateur(s) ·{' '}
                     {shop.activeTerminalsCount} terminal(aux)
                   </span>
