@@ -1,0 +1,107 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shopcontrol-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shopcontrol}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shopcontrol_secure_password_replace}
+      POSTGRES_DB: ${POSTGRES_CONTROL_DB:-shopcontrol_control}
+    command:
+      - postgres
+      - -c
+      - max_connections=300
+      - -c
+      - shared_buffers=512MB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shopcontrol} -d ${POSTGRES_CONTROL_DB:-shopcontrol_control}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - shopcontrol-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: shopcontrol-redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - shopcontrol-net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: shopcontrol-api
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379
+      API_PORT: 4000
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - shopcontrol-net
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: shopcontrol-web
+    restart: always
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_URL: http://api:4000
+      PORT: 3000
+    networks:
+      - shopcontrol-net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: shopcontrol-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+    networks:
+      - shopcontrol-net
+
+networks:
+  shopcontrol-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
+  caddy_data:
+  caddy_config:
