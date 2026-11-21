@@ -45,10 +45,10 @@ const envSchema = z
     CORS_ORIGINS: z.string().default('http://localhost:3000'),
     JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET doit contenir au moins 32 caractères.'),
     JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET doit contenir au moins 32 caractères.'),
-    JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
-    SESSION_TTL_OWNER_HOURS: z.coerce.number().int().min(1).max(168).default(24),
-    SESSION_TTL_AGENT_HOURS: z.coerce.number().int().min(1).max(24).default(4),
-    SESSION_TTL_SUPER_ADMIN_HOURS: z.coerce.number().int().min(1).max(24).default(8),
+    JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().min(60).max(604800).default(86400),
+    SESSION_TTL_OWNER_HOURS: z.coerce.number().int().min(1).max(8760).default(720),
+    SESSION_TTL_AGENT_HOURS: z.coerce.number().int().min(1).max(8760).default(720),
+    SESSION_TTL_SUPER_ADMIN_HOURS: z.coerce.number().int().min(1).max(8760).default(720),
     COOKIE_SECURE: z
       .enum(['true', 'false'])
       .default('false')
