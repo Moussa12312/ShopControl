@@ -8,6 +8,15 @@ export const metadata: Metadata = {
   description:
     'Plateforme SaaS de gestion commerciale multi-boutiques avec isolation par base de données dédiée et vitrine e-commerce par QR code.',
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'ShopControl',
+  },
+  icons: {
+    icon: '/icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 export const viewport: Viewport = {
