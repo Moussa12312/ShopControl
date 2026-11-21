@@ -1084,13 +1084,8 @@ export class OrdersService {
         message: `Moyen de paiement non activé : ${input.paymentMethodCode}.`,
       });
     }
+    // Référence facultative (unicité contrôlée ailleurs si fournie)
     const ref = input.transactionRef?.trim() || null;
-    if (methodCfg.requireReference && !ref) {
-      throw new BadRequestException({
-        code: 'PAYMENT_REFERENCE_REQUIRED',
-        message: `La référence de transaction est obligatoire pour ${methodCfg.label}.`,
-      });
-    }
 
     const client = await this.shopDbManager.getClientForShop(shopId);
 

@@ -121,6 +121,12 @@ interface ValuationResponse {
     totalEstimatedMarginXof: number | null;
     lowStockCount: number;
     outOfStockCount: number;
+    unitsBreakdown?: Array<{
+      unit: string;
+      available: number;
+      physical: number;
+      productsCount: number;
+    }>;
   };
   items: ValuationItem[];
 }
@@ -225,6 +231,7 @@ export default function StockPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [stockStatusFilter, setStockStatusFilter] = useState('ALL');
+  const [unitFilter, setUnitFilter] = useState('ALL');
   const [expandedVariants, setExpandedVariants] = useState<Record<string, boolean>>({});
 
   // Filtres onglet Mouvements
@@ -345,6 +352,20 @@ export default function StockPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Unités disponibles et filtrage des articles par unité
+  const availableUnits = useMemo(() => {
+    if (!valuationData?.summary?.unitsBreakdown) return [];
+    return valuationData.summary.unitsBreakdown.map((u) => u.unit);
+  }, [valuationData?.summary?.unitsBreakdown]);
+
+  const filteredValuationItems = useMemo(() => {
+    if (!valuationData?.items) return [];
+    if (unitFilter === 'ALL') return valuationData.items;
+    return valuationData.items.filter(
+      (item) => item.unit?.toLowerCase() === unitFilter.toLowerCase(),
+    );
+  }, [valuationData?.items, unitFilter]);
 
   // Détection du produit sélectionné pour la correction
   const selectedAdjProduct = useMemo(
@@ -708,8 +729,8 @@ export default function StockPage() {
             onClick={() => setTab('valuation')}
             className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
               tab === 'valuation'
-                ? 'bg-[#a3e635] text-[#051413] shadow'
-                : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                ? 'bg-[#a3e635] text-[#051413] font-black shadow border border-[#a3e635]'
+                : 'bg-[#0d2a27] text-white border border-[#214f4a] hover:bg-[#133c37] hover:border-[#a3e635]/60'
             }`}
           >
             <Boxes className="w-4 h-4" />
@@ -721,8 +742,8 @@ export default function StockPage() {
             onClick={() => setTab('movements')}
             className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
               tab === 'movements'
-                ? 'bg-[#a3e635] text-[#051413] shadow'
-                : 'bg-white/5 text-white/70 hover:text-white hover:bg-white/10'
+                ? 'bg-[#a3e635] text-[#051413] font-black shadow border border-[#a3e635]'
+                : 'bg-[#0d2a27] text-white border border-[#214f4a] hover:bg-[#133c37] hover:border-[#a3e635]/60'
             }`}
           >
             <Layers className="w-4 h-4" />
@@ -734,8 +755,8 @@ export default function StockPage() {
             onClick={() => setTab('adjust')}
             className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
               tab === 'adjust'
-                ? 'bg-[#a3e635] text-[#051413] shadow'
-                : 'bg-white/5 text-white/70 hover:text-white hover:bg-white/10'
+                ? 'bg-[#a3e635] text-[#051413] font-black shadow border border-[#a3e635]'
+                : 'bg-[#0d2a27] text-white border border-[#214f4a] hover:bg-[#133c37] hover:border-[#a3e635]/60'
             }`}
           >
             <Plus className="w-4 h-4" />
@@ -747,8 +768,8 @@ export default function StockPage() {
             onClick={() => setTab('inventory')}
             className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
               tab === 'inventory'
-                ? 'bg-[#a3e635] text-[#051413] shadow'
-                : 'bg-white/5 text-white/70 hover:text-white hover:bg-white/10'
+                ? 'bg-[#a3e635] text-[#051413] font-black shadow border border-[#a3e635]'
+                : 'bg-[#0d2a27] text-white border border-[#214f4a] hover:bg-[#133c37] hover:border-[#a3e635]/60'
             }`}
           >
             <ClipboardCheck className="w-4 h-4" />
@@ -760,8 +781,8 @@ export default function StockPage() {
             onClick={() => setTab('expiry')}
             className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
               tab === 'expiry'
-                ? 'bg-[#a3e635] text-[#051413] shadow'
-                : 'bg-white/5 text-white/70 hover:text-white hover:bg-white/10'
+                ? 'bg-[#a3e635] text-[#051413] font-black shadow border border-[#a3e635]'
+                : 'bg-[#0d2a27] text-white border border-[#214f4a] hover:bg-[#133c37] hover:border-[#a3e635]/60'
             }`}
           >
             <CalendarClock className="w-4 h-4" />
@@ -779,8 +800,8 @@ export default function StockPage() {
             onClick={() => setTab('sessions')}
             className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
               tab === 'sessions'
-                ? 'bg-[#a3e635] text-[#051413] shadow'
-                : 'bg-white/5 text-white/70 hover:text-white hover:bg-white/10'
+                ? 'bg-[#a3e635] text-[#051413] font-black shadow border border-[#a3e635]'
+                : 'bg-[#0d2a27] text-white border border-[#214f4a] hover:bg-[#133c37] hover:border-[#a3e635]/60'
             }`}
           >
             <History className="w-4 h-4" />
@@ -861,7 +882,11 @@ export default function StockPage() {
         )}
 
         {loading ? (
-          <LoadingSkeleton rows={5} />
+          <div className="space-y-3 pt-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-14 w-full animate-pulse rounded-xl bg-white/10" />
+            ))}
+          </div>
         ) : tab === 'valuation' ? (
           /* ========================================================================
              ONGLET 1 : ÉTAT & VALORISATION FINANCIÈRE COMPLÈTE DU STOCK
@@ -870,22 +895,49 @@ export default function StockPage() {
             {/* KPI Cards de valorisation */}
             {valuationData?.summary && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="rounded-2xl border border-[#1b3d3b] bg-[#091f1e] p-3.5 sm:p-4 text-white">
-                  <span className="text-[11px] font-bold text-white/50 uppercase tracking-wider">
-                    Références en stock
-                  </span>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-black text-[#a3e635] font-mono">
-                      {valuationData.summary.totalUnitsAvailable}
+                <div className="rounded-2xl border border-[#1b3d3b] bg-[#091f1e] p-3.5 sm:p-4 text-white flex flex-col justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold text-white/50 uppercase tracking-wider">
+                      Stock & Unités disponibles
                     </span>
-                    <span className="text-xs text-white/60">articles dispo</span>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="text-2xl font-black text-[#a3e635] font-mono">
+                        {valuationData.summary.totalUnitsAvailable}
+                      </span>
+                      <span className="text-xs text-white/60">total cumulé</span>
+                    </div>
+                    <div className="mt-1 text-[11px] text-white/45 flex items-center gap-2 font-mono">
+                      <span>{valuationData.summary.totalProductsCount} prods</span>
+                      {valuationData.summary.totalVariantsCount > 0 && (
+                        <span>· {valuationData.summary.totalVariantsCount} variantes</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="mt-1 text-[11px] text-white/45 flex items-center gap-2 font-mono">
-                    <span>{valuationData.summary.totalProductsCount} prods</span>
-                    {valuationData.summary.totalVariantsCount > 0 && (
-                      <span>· {valuationData.summary.totalVariantsCount} variantes</span>
-                    )}
-                  </div>
+
+                  {/* Distinction par unité de mesure (kg, pièces, litres...) */}
+                  {valuationData.summary.unitsBreakdown && valuationData.summary.unitsBreakdown.length > 0 ? (
+                    <div className="mt-2.5 pt-2 border-t border-[#1b3d3b]/80">
+                      <p className="text-[10px] text-white/40 mb-1 font-semibold uppercase tracking-wider">
+                        Détail par unité :
+                      </p>
+                      <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
+                        {valuationData.summary.unitsBreakdown.map((u) => (
+                          <span
+                            key={u.unit}
+                            className="inline-flex items-center gap-1 rounded-md bg-[#0a2320] border border-[#214f4a] px-1.5 py-0.5 text-[10px] font-mono font-bold text-white"
+                            title={`${u.productsCount} produit(s) en ${u.unit} (dispo : ${u.available}, physique : ${u.physical})`}
+                          >
+                            <span className="text-[#a3e635]">{u.available}</span>
+                            <span className="text-white/80">{u.unit}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-1.5 text-[10px] text-white/30 leading-tight">
+                      Total toutes unités confondues
+                    </p>
+                  )}
                 </div>
 
                 <div className="rounded-2xl border border-[#1b3d3b] bg-[#091f1e] p-3.5 sm:p-4 text-white">
@@ -953,14 +1005,14 @@ export default function StockPage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Rechercher par nom, SKU ou code-barres..."
-                    className="w-full bg-black/30 border border-[#1b3d3b] rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-white placeholder-white/40 focus:outline-none focus:border-[#a3e635]"
+                    className="w-full bg-[#0a2320] border border-[#1b3d3b] rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-white placeholder-white/50 focus:outline-none focus:border-[#a3e635]"
                   />
                 </div>
 
                 <select
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="bg-black/30 border border-[#1b3d3b] rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-[#a3e635] max-w-[140px]"
+                  className="bg-[#0a2320] border border-[#1b3d3b] rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-[#a3e635] max-w-[140px] [&>option]:bg-slate-800 [&>option]:text-white"
                 >
                   <option value="">Toutes catégories</option>
                   {valuationData?.categories.map((c) => (
@@ -973,13 +1025,29 @@ export default function StockPage() {
                 <select
                   value={stockStatusFilter}
                   onChange={(e) => setStockStatusFilter(e.target.value)}
-                  className="bg-black/30 border border-[#1b3d3b] rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-[#a3e635] max-w-[130px]"
+                  className="bg-[#0a2320] border border-[#1b3d3b] rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-[#a3e635] max-w-[130px] [&>option]:bg-slate-800 [&>option]:text-white"
                 >
                   <option value="ALL">Tous statuts</option>
                   <option value="LOW_STOCK">Stock bas</option>
                   <option value="OUT_OF_STOCK">Rupture</option>
                   <option value="IN_STOCK">En stock</option>
                 </select>
+
+                {availableUnits.length > 0 && (
+                  <select
+                    value={unitFilter}
+                    onChange={(e) => setUnitFilter(e.target.value)}
+                    className="bg-[#0a2320] border border-[#1b3d3b] rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-[#a3e635] max-w-[130px] [&>option]:bg-slate-800 [&>option]:text-white"
+                    title="Filtrer par unité de mesure (kg, pièce, etc.)"
+                  >
+                    <option value="ALL">Toutes unités</option>
+                    {availableUnits.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
@@ -1016,16 +1084,16 @@ export default function StockPage() {
             </div>
 
             {/* Tableau / Cartes État & Valeur */}
-            {!valuationData || valuationData.items.length === 0 ? (
+            {!valuationData || filteredValuationItems.length === 0 ? (
               <EmptyState
                 title="Aucun article trouvé"
-                description="Aucun produit ne correspond à vos filtres de stock."
+                description="Aucun produit ne correspond à vos filtres de stock ou unité sélectionnée."
               />
             ) : (
               <div className="space-y-3">
                 {/* Cartes Mobile (< md) */}
                 <div className="space-y-2.5 md:hidden">
-                  {valuationData.items.map((item) => {
+                  {filteredValuationItems.map((item) => {
                     const isExpanded = Boolean(expandedVariants[item.productId]);
                     return (
                       <div
@@ -1180,7 +1248,7 @@ export default function StockPage() {
                 {/* Tableau Desktop (>= md) */}
                 <div className="hidden md:block overflow-x-auto rounded-2xl border border-[#1b3d3b] bg-[#091f1e]">
                   <table className="min-w-full divide-y divide-[#1b3d3b] text-xs">
-                    <thead className="bg-black/30 text-left text-white/60 uppercase tracking-wider text-[10px] font-bold">
+                    <thead className="bg-[#0a2320] text-left text-white/80 uppercase tracking-wider text-[10px] font-bold">
                       <tr>
                         <th className="px-4 py-3">Produit & Réf</th>
                         <th className="px-3 py-3">Catégorie</th>
@@ -1199,7 +1267,7 @@ export default function StockPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#1b3d3b]/50 text-white">
-                      {valuationData.items.map((item) => {
+                      {filteredValuationItems.map((item) => {
                         const isExpanded = Boolean(expandedVariants[item.productId]);
                         return (
                           <React.Fragment key={item.productId}>
@@ -1415,14 +1483,14 @@ export default function StockPage() {
                   value={mvtSearch}
                   onChange={(e) => setMvtSearch(e.target.value)}
                   placeholder="Filtrer les mouvements (motif, SKU, référence, produit)..."
-                  className="w-full bg-black/30 border border-[#1b3d3b] rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-white placeholder-white/40 focus:outline-none focus:border-[#a3e635]"
+                  className="w-full bg-[#0a2320] border border-[#1b3d3b] rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-white placeholder-white/50 focus:outline-none focus:border-[#a3e635]"
                 />
               </div>
 
               <select
                 value={mvtTypeFilter}
                 onChange={(e) => setMvtTypeFilter(e.target.value)}
-                className="bg-black/30 border border-[#1b3d3b] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#a3e635]"
+                className="bg-[#0a2320] border border-[#1b3d3b] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#a3e635] [&>option]:bg-slate-800 [&>option]:text-white"
               >
                 <option value="">Tous les types</option>
                 <option value="SALE_OUT">Ventes comptoir (SALE_OUT)</option>
@@ -1488,7 +1556,7 @@ export default function StockPage() {
                 {/* Desktop */}
                 <div className="hidden md:block overflow-x-auto rounded-2xl border border-[#1b3d3b] bg-[#091f1e]">
                   <table className="min-w-full divide-y divide-[#1b3d3b] text-xs">
-                    <thead className="bg-black/30 text-left text-white/60 uppercase tracking-wider text-[10px] font-bold">
+                    <thead className="bg-[#0a2320] text-left text-white/80 uppercase tracking-wider text-[10px] font-bold">
                       <tr>
                         <th className="px-4 py-3">Produit & Réf</th>
                         <th className="px-4 py-3">Type</th>
@@ -1588,7 +1656,7 @@ export default function StockPage() {
                   setAdjProductId(e.target.value);
                   setAdjVariantId('');
                 }}
-                className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-black/40 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#a3e635]"
+                className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-[#0a2320] px-3.5 py-2.5 text-sm text-white [&>option]:bg-[#0d2b28] [&>option]:text-white focus:outline-none focus:border-[#a3e635]"
               >
                 {valuationData?.items.map((p) => (
                   <option key={p.productId} value={p.productId}>
@@ -1607,7 +1675,7 @@ export default function StockPage() {
                 <select
                   value={adjVariantId}
                   onChange={(e) => setAdjVariantId(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-black/40 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#a3e635]"
+                  className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-[#0a2320] px-3.5 py-2.5 text-sm text-white [&>option]:bg-[#0d2b28] [&>option]:text-white focus:outline-none focus:border-[#a3e635]"
                 >
                   <option value="">Sélectionnez la variante...</option>
                   {selectedAdjProduct.variants.map((v) => (
@@ -1625,7 +1693,7 @@ export default function StockPage() {
                 <select
                   value={adjType}
                   onChange={(e) => setAdjType(e.target.value as any)}
-                  className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-black/40 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#a3e635]"
+                  className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-[#0a2320] px-3.5 py-2.5 text-sm text-white [&>option]:bg-[#0d2b28] [&>option]:text-white focus:outline-none focus:border-[#a3e635]"
                 >
                   <option value="INVENTORY_ADJUSTMENT">Correction d’inventaire</option>
                   <option value="MANUAL_IN">Entrée manuelle (+)</option>
@@ -2077,7 +2145,7 @@ export default function StockPage() {
                     required
                     value={batchForm.productId}
                     onChange={(e) => setBatchForm({ ...batchForm, productId: e.target.value })}
-                    className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-black/40 px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#a3e635]"
+                    className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-[#0a2320] px-3.5 py-2.5 text-xs sm:text-sm text-white [&>option]:bg-[#0d2b28] [&>option]:text-white focus:outline-none focus:border-[#a3e635]"
                   >
                     {valuationData?.items.map((p) => (
                       <option key={p.productId} value={p.productId}>
@@ -2096,7 +2164,7 @@ export default function StockPage() {
                     onChange={(e) =>
                       setBatchForm({ ...batchForm, quantity: Number(e.target.value) || 1 })
                     }
-                    className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-black/40 px-3.5 py-2.5 text-xs sm:text-sm text-white font-mono font-bold focus:outline-none focus:border-[#a3e635]"
+                    className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-[#0a2320] px-3.5 py-2.5 text-xs sm:text-sm text-white [&>option]:bg-[#0d2b28] [&>option]:text-white font-mono font-bold focus:outline-none focus:border-[#a3e635]"
                   />
                 </div>
                 <div className="sm:col-span-3">
@@ -2108,7 +2176,7 @@ export default function StockPage() {
                     required
                     value={batchForm.expiryDate}
                     onChange={(e) => setBatchForm({ ...batchForm, expiryDate: e.target.value })}
-                    className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-black/40 px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#a3e635]"
+                    className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-[#0a2320] px-3.5 py-2.5 text-xs sm:text-sm text-white [&>option]:bg-[#0d2b28] [&>option]:text-white focus:outline-none focus:border-[#a3e635]"
                   />
                 </div>
                 <div className="sm:col-span-3">
@@ -2259,7 +2327,7 @@ export default function StockPage() {
                   required
                   value={restockSupplierId}
                   onChange={(e) => setRestockSupplierId(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-black/40 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#a3e635]"
+                  className="mt-1 w-full rounded-xl border border-[#1b3d3b] bg-[#0a2320] px-3.5 py-2.5 text-sm text-white [&>option]:bg-[#0d2b28] [&>option]:text-white focus:outline-none focus:border-[#a3e635]"
                 >
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -2469,3 +2537,11 @@ export default function StockPage() {
     </AppShell>
   );
 }
+
+
+
+
+
+
+
+

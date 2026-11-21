@@ -78,6 +78,7 @@ const OWNER_SUPERVISION_NAV: NavItem[] = [
   { href: '/owner', label: 'Tableau de bord', shortLabel: 'Accueil', group: 'Pilotage', icon: LayoutDashboard, inMobileDock: true },
   { href: '/owner/shops', label: 'Boutiques & QR', shortLabel: 'Boutiques', group: 'Pilotage', icon: Store, inMobileDock: true },
   { href: '/owner/reports', label: 'Bilans & Exports', shortLabel: 'Bilans', group: 'Pilotage', icon: BarChart3, inMobileDock: true },
+  { href: '/owner/subscription', label: 'Mon abonnement', shortLabel: 'Abonnement', group: 'Pilotage', icon: Crown },
   { href: '/owner/agents', label: 'Équipe & Agents', shortLabel: 'Agents', group: 'Organisation', icon: Users },
   { href: '/owner/operators', label: 'Opérateurs', group: 'Organisation', icon: UserCheck },
   { href: '/messaging', label: 'Messagerie', shortLabel: 'Messages', group: 'Communication', icon: MessageSquare, inMobileDock: true },

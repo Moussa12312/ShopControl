@@ -256,6 +256,8 @@ export const createSaleSchema = z.object({
   payments: z.array(salePaymentInputSchema).default([]),
   allowCreditOverride: z.boolean().default(false),
   notes: z.string().trim().max(400).optional(),
+  // Échéance de la dette (obligatoire côté serveur dès qu'un solde reste dû)
+  debtDueDate: z.string().datetime().optional(),
   // Champs Option B (synchronisation vente comptoir hors-ligne)
   offlineSaleNumber: z.string().trim().max(40).optional(),
   offlineCapturedAt: z.string().datetime().optional(),

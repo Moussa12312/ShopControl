@@ -1,5 +1,5 @@
-const CACHE_NAME = 'shopcontrol-shell-v11';
-const STATIC_CACHE_NAME = 'shopcontrol-static-v11';
+const CACHE_NAME = 'shopcontrol-shell-v12';
+const STATIC_CACHE_NAME = 'shopcontrol-static-v12';
 
 const PRECACHE_URLS = [
   '/',
@@ -17,6 +17,7 @@ const PRECACHE_URLS = [
   '/owner/settings',
   '/owner/shops',
   '/owner/reports',
+  '/owner/subscription',
   '/owner/operators',
   '/owner/audit',
   '/owner/agents',

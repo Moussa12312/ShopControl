@@ -110,6 +110,19 @@ interface AnnouncementRow {
   createdAt: string;
 }
 
+interface RenewalReq {
+  id: string;
+  planCode: string;
+  billingCycle: string;
+  amountXof: number;
+  paymentMethodCode: string;
+  reference: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewNote: string | null;
+  createdAt: string;
+  merchant: { id: string; name: string; email: string; phone: string };
+}
+
 interface MerchantOpt {
   id: string;
   name: string;
@@ -153,6 +166,9 @@ export default function AdminPlatformPage() {
     reactivateIfPastDue: true,
   });
 
+  // Demandes d'activation / renouvellement d'abonnement
+  const [renewals, setRenewals] = useState<RenewalReq[]>([]);
+
   // Réponse ticket
   const [replyMap, setReplyMap] = useState<Record<string, string>>({});
 
@@ -168,14 +184,16 @@ export default function AdminPlatformPage() {
     setLoading(true);
     setError(null);
     try {
-      const [pl, s, p, t, a, m] = await Promise.all([
+      const [pl, s, p, t, a, m, rq] = await Promise.all([
         apiFetch<PlatformPlanConfigRow[]>('/admin/plans'),
         apiFetch<SubscriptionRow[]>('/admin/subscriptions'),
         apiFetch<PlatformPaymentRow[]>('/admin/platform-payments'),
         apiFetch<SupportTicketRow[]>('/support/tickets'),
         apiFetch<AnnouncementRow[]>('/admin/announcements'),
         apiFetch<MerchantOpt[]>('/admin/merchants'),
+        apiFetch<RenewalReq[]>('/admin/renewal-requests'),
       ]);
+      setRenewals(rq);
       setPlans(pl);
       const drafts: Record<string, PlatformPlanConfigRow & { featuresText: string }> = {};
       for (const item of pl) {
@@ -279,6 +297,26 @@ export default function AdminPlatformPage() {
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Enregistrement impossible.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReviewRenewal = async (id: string, decision: 'approve' | 'reject') => {
+    const note =
+      decision === 'reject'
+        ? (window.prompt('Motif du refus (visible par le commerçant) :') ?? '').trim()
+        : undefined;
+    if (decision === 'reject' && note === '') return;
+    setBusy(true);
+    setMsg(null);
+    setError(null);
+    try {
+      await apiFetch(`/admin/renewal-requests/${id}/${decision}`, { method: 'POST', body: { note } });
+      setMsg(decision === 'approve' ? 'Abonnement activé et période prolongée.' : 'Demande refusée.');
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Traitement impossible.');
     } finally {
       setBusy(false);
     }
@@ -660,6 +698,60 @@ export default function AdminPlatformPage() {
           </div>
         ) : tab === 'payments' ? (
           <div className="grid gap-5 lg:grid-cols-12">
+            <section className="sc-card p-5 lg:col-span-12" aria-label="Demandes d’activation d’abonnement">
+              <h2 className="text-base font-extrabold text-slate-900">
+                Demandes d’activation / renouvellement (
+                {renewals.filter((r) => r.status === 'PENDING').length} à vérifier)
+              </h2>
+              {renewals.length === 0 ? (
+                <p className="mt-2 text-sm text-slate-500">Aucune demande.</p>
+              ) : (
+                <ul className="mt-3 divide-y divide-slate-100">
+                  {renewals.slice(0, 20).map((r) => (
+                    <li key={r.id} className="flex flex-wrap items-start justify-between gap-3 py-3 text-sm">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900">
+                          {r.merchant.name} — {r.planCode} ({r.billingCycle}) · {r.amountXof.toLocaleString('fr-FR')} FCFA
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {r.paymentMethodCode} · réf. <span className="font-mono">{r.reference}</span> ·{' '}
+                          {r.merchant.phone} · {new Date(r.createdAt).toLocaleString('fr-FR')}
+                        </p>
+                        {r.reviewNote ? <p className="text-xs text-slate-600">Note : {r.reviewNote}</p> : null}
+                      </div>
+                      {r.status === 'PENDING' ? (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void handleReviewRenewal(r.id, 'approve')}
+                            className="sc-hero-btn-primary text-xs disabled:opacity-50"
+                          >
+                            Valider &amp; activer
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void handleReviewRenewal(r.id, 'reject')}
+                            className="sc-btn-ghost text-xs disabled:opacity-50"
+                          >
+                            Refuser
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                            r.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {r.status === 'APPROVED' ? 'Validée' : 'Refusée'}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
             <form onSubmit={handleRecordPayment} className="sc-card space-y-3 p-5 lg:col-span-5">
               <h2 className="text-base font-extrabold text-slate-900">Enregistrer un paiement SaaS</h2>
               <select

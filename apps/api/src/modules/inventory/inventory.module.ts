@@ -646,6 +646,7 @@ export class InventoryService {
     let hasAnyCost = false;
     let lowStockCount = 0;
     let outOfStockCount = 0;
+    const unitsBreakdown: Record<string, { unit: string; available: number; physical: number; productsCount: number }> = {};
 
     const items: Array<any> = [];
 
@@ -769,6 +770,15 @@ export class InventoryService {
       if (pStatus === 'OUT_OF_STOCK' || pStatus === 'NEGATIVE_CONFLICT') outOfStockCount += 1;
       if (pStatus === 'LOW_STOCK') lowStockCount += 1;
 
+      const unitLabel = (p.unit || 'unité').trim();
+      const unitKey = unitLabel.toLowerCase();
+      if (!unitsBreakdown[unitKey]) {
+        unitsBreakdown[unitKey] = { unit: unitLabel, available: 0, physical: 0, productsCount: 0 };
+      }
+      unitsBreakdown[unitKey].available += pAvailable;
+      unitsBreakdown[unitKey].physical += pPhysical;
+      unitsBreakdown[unitKey].productsCount += 1;
+
       items.push({
         productId: p.id,
         name: p.name,
@@ -810,6 +820,7 @@ export class InventoryService {
             : null,
         lowStockCount,
         outOfStockCount,
+        unitsBreakdown: Object.values(unitsBreakdown),
       },
       items,
     };

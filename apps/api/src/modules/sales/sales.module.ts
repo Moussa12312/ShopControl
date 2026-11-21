@@ -397,13 +397,9 @@ export class SalesService {
           });
         }
 
+        // La référence Mobile Money est facultative à la vente (elle reste obligatoire
+        // uniquement pour le paiement d'un abonnement). Si elle est saisie, elle doit être unique.
         const ref = p.transactionRef?.trim() || null;
-        if (cfg.requireReference && !ref) {
-          throw new BadRequestException({
-            code: 'PAYMENT_REFERENCE_REQUIRED',
-            message: `La référence de transaction est obligatoire pour ${cfg.label}.`,
-          });
-        }
         if (ref) {
           const refKey = `${p.paymentMethodCode}:${ref}`;
           if (seenRefsInPayload.has(refKey)) {
@@ -452,6 +448,21 @@ export class SalesService {
 
       const dueAmountXof = Math.max(0, calc.totalXof - paidAmountXof);
 
+      // Date d'échéance de la dette : obligatoire en ligne (sert aux relances automatiques).
+      // Une vente hors-ligne synchronisée sans date reçoit un délai par défaut de 7 jours.
+      let debtDueDate: Date | null = null;
+      if (dueAmountXof > 0) {
+        if (input.debtDueDate) {
+          debtDueDate = new Date(input.debtDueDate);
+        } else if (isOfflineSync) {
+          debtDueDate = new Date(Date.now() + 7 * 86_400_000);
+        } else {
+          throw new BadRequestException({
+            code: 'DEBT_DUE_DATE_REQUIRED',
+            message: 'Indiquez la date à laquelle le client s’engage à régler sa dette.',
+          });
+        }
+      }
       // 5. Vente à crédit / paiement partiel -> client identifié obligatoire + contrôle plafond crédit (Section 5.7)
       if (dueAmountXof > 0) {
         if (!input.clientId) {
@@ -610,12 +621,14 @@ export class SalesService {
         });
       }
 
-      // 11. Création créance client si solde dû > 0
+      // 11. Création créance client si solde dû > 0 (échéance de la dette = base des relances automatiques)
       if (dueAmountXof > 0 && input.clientId) {
         await tx.receivable.create({
           data: {
             clientId: input.clientId,
             saleId: sale.id,
+            description: `Vente ${sale.saleNumber} à crédit`,
+            dueDate: debtDueDate,
             initialAmountXof: dueAmountXof,
             paidAmountXof: 0,
             remainingAmountXof: dueAmountXof,

@@ -75,6 +75,7 @@ model Merchant {
   subscription        MerchantSubscription?
   platformPayments    PlatformPayment[]
   supportTickets      SupportTicket[]
+  renewalRequests     SubscriptionRenewalRequest[]
 
   @@index([status])
   @@index([createdAt])
@@ -454,6 +455,28 @@ model MerchantSubscription {
   merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@map("merchant_subscriptions")
+}
+
+model SubscriptionRenewalRequest {
+  id                String    @id @default(uuid()) @db.Uuid
+  merchantId        String    @map("merchant_id") @db.Uuid
+  planCode          String    @map("plan_code") @db.VarChar(32)
+  billingCycle      String    @map("billing_cycle") @db.VarChar(24)
+  amountXof         Int       @map("amount_xof")
+  paymentMethodCode String    @map("payment_method_code") @db.VarChar(32)
+  reference         String    @db.VarChar(120)
+  status            String    @default("PENDING") @db.VarChar(16)
+  requestedByUserId String    @map("requested_by_user_id") @db.Uuid
+  reviewedByUserId  String?   @map("reviewed_by_user_id") @db.Uuid
+  reviewNote        String?   @map("review_note") @db.VarChar(300)
+  reviewedAt        DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+
+  @@index([merchantId, status])
+  @@index([status, createdAt])
+  @@map("subscription_renewal_requests")
 }
 
 model PlatformPayment {

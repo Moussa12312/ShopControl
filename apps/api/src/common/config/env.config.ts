@@ -60,6 +60,9 @@ const envSchema = z
       .enum(['true', 'false'])
       .optional()
       .transform((v) => v === 'true'),
+    // Passerelle SMS / WhatsApp / e-mail (facultative) qui reçoit les relances destinées aux clients débiteurs.
+    REMINDER_WEBHOOK_URL: z.string().url().optional().or(z.literal('').transform(() => undefined)),
+    REMINDER_WEBHOOK_TOKEN: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

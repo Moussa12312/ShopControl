@@ -93,10 +93,10 @@ const PLAN_PRICING: Record<
 
 const ALL_SHOP_PAYMENT_METHOD_OPTIONS: PaymentMethodConfig[] = [
   { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
-  { code: 'ORANGE_MONEY', label: 'Orange Money', enabled: true, requireReference: true, affectsCashDrawer: false },
-  { code: 'WAVE', label: 'Wave', enabled: true, requireReference: true, affectsCashDrawer: false },
-  { code: 'MOOV_MONEY', label: 'Moov Money', enabled: true, requireReference: true, affectsCashDrawer: false },
-  { code: 'CARD', label: 'Carte bancaire / Virement', enabled: true, requireReference: true, affectsCashDrawer: false },
+  { code: 'ORANGE_MONEY', label: 'Orange Money', enabled: true, requireReference: false, affectsCashDrawer: false },
+  { code: 'WAVE', label: 'Wave', enabled: true, requireReference: false, affectsCashDrawer: false },
+  { code: 'MOOV_MONEY', label: 'Moov Money', enabled: true, requireReference: false, affectsCashDrawer: false },
+  { code: 'CARD', label: 'Carte bancaire / Virement', enabled: true, requireReference: false, affectsCashDrawer: false },
 ];
 
 @Injectable()

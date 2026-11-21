@@ -135,6 +135,9 @@ interface SaleRow {
   createdAt: string;
 }
 
+// Option « Dette » : pseudo moyen de paiement côté interface (aucun paiement envoyé, la vente reste due).
+const DEBT_METHOD = '__DEBT__';
+
 export default function PosPage() {
   const { activeOperator } = useAuth();
   const { isOnline, apiReachable } = useNetworkStatus();
@@ -168,7 +171,10 @@ export default function PosPage() {
   const [amountPaidXof, setAmountPaidXof] = useState<string>('');
   const [transactionRef, setTransactionRef] = useState('');
   const [selectedClientId, setSelectedClientId] = useState('');
-
+  const [debtDueDate, setDebtDueDate] = useState('');
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientPhone, setNewClientPhone] = useState('');
+  const [creatingClient, setCreatingClient] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err' | 'warn'; msg: string } | null>(null);
@@ -290,11 +296,49 @@ export default function PosPage() {
     });
   }, [cart, discountPercent, taxMode, taxRateBps, paymentMethodCode, cashRoundingStep]);
 
-  const activeMethod = paymentMethods.find((m) => m.code === paymentMethodCode) || paymentMethods[0];
-  const effectivePaid =
-    amountPaidXof.trim() === '' ? (totals?.totalXof ?? 0) : Math.max(0, Math.round(Number(amountPaidXof) || 0));
+  const isDebt = paymentMethodCode === DEBT_METHOD;
+  const activeMethod = isDebt
+    ? undefined
+    : paymentMethods.find((m) => m.code === paymentMethodCode) || paymentMethods[0];
+  const effectivePaid = isDebt
+    ? 0
+    : amountPaidXof.trim() === ''
+      ? (totals?.totalXof ?? 0)
+      : Math.max(0, Math.round(Number(amountPaidXof) || 0));
   const changeDue = totals ? Math.max(0, effectivePaid - totals.totalXof) : 0;
   const creditDue = totals ? Math.max(0, totals.totalXof - effectivePaid) : 0;
+
+  // Création rapide du client débiteur directement depuis la caisse (nom + téléphone).
+  const handleCreateDebtClient = async () => {
+    if (!shopId) return;
+    const fullName = newClientName.trim();
+    const phone = newClientPhone.trim();
+    if (fullName.length < 2 || phone.length < 6) {
+      setFeedback({ type: 'err', msg: 'Renseignez le nom et le téléphone du client débiteur.' });
+      return;
+    }
+    setCreatingClient(true);
+    try {
+      const created = await apiFetch<ClientItem>(`/shops/${shopId}/clients`, {
+        method: 'POST',
+        shopId,
+        // Plafond = montant de cette dette ; le propriétaire peut l'ajuster ensuite dans « Clients ».
+        body: { fullName, phone, creditLimitXof: totals?.totalXof ?? 0 },
+      });
+      setClients((prev) => [created, ...prev]);
+      setSelectedClientId(created.id);
+      setNewClientName('');
+      setNewClientPhone('');
+      setFeedback(null);
+    } catch (err) {
+      setFeedback({
+        type: 'err',
+        msg: err instanceof ApiError ? err.message : 'Impossible de créer le client.',
+      });
+    } finally {
+      setCreatingClient(false);
+    }
+  };
 
   const pinnedFavorites = useMemo(
     () => products.filter((p) => p.isPinnedPos),
@@ -591,12 +635,27 @@ export default function PosPage() {
     e.preventDefault();
     if (!shopId || !totals || cart.length === 0) return;
 
+    // Vente à crédit : client identifié + date d'engagement de paiement obligatoires (base des relances).
+    if (creditDue > 0) {
+      if (!selectedClientId) {
+        setFeedback({ type: 'err', msg: 'Choisissez ou créez le client débiteur (nom + téléphone).' });
+        return;
+      }
+      if (!debtDueDate) {
+        setFeedback({ type: 'err', msg: 'Indiquez la date à laquelle le client paiera sa dette.' });
+        return;
+      }
+    }
+
     setBusy(true);
     setFeedback(null);
 
     const payload = {
       clientOperationId: crypto.randomUUID(),
       clientId: selectedClientId || null,
+      ...(creditDue > 0 && debtDueDate
+        ? { debtDueDate: new Date(`${debtDueDate}T18:00:00`).toISOString() }
+        : {}),
       lines: cart.map((c) => ({
         productId: c.product.id,
         ...(c.variantId ? { variantId: c.variantId } : {}),
@@ -635,6 +694,7 @@ export default function PosPage() {
         setDiscountPercent(0);
         setAmountPaidXof('');
         setTransactionRef('');
+        setDebtDueDate('');
         await loadOfflineQueue();
         setFeedback({
           type: 'ok',
@@ -661,6 +721,7 @@ export default function PosPage() {
       setAmountPaidXof('');
       setTransactionRef('');
       setSelectedClientId('');
+      setDebtDueDate('');
       setFeedback({
         type: 'ok',
         msg: `Vente ${created.saleNumber} validée (${formatXof(created.totalXof)})${created.dueAmountXof > 0 ? ` — Créance : ${formatXof(created.dueAmountXof)}` : ''
@@ -1366,8 +1427,15 @@ export default function PosPage() {
                             {m.label}
                           </option>
                         ))}
+                        <option value={DEBT_METHOD}>Dette (paiement différé)</option>
                       </select>
                     </div>
+                    {isDebt ? (
+                      <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                        Aucun encaissement maintenant : {totals ? formatXof(totals.totalXof) : '0 F'} seront
+                        enregistrés comme dette.
+                      </div>
+                    ) : (
                     <div>
                       <div className="flex items-center justify-between">
                         <label className="block text-xs font-medium text-slate-700">
@@ -1393,20 +1461,79 @@ export default function PosPage() {
                         className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold"
                       />
                     </div>
+                    )}
                   </div>
 
-                  {activeMethod?.requireReference ? (
+                  {activeMethod && activeMethod.code !== 'CASH' ? (
                     <div>
                       <label className="block text-xs font-medium text-slate-700">
-                        Référence transaction {activeMethod.label} (obligatoire et unique) *
+                        Référence transaction {activeMethod.label} (facultative, unique si saisie)
                       </label>
                       <input
-                        required
                         value={transactionRef}
                         onChange={(e) => setTransactionRef(e.target.value)}
                         placeholder="ex. OM261119.123456"
-                        className="mt-1 w-full rounded-lg border border-amber-300 bg-amber-50/40 px-3 py-1.5 text-sm font-mono"
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-mono"
                       />
+                    </div>
+                  ) : null}
+
+                  {creditDue > 0 ? (
+                    <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50/60 p-3">
+                      <p className="text-xs font-extrabold text-amber-900">
+                        Dette de {formatXof(creditDue)} — renseignez le débiteur et la date de paiement.
+                        Des rappels automatiques seront envoyés avant et après l’échéance.
+                      </p>
+                      {selectedClientId ? (
+                        <p className="text-xs text-amber-900">
+                          Débiteur :{' '}
+                          <strong>
+                            {clients.find((c) => c.id === selectedClientId)?.fullName ?? 'client sélectionné'}
+                          </strong>{' '}
+                          ({clients.find((c) => c.id === selectedClientId)?.phone ?? ''})
+                        </p>
+                      ) : (
+                        <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                          <input
+                            value={newClientName}
+                            onChange={(e) => setNewClientName(e.target.value)}
+                            placeholder="Nom du client *"
+                            aria-label="Nom du client débiteur"
+                            maxLength={120}
+                            className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm"
+                          />
+                          <input
+                            value={newClientPhone}
+                            onChange={(e) => setNewClientPhone(e.target.value)}
+                            placeholder="Téléphone *"
+                            aria-label="Téléphone du client débiteur"
+                            inputMode="tel"
+                            maxLength={30}
+                            className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handleCreateDebtClient()}
+                            disabled={creatingClient}
+                            className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 disabled:opacity-50"
+                          >
+                            {creatingClient ? '…' : 'Ajouter'}
+                          </button>
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-xs font-medium text-amber-900">
+                          Date de paiement promise *
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          min={new Date().toISOString().slice(0, 10)}
+                          value={debtDueDate}
+                          onChange={(e) => setDebtDueDate(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm"
+                        />
+                      </div>
                     </div>
                   ) : null}
 

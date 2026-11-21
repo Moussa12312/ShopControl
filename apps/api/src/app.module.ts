@@ -34,6 +34,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
 import { PlatformModule } from './modules/platform/platform.module';
+import { BillingJobsModule } from './modules/billing/billing-jobs.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     OrdersModule,
     MessagingModule,
     PlatformModule,
+    BillingJobsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

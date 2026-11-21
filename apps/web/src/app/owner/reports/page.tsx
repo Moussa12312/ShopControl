@@ -179,19 +179,19 @@ export default function OwnerReportsPage() {
             href={`${API_BASE_URL}/merchant/reports/export.csv?from=${from}&to=${to}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="sc-hero-btn-ghost"
+            className="sc-hero-btn-ghost text-xs sm:text-sm"
           >
             <FileSpreadsheet className="h-3.5 w-3.5 text-limeglow-400" />
-            Export CSV
+            <span className="hidden sm:inline">Export</span> CSV
           </a>
           <a
             href={`${API_BASE_URL}/merchant/reports/export.pdf?from=${from}&to=${to}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="sc-hero-btn-primary"
+            className="sc-hero-btn-primary text-xs sm:text-sm"
           >
             <Download className="h-3.5 w-3.5" />
-            Exporter PDF
+            <span className="hidden sm:inline">Exporter</span> PDF
           </a>
         </div>
       }
@@ -199,29 +199,29 @@ export default function OwnerReportsPage() {
       <div className="space-y-5">
 
         {/* Sélecteur période */}
-        <div className="sc-card grid grid-cols-2 items-end gap-2.5 p-3.5 sm:flex sm:flex-wrap sm:gap-3 sm:p-4">
-          <div className="min-w-0">
+        <div className="sc-card grid grid-cols-1 gap-2.5 p-3.5 sm:grid-cols-2 lg:flex lg:flex-row lg:items-end lg:gap-3 sm:p-4">
+          <div className="w-full sm:w-auto min-w-0">
             <label className="block text-xs font-semibold text-slate-600">Du</label>
             <input
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="sc-input mt-1 py-2 text-xs"
+              className="sc-input mt-1 w-full py-2 text-xs"
             />
           </div>
-          <div className="min-w-0">
+          <div className="w-full sm:w-auto min-w-0">
             <label className="block text-xs font-semibold text-slate-600">Au</label>
             <input
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="sc-input mt-1 py-2 text-xs"
+              className="sc-input mt-1 w-full py-2 text-xs"
             />
           </div>
           <button
             type="button"
             onClick={() => void load()}
-            className="sc-btn-ghost col-span-2 w-full py-2 text-xs sm:col-span-1 sm:w-auto"
+            className="sc-btn-ghost w-full py-2 text-xs sm:w-auto justify-center"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Actualiser
@@ -305,7 +305,7 @@ export default function OwnerReportsPage() {
 
             {/* Ligne Stock en transit + Ventilation Paiements */}
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="sc-card flex items-center justify-between gap-3 p-4">
+              <div className="sc-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
                 <div className="flex items-center gap-3">
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
                     <Truck className="h-5 w-5" />
@@ -319,7 +319,7 @@ export default function OwnerReportsPage() {
                     </p>
                   </div>
                 </div>
-                <div className="shrink-0 text-right tabular">
+                <div className="sm:text-right tabular">
                   <p className="text-lg font-extrabold text-indigo-700">{t.inTransitQty} unité(s)</p>
                   <p className="text-xs font-semibold text-slate-600">
                     {formatXof(t.inTransitValueXof)}
@@ -380,6 +380,40 @@ export default function OwnerReportsPage() {
                     </div>
                   </div>
                 ))}
+
+                {/* Total consolidé pour mobile */}
+                <div className="rounded-2xl border border-forest-800 bg-forest-950 p-4 text-xs text-white shadow-card">
+                  <div className="flex items-center justify-between border-b border-forest-800/80 pb-2">
+                    <p className="text-sm font-black text-limeglow-400">TOTAL CONSOLIDÉ</p>
+                    <span className="text-[11px] text-emerald-200/80">{t.salesCount} ventes</span>
+                  </div>
+                  <div className="mt-2.5 grid grid-cols-2 gap-2.5 tabular">
+                    <div>
+                      <span className="text-emerald-200/60 block text-[10px]">CA Brut</span>
+                      <strong className="text-white">{formatXof(t.grossSalesXof)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-emerald-200/60 block text-[10px]">Remboursements</span>
+                      <strong className="text-rose-300">-{formatXof(t.refundsXof)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-emerald-200/60 block text-[10px]">CA Net</span>
+                      <strong className="text-limeglow-400 font-extrabold text-sm">{formatXof(t.netSalesXof)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-emerald-200/60 block text-[10px]">Marge Brute</span>
+                      <strong className="text-white">{formatXof(t.grossMarginXof)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-emerald-200/60 block text-[10px]">Total Dépenses</span>
+                      <strong className="text-rose-300">-{formatXof(t.totalExpensesXof)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-emerald-200/60 block text-[10px]">Résultat Net</span>
+                      <strong className="text-limeglow-400 font-black text-sm">{formatXof(t.estimatedNetProfitXof)}</strong>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Tableau desktop */}
@@ -448,10 +482,10 @@ export default function OwnerReportsPage() {
             </section>
 
             {/* Archive des Bilans Journaliers Versionnés */}
-            <section className="sc-card space-y-4 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <section className="sc-card space-y-4 p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <Archive className="h-5 w-5 text-brand-700" />
+                  <Archive className="h-5 w-5 text-brand-700 shrink-0" />
                   <div>
                     <h2 className="text-base font-extrabold text-slate-900">
                       Bilans Journaliers Archivés (Versionnés)
@@ -461,12 +495,12 @@ export default function OwnerReportsPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
                   {shops.length > 1 ? (
                     <select
                       value={dailyShopId}
                       onChange={(e) => setDailyShopId(e.target.value)}
-                      className="sc-input w-auto py-2 text-xs"
+                      className="sc-input w-full sm:w-auto py-2 text-xs"
                     >
                       {shops.map((s) => (
                         <option key={s.shopId} value={s.shopId}>
@@ -479,7 +513,7 @@ export default function OwnerReportsPage() {
                     type="button"
                     disabled={busy || !dailyShopId}
                     onClick={handleGenerateDaily}
-                    className="sc-btn-primary text-xs"
+                    className="sc-btn-primary w-full sm:w-auto text-xs justify-center"
                   >
                     <FileText className="h-3.5 w-3.5" />
                     Archiver le bilan du jour

@@ -274,6 +274,23 @@ export const recordPlatformPaymentSchema = z.object({
   reactivateIfPastDue: z.boolean().default(true),
 });
 
+// Demande de renouvellement / activation d'abonnement par le propriétaire.
+// La référence de transfert est OBLIGATOIRE (contrairement aux ventes en boutique).
+export const requestSubscriptionRenewalSchema = z.object({
+  planCode: z.enum(SUBSCRIPTION_PLANS).optional(),
+  billingCycle: z.enum(SUBSCRIPTION_BILLING_CYCLES).default('MONTHLY'),
+  paymentMethodCode: z.string().trim().min(2).max(32),
+  reference: z
+    .string()
+    .trim()
+    .min(4, 'La référence du transfert est obligatoire pour activer ou renouveler l’abonnement.')
+    .max(120),
+});
+
+export const reviewSubscriptionRenewalSchema = z.object({
+  note: z.string().trim().max(300).optional(),
+});
+
 export const createSupportTicketSchema = z.object({
   subject: z.string().trim().min(4, 'Objet du ticket requis.').max(180),
   priority: z.enum(['INFO', 'WARNING', 'URGENT']).default('INFO'),

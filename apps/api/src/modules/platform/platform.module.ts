@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -10,6 +12,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -19,12 +22,14 @@ import {
   PLATFORM_MODULES,
   recordPlatformPaymentSchema,
   replySupportTicketSchema,
+  requestSubscriptionRenewalSchema,
+  reviewSubscriptionRenewalSchema,
   SubscriptionBillingCycle,
   updatePlatformPlanConfigSchema,
   updateSupportTicketStatusSchema,
   upsertSubscriptionSchema,
 } from '@shopcontrol/shared';
-import { CurrentUser, Public, Roles } from '../../common/auth/auth.decorators';
+import { AllowSuspendedWrite, CurrentUser, Public, Roles } from '../../common/auth/auth.decorators';
 import { AuthenticatedUser, RequestWithAuth } from '../../common/auth/request-context.types';
 import { ControlPrismaService } from '../../common/database/control-prisma.service';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
@@ -426,6 +431,240 @@ export class PlatformService {
     return payment;
   }
 
+  // --- Renouvellement / activation d'abonnement (essai terminé, impayé, suspendu) ---
+
+  private cyclePrice(plan: { monthlyPriceXof: number; yearlyPriceXof: number; directSalePriceXof: number }, cycle: string) {
+    return cycle === 'YEARLY'
+      ? plan.yearlyPriceXof
+      : cycle === 'DIRECT_SALE'
+        ? plan.directSalePriceXof
+        : plan.monthlyPriceXof;
+  }
+
+  async getRenewalOverview(merchantId: string) {
+    const [merchant, requests] = await Promise.all([
+      this.controlPrisma.merchant.findUnique({
+        where: { id: merchantId },
+        select: { status: true, statusReason: true, gracePeriodEndsAt: true },
+      }),
+      this.controlPrisma.subscriptionRenewalRequest.findMany({
+        where: { merchantId },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
+    ]);
+    return {
+      merchantStatus: merchant?.status ?? 'ACTIVE',
+      statusReason: merchant?.statusReason ?? null,
+      gracePeriodEndsAt: merchant?.gracePeriodEndsAt?.toISOString() ?? null,
+      renewalRequests: requests.map((r) => ({
+        ...r,
+        reviewedAt: r.reviewedAt?.toISOString() ?? null,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async requestRenewal(input: any, actor: AuthenticatedUser, meta: RequestMeta) {
+    if (!actor.merchantId) throw new ForbiddenException('Marchand manquant.');
+    const sub = await this.getOrInitSubscription(actor.merchantId);
+    await this.ensureDefaultPlans();
+
+    const planCode: string = input.planCode || sub.planCode;
+    const plan = await this.controlPrisma.platformPlanConfig.findUnique({ where: { code: planCode } });
+    if (!plan || !plan.isActive) throw new BadRequestException('Formule indisponible.');
+
+    const cycle: string = input.billingCycle;
+    const allowed =
+      cycle === 'YEARLY' ? plan.allowYearly : cycle === 'DIRECT_SALE' ? plan.allowDirectSale : plan.allowMonthly;
+    if (!allowed) throw new BadRequestException('Ce mode de facturation n’est pas proposé pour cette formule.');
+
+    const pending = await this.controlPrisma.subscriptionRenewalRequest.findFirst({
+      where: { merchantId: actor.merchantId, status: 'PENDING' },
+    });
+    if (pending) {
+      throw new ConflictException({
+        code: 'RENEWAL_ALREADY_PENDING',
+        message: 'Une demande est déjà en cours de vérification par l’équipe ShopControl.',
+      });
+    }
+
+    // Le montant est TOUJOURS recalculé côté serveur à partir de la grille tarifaire.
+    const amountXof = this.cyclePrice(plan, cycle);
+    let created;
+    try {
+      created = await this.controlPrisma.subscriptionRenewalRequest.create({
+        data: {
+          merchantId: actor.merchantId,
+          planCode,
+          billingCycle: cycle,
+          amountXof,
+          paymentMethodCode: input.paymentMethodCode,
+          reference: input.reference,
+          requestedByUserId: actor.userId,
+        },
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2002') {
+        throw new ConflictException({
+          code: 'DUPLICATE_PAYMENT_REFERENCE',
+          message: 'Cette référence de transfert a déjà été utilisée.',
+        });
+      }
+      throw e;
+    }
+
+    await this.auditService.recordControl({
+      merchantId: actor.merchantId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: 'SUBSCRIPTION_RENEWAL_REQUESTED',
+      entityType: 'SubscriptionRenewalRequest',
+      entityId: created.id,
+      afterData: { planCode, billingCycle: cycle, amountXof, paymentMethodCode: input.paymentMethodCode },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+
+    const admins = await this.controlPrisma.user.findMany({
+      where: { role: 'SUPER_ADMIN', isActive: true },
+      select: { id: true },
+    });
+    for (const a of admins) {
+      await this.notificationsService.create({
+        merchantId: actor.merchantId,
+        recipientUserId: a.id,
+        type: 'PLATFORM',
+        priority: 'WARNING',
+        title: 'Demande d’activation d’abonnement',
+        message: `${actor.fullName} — ${amountXof} FCFA (${input.paymentMethodCode}), réf. ${input.reference}. À vérifier.`,
+        targetPath: '/admin/platform',
+      });
+    }
+    return { ...created, createdAt: created.createdAt.toISOString() };
+  }
+
+  async listRenewalRequests(status?: string) {
+    const items = await this.controlPrisma.subscriptionRenewalRequest.findMany({
+      where: status ? { status } : undefined,
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { merchant: { select: { id: true, name: true, email: true, phone: true } } },
+    });
+    return items.map((r) => ({
+      ...r,
+      reviewedAt: r.reviewedAt?.toISOString() ?? null,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
+  async approveRenewal(id: string, note: string | undefined, actor: AuthenticatedUser, meta: RequestMeta) {
+    const req = await this.controlPrisma.subscriptionRenewalRequest.findUnique({ where: { id } });
+    if (!req) throw new NotFoundException('Demande introuvable.');
+    if (req.status !== 'PENDING') throw new ConflictException('Cette demande a déjà été traitée.');
+
+    const sub = await this.getOrInitSubscription(req.merchantId);
+    const plan = await this.controlPrisma.platformPlanConfig.findUnique({ where: { code: req.planCode } });
+    const now = new Date();
+    // Essai en cours ou période échue : la nouvelle période démarre maintenant ; sinon on prolonge.
+    const trialRunning = sub.trialEndsAt && new Date(sub.trialEndsAt) > now;
+    const currentEnd = new Date(sub.currentPeriodEnd);
+    const base = trialRunning || currentEnd < now ? now : currentEnd;
+    const newEnd =
+      req.billingCycle === 'DIRECT_SALE'
+        ? new Date('2099-12-31T23:59:59.000Z')
+        : new Date(base.getTime() + (req.billingCycle === 'YEARLY' ? 365 : 30) * 86_400_000);
+
+    await this.controlPrisma.$transaction([
+      this.controlPrisma.subscriptionRenewalRequest.update({
+        where: { id },
+        data: { status: 'APPROVED', reviewedByUserId: actor.userId, reviewedAt: now, reviewNote: note ?? null },
+      }),
+      this.controlPrisma.platformPayment.create({
+        data: {
+          merchantId: req.merchantId,
+          amountXof: req.amountXof,
+          paymentMethodCode: req.paymentMethodCode,
+          reference: req.reference,
+          periodLabel: `Abonnement ${req.planCode} (${req.billingCycle}) jusqu’au ${newEnd.toLocaleDateString('fr-FR')}`,
+          notes: 'Demande de renouvellement approuvée',
+          recordedByUserId: actor.userId,
+        },
+      }),
+      this.controlPrisma.merchantSubscription.update({
+        where: { merchantId: req.merchantId },
+        data: {
+          planCode: req.planCode,
+          billingCycle: req.billingCycle,
+          priceXof: req.amountXof,
+          ...(plan
+            ? { monthlyPriceXof: plan.monthlyPriceXof, maxShops: plan.maxShops, maxAgentsPerShop: plan.maxAgentsPerShop }
+            : {}),
+          currentPeriodStart: now,
+          currentPeriodEnd: newEnd,
+          trialEndsAt: null,
+        },
+      }),
+      this.controlPrisma.merchant.update({
+        where: { id: req.merchantId },
+        data: { status: 'ACTIVE', statusReason: null, gracePeriodEndsAt: null },
+      }),
+    ]);
+
+    await this.auditService.recordControl({
+      merchantId: req.merchantId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: 'SUBSCRIPTION_RENEWAL_APPROVED',
+      entityType: 'SubscriptionRenewalRequest',
+      entityId: id,
+      afterData: { amountXof: req.amountXof, newPeriodEnd: newEnd.toISOString() },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+    await this.notificationsService.notifyMerchantOwners(req.merchantId, {
+      type: 'PLATFORM',
+      priority: 'INFO',
+      title: 'Abonnement activé',
+      message: `Votre paiement est confirmé. Abonnement actif jusqu’au ${newEnd.toLocaleDateString('fr-FR')}.`,
+      targetPath: '/owner/subscription',
+    });
+    return { ok: true, currentPeriodEnd: newEnd.toISOString() };
+  }
+
+  async rejectRenewal(id: string, note: string | undefined, actor: AuthenticatedUser, meta: RequestMeta) {
+    const req = await this.controlPrisma.subscriptionRenewalRequest.findUnique({ where: { id } });
+    if (!req) throw new NotFoundException('Demande introuvable.');
+    if (req.status !== 'PENDING') throw new ConflictException('Cette demande a déjà été traitée.');
+
+    await this.controlPrisma.subscriptionRenewalRequest.update({
+      where: { id },
+      data: { status: 'REJECTED', reviewedByUserId: actor.userId, reviewedAt: new Date(), reviewNote: note ?? null },
+    });
+    await this.auditService.recordControl({
+      merchantId: req.merchantId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: 'SUBSCRIPTION_RENEWAL_REJECTED',
+      entityType: 'SubscriptionRenewalRequest',
+      entityId: id,
+      afterData: { note: note ?? null },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+    await this.notificationsService.notifyMerchantOwners(req.merchantId, {
+      type: 'PLATFORM',
+      priority: 'WARNING',
+      title: 'Paiement d’abonnement non validé',
+      message: `La référence ${req.reference} n’a pas pu être vérifiée${note ? ` : ${note}` : '.'} Soumettez une nouvelle demande.`,
+      targetPath: '/owner/subscription',
+    });
+    return { ok: true };
+  }
+
   // --- Support Tickets ---
   async listTickets(user: AuthenticatedUser) {
     const where = user.role === 'SUPER_ADMIN' ? {} : { merchantId: user.merchantId ?? '' };
@@ -632,11 +871,65 @@ export class PlatformController {
   @Roles('OWNER')
   async mySubscription(@CurrentUser() user: AuthenticatedUser) {
     if (!user.merchantId) throw new ForbiddenException('Marchand manquant.');
-    const [subscription, payments] = await Promise.all([
+    const [subscription, payments, overview] = await Promise.all([
       this.platformService.getOrInitSubscription(user.merchantId),
       this.platformService.listPlatformPayments(user.merchantId),
+      this.platformService.getRenewalOverview(user.merchantId),
     ]);
-    return { subscription, payments };
+    return { subscription, payments, ...overview };
+  }
+
+  // Autorisé même compte suspendu : c'est le seul moyen pour le propriétaire de se réactiver.
+  @Post('merchant/subscription/renew')
+  @Roles('OWNER')
+  @AllowSuspendedWrite()
+  @ApiOperation({ summary: 'Demander l’activation / le renouvellement (référence de transfert obligatoire)' })
+  requestRenewal(
+    @Body(new ZodValidationPipe(requestSubscriptionRenewalSchema)) body: any,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.platformService.requestRenewal(body, user, {
+      ipAddress: req.ip || null,
+      userAgent: req.header('user-agent') || null,
+      correlationId: req.correlationId || null,
+    });
+  }
+
+  @Get('admin/renewal-requests')
+  @Roles('SUPER_ADMIN')
+  listRenewalRequests(@Query('status') status?: string) {
+    return this.platformService.listRenewalRequests(status);
+  }
+
+  @Post('admin/renewal-requests/:id/approve')
+  @Roles('SUPER_ADMIN')
+  approveRenewal(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(reviewSubscriptionRenewalSchema)) body: { note?: string },
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.platformService.approveRenewal(id, body.note, user, {
+      ipAddress: req.ip || null,
+      userAgent: req.header('user-agent') || null,
+      correlationId: req.correlationId || null,
+    });
+  }
+
+  @Post('admin/renewal-requests/:id/reject')
+  @Roles('SUPER_ADMIN')
+  rejectRenewal(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(reviewSubscriptionRenewalSchema)) body: { note?: string },
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.platformService.rejectRenewal(id, body.note, user, {
+      ipAddress: req.ip || null,
+      userAgent: req.header('user-agent') || null,
+      correlationId: req.correlationId || null,
+    });
   }
 
   @Get('admin/platform-payments')

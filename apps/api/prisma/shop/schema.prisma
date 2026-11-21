@@ -673,6 +673,8 @@ model Receivable {
   status               String    @default("OPEN") @db.VarChar(24)
   actorUserId          String?   @map("actor_user_id") @db.Uuid
   declaredOperatorName String?   @map("declared_operator_name") @db.VarChar(80)
+  reminderCount        Int       @default(0) @map("reminder_count")
+  lastRemindedAt       DateTime? @map("last_reminded_at") @db.Timestamptz(6)
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
