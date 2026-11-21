@@ -44,13 +44,13 @@ export class JwtAuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (isPublic) {
-      return true;
-    }
 
     const req = context.switchToHttp().getRequest<RequestWithAuth>();
     const token = this.extractToken(req);
     if (!token) {
+      if (isPublic) {
+        return true;
+      }
       throw new UnauthorizedException({
         code: 'AUTH_REQUIRED',
         message: 'Authentification requise.',
@@ -65,6 +65,9 @@ export class JwtAuthGuard implements CanActivate {
         throw new Error('Invalid token type');
       }
     } catch {
+      if (isPublic) {
+        return true;
+      }
       throw new UnauthorizedException({
         code: 'TOKEN_INVALID',
         message: 'Session expirée ou jeton invalide. Veuillez vous reconnecter.',
@@ -93,6 +96,9 @@ export class JwtAuthGuard implements CanActivate {
     });
 
     if (!session || session.revokedAt || session.expiresAt <= new Date()) {
+      if (isPublic) {
+        return true;
+      }
       throw new UnauthorizedException({
         code: 'SESSION_REVOKED',
         message: 'Votre session a été révoquée ou a expiré.',
@@ -100,6 +106,9 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     if (!session.user || !session.user.isActive || session.user.id !== payload.sub) {
+      if (isPublic) {
+        return true;
+      }
       throw new UnauthorizedException({
         code: 'ACCOUNT_DISABLED',
         message: 'Ce compte utilisateur est désactivé.',
@@ -119,6 +128,9 @@ export class JwtAuthGuard implements CanActivate {
         where: { id: session.id },
         data: { revokedAt: new Date() },
       });
+      if (isPublic) {
+        return true;
+      }
       throw new UnauthorizedException({
         code: 'SESSION_IDLE_EXPIRED',
         message: 'Session expirée pour inactivité. Veuillez vous reconnecter.',
