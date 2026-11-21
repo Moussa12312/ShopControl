@@ -402,7 +402,17 @@ export class TransfersService {
       }
     }
 
-    const destClient = await this.shopDbManager.getClientForShop(trf.destShopId);
+    const [sourceClient, destClient] = await Promise.all([
+      this.shopDbManager.getClientForShop(trf.sourceShopId),
+      this.shopDbManager.getClientForShop(trf.destShopId),
+    ]);
+
+    const sourceProducts = await sourceClient.product.findMany({
+      where: { id: { in: trf.items.map((i) => i.sourceProductId) } },
+      include: { category: true },
+    });
+    const sourceProdMap = new Map(sourceProducts.map((p) => [p.id, p]));
+
     const inputMap = new Map(input.items.map((i) => [i.itemId, i]));
     let hasDiscrepancy = false;
     const destProductIdMap = new Map<string, string>();
@@ -419,6 +429,22 @@ export class TransfersService {
           );
         }
 
+        const sourceProd = sourceProdMap.get(item.sourceProductId);
+
+        // Trouve ou mappe la catégorie dans la boutique destination si présente
+        let destCategoryId: string | null = null;
+        if (sourceProd?.category) {
+          let destCat = await tx.category.findFirst({
+            where: { name: sourceProd.category.name },
+          });
+          if (!destCat) {
+            destCat = await tx.category.create({
+              data: { name: sourceProd.category.name },
+            });
+          }
+          destCategoryId = destCat.id;
+        }
+
         // Trouve ou crée le produit par SKU dans la BDD dédiée de la boutique destination
         let destProd = await tx.product.findUnique({ where: { sku: item.productSku } });
         if (!destProd) {
@@ -426,11 +452,44 @@ export class TransfersService {
             data: {
               name: item.productName,
               sku: item.productSku,
+              description: sourceProd?.description || null,
+              unit: sourceProd?.unit || 'unité',
+              barcode: sourceProd?.barcode || null,
+              imageUrls: sourceProd?.imageUrls || [],
+              categoryId: destCategoryId,
+              brand: sourceProd?.brand || null,
+              modelName: sourceProd?.modelName || null,
+              availableSizes: sourceProd?.availableSizes || [],
+              availableColors: sourceProd?.availableColors || [],
+              alertThreshold: sourceProd?.alertThreshold || 5,
+              allowFractionalSale: sourceProd?.allowFractionalSale || false,
               salePriceXof: item.salePriceXof,
               costPriceXof: item.unitCostXof,
               status: 'PUBLISHED',
             },
           });
+        } else {
+          // Si le produit existe déjà mais manquait de photo ou d'informations descriptives
+          const destImages = Array.isArray(destProd.imageUrls) ? (destProd.imageUrls as any[]) : [];
+          const sourceImages = sourceProd && Array.isArray(sourceProd.imageUrls) ? (sourceProd.imageUrls as any[]) : [];
+          const shouldUpdateImages = destImages.length === 0 && sourceImages.length > 0;
+          const shouldUpdateDesc = !destProd.description && Boolean(sourceProd?.description);
+          const shouldUpdateBarcode = !destProd.barcode && Boolean(sourceProd?.barcode);
+          const shouldUpdateUnit = destProd.unit === 'unité' && sourceProd?.unit && sourceProd.unit !== 'unité';
+          const shouldUpdateCat = !destProd.categoryId && Boolean(destCategoryId);
+
+          if (shouldUpdateImages || shouldUpdateDesc || shouldUpdateBarcode || shouldUpdateUnit || shouldUpdateCat) {
+            destProd = await tx.product.update({
+              where: { id: destProd.id },
+              data: {
+                ...(shouldUpdateImages ? { imageUrls: sourceImages } : {}),
+                ...(shouldUpdateDesc ? { description: sourceProd?.description } : {}),
+                ...(shouldUpdateBarcode ? { barcode: sourceProd?.barcode } : {}),
+                ...(shouldUpdateUnit ? { unit: sourceProd?.unit } : {}),
+                ...(shouldUpdateCat ? { categoryId: destCategoryId } : {}),
+              },
+            });
+          }
         }
         destProductIdMap.set(item.id, destProd.id);
 
