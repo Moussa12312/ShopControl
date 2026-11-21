@@ -57,6 +57,26 @@ Plateforme web SaaS complète de gestion commerciale multi-boutiques et d’e-co
    - API REST : `http://localhost:4000/api/v1`
    - Documentation Swagger : `http://localhost:4000/api/docs`
 
+## Déploiement en Production (Docker & VPS Ubuntu / Oracle Cloud)
+
+Le projet intègre une conteneurisation Docker complète avec reverse-proxy Caddy (HTTPS / SSL automatique gratuit) :
+
+```bash
+# 1. Copier le fichier d'environnement de production
+cp .env.production.example .env.production
+
+# 2. Rendre le script exécutable et lancer le déploiement automatique
+chmod +x deploy.sh
+./deploy.sh
+```
+
+Conteneurs inclus dans `docker-compose.prod.yml` :
+- **PostgreSQL 16** (multi-tenant avec persistance des volumes)
+- **Redis 7** (cache & queues)
+- **API NestJS** (`Dockerfile.api`)
+- **Web Next.js 15** (`Dockerfile.web`)
+- **Caddy 2** (reverse-proxy avec certificats Let's Encrypt automatiques)
+
 ## Vérification & Tests
 
 ```powershell
