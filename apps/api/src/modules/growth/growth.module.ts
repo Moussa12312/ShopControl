@@ -31,18 +31,23 @@ import { computeCommissionXof, computeLoyaltyPoints, pickCommissionRule } from '
 
 /* ------------------------------------------------------------------ Schémas */
 
-const growthConfigSchema = z.object({
+const ownerGrowthConfigSchema = z.object({
+  smsEnabled: z.boolean().optional(),
+  waveLink: z.string().url().max(300).or(z.literal('')).optional(),
+  wavePhone: z.string().regex(/^[0-9+ ]{6,20}$/).or(z.literal('')).optional(),
+  orangeMoneyCode: z.string().regex(/^[0-9A-Za-z #*+]{3,30}$/).or(z.literal('')).optional(),
+});
+
+const adminSmsGatewaySchema = z.object({
   smsEnabled: z.boolean().optional(),
   smsProvider: z.enum(['WEBHOOK', 'ORANGE_MALI', 'TWILIO', 'TEXTBEE']).optional(),
   smsSenderId: z.string().trim().max(30).optional(),
   smsApiKey: z.string().trim().max(300).optional(),
   smsApiSecret: z.string().trim().max(300).optional(),
   smsWebhookUrl: z.string().url().max(400).or(z.literal('')).optional(),
-  waveLink: z.string().url().max(300).or(z.literal('')).optional(),
-  wavePhone: z.string().regex(/^[0-9+ ]{6,20}$/).or(z.literal('')).optional(),
-  orangeMoneyCode: z.string().regex(/^[0-9A-Za-z #*+]{3,30}$/).or(z.literal('')).optional(),
 });
-type GrowthConfig = z.infer<typeof growthConfigSchema>;
+
+type GrowthConfig = z.infer<typeof ownerGrowthConfigSchema> & z.infer<typeof adminSmsGatewaySchema>;
 
 const testSmsSchema = z.object({
   phone: z.string().trim().min(6).max(25),
@@ -121,7 +126,26 @@ export class GrowthService {
     return (profile.growth ?? {}) as GrowthConfig;
   }
 
-  async setConfig(shopId: string, input: GrowthConfig): Promise<GrowthConfig> {
+  async getOwnerSafeConfig(shopId: string) {
+    const cfg = await this.getConfig(shopId);
+    const env = getEnv();
+    const providerConfigured = Boolean(
+      (cfg.smsProvider === 'ORANGE_MALI' && cfg.smsApiKey && cfg.smsApiSecret) ||
+        (cfg.smsProvider === 'TWILIO' && cfg.smsApiKey && cfg.smsApiSecret && cfg.smsSenderId) ||
+        (cfg.smsProvider === 'TEXTBEE' && cfg.smsApiKey && cfg.smsSenderId) ||
+        ((!cfg.smsProvider || cfg.smsProvider === 'WEBHOOK') && (cfg.smsWebhookUrl || env.REMINDER_WEBHOOK_URL)),
+    );
+    return {
+      smsEnabled: Boolean(cfg.smsEnabled),
+      smsProvider: cfg.smsProvider || null,
+      smsGatewayReady: providerConfigured,
+      waveLink: cfg.waveLink ?? '',
+      wavePhone: cfg.wavePhone ?? '',
+      orangeMoneyCode: cfg.orangeMoneyCode ?? '',
+    };
+  }
+
+  async setConfig(shopId: string, input: Partial<GrowthConfig>): Promise<GrowthConfig> {
     const client = await this.shopDbManager.getClientForShop(shopId);
     const cfg = await client.shopLocalConfig.findFirst();
     if (!cfg) throw new NotFoundException('Configuration boutique introuvable.');
@@ -683,33 +707,19 @@ export class GrowthController {
 
   @Get('growth/config')
   @Roles('OWNER', 'AGENT')
-  @ApiOperation({ summary: 'Configuration SMS / Wave / Orange Money de la boutique' })
+  @ApiOperation({ summary: 'Configuration Mobile Money & activation SMS de la boutique (sans secrets)' })
   getConfig(@Param('shopId') shopId: string) {
-    return this.growth.getConfig(shopId);
+    return this.growth.getOwnerSafeConfig(shopId);
   }
 
   @Put('growth/config')
   @Roles('OWNER')
-  @ApiOperation({ summary: 'Mettre à jour la configuration SMS / Mobile Money' })
-  setConfig(@Param('shopId') shopId: string, @Body(new ZodValidationPipe(growthConfigSchema)) body: GrowthConfig) {
-    return this.growth.setConfig(shopId, body);
-  }
-
-  @Post('growth/sms/test')
-  @Roles('OWNER')
-  @ApiOperation({ summary: 'Envoyer un SMS de test pour vérifier la passerelle Cloud configurée' })
-  async testSms(
+  @ApiOperation({ summary: 'Mettre à jour la configuration Mobile Money & activation SMS (Propriétaire)' })
+  setConfig(
     @Param('shopId') shopId: string,
-    @Body(new ZodValidationPipe(testSmsSchema)) body: z.infer<typeof testSmsSchema>,
+    @Body(new ZodValidationPipe(ownerGrowthConfigSchema)) body: z.infer<typeof ownerGrowthConfigSchema>,
   ) {
-    const res = await this.growth.sendMessageForShop(
-      shopId,
-      body.phone,
-      body.message || 'Test SMS ShopControl : votre passerelle SMS Cloud est bien connectée !',
-      'TEST_SMS',
-    );
-    if (!res.ok) throw new BadRequestException(res.detail);
-    return res;
+    return this.growth.setConfig(shopId, body);
   }
 
   @Get('loyalty')
@@ -864,9 +874,50 @@ export class GrowthController {
   }
 }
 
+@ApiTags('Super Admin — Passerelle SMS Cloud par Boutique')
+@ApiBearerAuth()
+@Controller('admin/shops/:shopId/sms-gateway')
+export class AdminSmsGatewayController {
+  constructor(private readonly growth: GrowthService) {}
+
+  @Get()
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Lire la configuration de la passerelle SMS Cloud d’une boutique (Super Admin)' })
+  getSmsGateway(@Param('shopId') shopId: string) {
+    return this.growth.getConfig(shopId);
+  }
+
+  @Put()
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Configurer le fournisseur et les clés API SMS Cloud d’une boutique (Super Admin)' })
+  setSmsGateway(
+    @Param('shopId') shopId: string,
+    @Body(new ZodValidationPipe(adminSmsGatewaySchema)) body: z.infer<typeof adminSmsGatewaySchema>,
+  ) {
+    return this.growth.setConfig(shopId, body);
+  }
+
+  @Post('test')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Envoyer un SMS de test pour une boutique (Super Admin)' })
+  async testSms(
+    @Param('shopId') shopId: string,
+    @Body(new ZodValidationPipe(testSmsSchema)) body: z.infer<typeof testSmsSchema>,
+  ) {
+    const res = await this.growth.sendMessageForShop(
+      shopId,
+      body.phone,
+      body.message || 'Test SMS ShopControl (Super Admin) : passerelle SMS Cloud opérationnelle !',
+      'TEST_SMS',
+    );
+    if (!res.ok) throw new BadRequestException(res.detail);
+    return res;
+  }
+}
+
 @Global()
 @Module({
-  controllers: [GrowthController],
+  controllers: [GrowthController, AdminSmsGatewayController],
   providers: [GrowthService],
   exports: [GrowthService],
 })

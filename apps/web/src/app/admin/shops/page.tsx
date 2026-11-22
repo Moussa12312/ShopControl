@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Database, ExternalLink, Layers, Plus, RefreshCw, X } from 'lucide-react';
+import { CheckCircle2, Database, ExternalLink, Layers, MessageSquare, Plus, RefreshCw, X } from 'lucide-react';
 import {
   BusinessProfileConfig,
   normalizeBusinessProfile,
@@ -67,6 +67,19 @@ export default function AdminShopsPage() {
     seedCategories: boolean;
   } | null>(null);
 
+  // Modale Super Admin : Configuration Passerelle SMS Cloud par boutique
+  const [smsModal, setSmsModal] = useState<{
+    shop: AdminShopRow;
+    smsEnabled: boolean;
+    smsProvider: 'ORANGE_MALI' | 'TWILIO' | 'TEXTBEE' | 'WEBHOOK';
+    smsSenderId: string;
+    smsApiKey: string;
+    smsApiSecret: string;
+    smsWebhookUrl: string;
+    testPhone: string;
+    testResult: { ok: boolean; text: string } | null;
+  } | null>(null);
+
   // Modale Super Admin : Création directe d'une boutique avec son Type
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -117,6 +130,106 @@ export default function AdminShopsPage() {
           : [primary],
       seedCategories: true,
     });
+  };
+
+  const openSmsModal = async (shop: AdminShopRow) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const cfg = await apiFetch<{
+        smsEnabled?: boolean;
+        smsProvider?: 'ORANGE_MALI' | 'TWILIO' | 'TEXTBEE' | 'WEBHOOK';
+        smsSenderId?: string;
+        smsApiKey?: string;
+        smsApiSecret?: string;
+        smsWebhookUrl?: string;
+      }>(`/admin/shops/${shop.id}/sms-gateway`);
+      setSmsModal({
+        shop,
+        smsEnabled: Boolean(cfg.smsEnabled),
+        smsProvider: cfg.smsProvider || 'ORANGE_MALI',
+        smsSenderId: cfg.smsSenderId || '',
+        smsApiKey: cfg.smsApiKey || '',
+        smsApiSecret: cfg.smsApiSecret || '',
+        smsWebhookUrl: cfg.smsWebhookUrl || '',
+        testPhone: '',
+        testResult: null,
+      });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Impossible de charger la passerelle SMS de cette boutique.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSaveSmsGateway = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!smsModal) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch(`/admin/shops/${smsModal.shop.id}/sms-gateway`, {
+        method: 'PUT',
+        body: {
+          smsEnabled: smsModal.smsEnabled,
+          smsProvider: smsModal.smsProvider,
+          smsSenderId: smsModal.smsSenderId,
+          smsApiKey: smsModal.smsApiKey,
+          smsApiSecret: smsModal.smsApiSecret,
+          smsWebhookUrl: smsModal.smsWebhookUrl,
+        },
+      });
+      const shopName = smsModal.shop.name;
+      setSmsModal(null);
+      setMsg(`Passerelle SMS Cloud enregistrée pour la boutique « ${shopName} ».`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Enregistrement SMS impossible.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleTestSmsFromAdmin = async () => {
+    if (!smsModal || !smsModal.testPhone.trim()) return;
+    setBusy(true);
+    setSmsModal((prev) => (prev ? { ...prev, testResult: null } : null));
+    try {
+      await apiFetch(`/admin/shops/${smsModal.shop.id}/sms-gateway`, {
+        method: 'PUT',
+        body: {
+          smsEnabled: smsModal.smsEnabled,
+          smsProvider: smsModal.smsProvider,
+          smsSenderId: smsModal.smsSenderId,
+          smsApiKey: smsModal.smsApiKey,
+          smsApiSecret: smsModal.smsApiSecret,
+          smsWebhookUrl: smsModal.smsWebhookUrl,
+        },
+      });
+      const res = await apiFetch<{ ok: boolean; detail: string }>(
+        `/admin/shops/${smsModal.shop.id}/sms-gateway/test`,
+        {
+          method: 'POST',
+          body: { phone: smsModal.testPhone.trim() },
+        },
+      );
+      setSmsModal((prev) =>
+        prev ? { ...prev, testResult: { ok: res.ok, text: res.detail } } : null,
+      );
+    } catch (err) {
+      setSmsModal((prev) =>
+        prev
+          ? {
+              ...prev,
+              testResult: {
+                ok: false,
+                text: err instanceof ApiError ? err.message : 'Échec du test SMS.',
+              },
+            }
+          : null,
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   const toggleEnabledTypeInModal = (t: ShopType) => {
@@ -329,6 +442,16 @@ export default function AdminShopsPage() {
                         <Layers className="h-3.5 w-3.5" />
                         Types & Rayons
                       </button>
+                      {shop.dbStatus === 'READY' ? (
+                        <button
+                          type="button"
+                          onClick={() => void openSmsModal(shop)}
+                          className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 py-2 text-xs font-bold text-emerald-900"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          SMS Cloud
+                        </button>
+                      ) : null}
                       {shop.dbStatus !== 'READY' ? (
                         <button
                           type="button"
@@ -432,6 +555,16 @@ export default function AdminShopsPage() {
                               <Layers className="h-3.5 w-3.5" />
                               Types & Rayons
                             </button>
+                            {shop.dbStatus === 'READY' ? (
+                              <button
+                                type="button"
+                                onClick={() => void openSmsModal(shop)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" />
+                                SMS Cloud
+                              </button>
+                            ) : null}
                             {shop.dbStatus !== 'READY' ? (
                               <button
                                 type="button"
@@ -677,6 +810,229 @@ export default function AdminShopsPage() {
                 </button>
                 <button type="submit" disabled={busy} className="sc-btn-primary w-full sm:w-auto">
                   {busy ? 'Provisionnement…' : 'Créer la boutique & sa BDD'}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
+
+        {/* Modale Super Admin : Configuration Passerelle SMS Cloud par Boutique */}
+        {smsModal ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/70 p-4 backdrop-blur-xs">
+            <form
+              onSubmit={handleSaveSmsGateway}
+              className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h2 className="text-lg font-extrabold text-slate-900">
+                    Passerelle SMS Cloud — « {smsModal.shop.name} »
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Marchand : {smsModal.shop.merchant.name} · Ces identifiants API ne sont visibles que par le Super Admin.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSmsModal(null)}
+                  className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <label className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-porcelain-50 p-3 text-xs font-bold text-slate-800">
+                <input
+                  type="checkbox"
+                  checked={smsModal.smsEnabled}
+                  onChange={(e) => setSmsModal({ ...smsModal, smsEnabled: e.target.checked })}
+                  className="h-4 w-4 accent-brand-700"
+                />
+                Activer l’envoi automatique de SMS (confirmation de vente &amp; relances de dettes) pour cette boutique
+              </label>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">Fournisseur SMS Cloud</label>
+                <select
+                  value={smsModal.smsProvider}
+                  onChange={(e) =>
+                    setSmsModal({
+                      ...smsModal,
+                      smsProvider: e.target.value as 'ORANGE_MALI' | 'TWILIO' | 'TEXTBEE' | 'WEBHOOK',
+                    })
+                  }
+                  className="sc-input mt-1"
+                >
+                  <option value="ORANGE_MALI">Orange SMS API Mali (developer.orange.com)</option>
+                  <option value="TWILIO">Twilio Cloud SMS (twilio.com)</option>
+                  <option value="TEXTBEE">TextBee Cloud (textbee.dev)</option>
+                  <option value="WEBHOOK">Webhook personnalisé / Autre fournisseur</option>
+                </select>
+              </div>
+
+              {smsModal.smsProvider === 'ORANGE_MALI' && (
+                <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                  <p className="text-xs text-slate-600">
+                    Identifiants de l’application <strong>Orange Developer (SMS Mali)</strong> pour cette boutique :
+                  </p>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Numéro expéditeur Orange Mali (ex: +22370000000)
+                    </label>
+                    <input
+                      value={smsModal.smsSenderId}
+                      onChange={(e) => setSmsModal({ ...smsModal, smsSenderId: e.target.value })}
+                      placeholder="+22370000000"
+                      className="sc-input mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">Client ID</label>
+                    <input
+                      value={smsModal.smsApiKey}
+                      onChange={(e) => setSmsModal({ ...smsModal, smsApiKey: e.target.value })}
+                      placeholder="Client ID Orange Developer"
+                      className="sc-input mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">Client Secret</label>
+                    <input
+                      type="password"
+                      value={smsModal.smsApiSecret}
+                      onChange={(e) => setSmsModal({ ...smsModal, smsApiSecret: e.target.value })}
+                      placeholder="Client Secret Orange Developer"
+                      className="sc-input mt-1"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {smsModal.smsProvider === 'TWILIO' && (
+                <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Numéro Twilio ou Sender ID (ex: {smsModal.shop.name.slice(0, 11)})
+                    </label>
+                    <input
+                      value={smsModal.smsSenderId}
+                      onChange={(e) => setSmsModal({ ...smsModal, smsSenderId: e.target.value })}
+                      placeholder="ChakirShop"
+                      className="sc-input mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">Account SID</label>
+                    <input
+                      value={smsModal.smsApiKey}
+                      onChange={(e) => setSmsModal({ ...smsModal, smsApiKey: e.target.value })}
+                      placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                      className="sc-input mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">Auth Token</label>
+                    <input
+                      type="password"
+                      value={smsModal.smsApiSecret}
+                      onChange={(e) => setSmsModal({ ...smsModal, smsApiSecret: e.target.value })}
+                      placeholder="Auth Token Twilio"
+                      className="sc-input mt-1"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {smsModal.smsProvider === 'TEXTBEE' && (
+                <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">Device ID TextBee</label>
+                    <input
+                      value={smsModal.smsSenderId}
+                      onChange={(e) => setSmsModal({ ...smsModal, smsSenderId: e.target.value })}
+                      placeholder="Device ID"
+                      className="sc-input mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">API Key TextBee</label>
+                    <input
+                      type="password"
+                      value={smsModal.smsApiKey}
+                      onChange={(e) => setSmsModal({ ...smsModal, smsApiKey: e.target.value })}
+                      placeholder="API Key"
+                      className="sc-input mt-1"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {smsModal.smsProvider === 'WEBHOOK' && (
+                <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">URL Webhook SMS</label>
+                    <input
+                      value={smsModal.smsWebhookUrl}
+                      onChange={(e) => setSmsModal({ ...smsModal, smsWebhookUrl: e.target.value })}
+                      placeholder="https://..."
+                      className="sc-input mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">Jeton Bearer (facultatif)</label>
+                    <input
+                      type="password"
+                      value={smsModal.smsApiKey}
+                      onChange={(e) => setSmsModal({ ...smsModal, smsApiKey: e.target.value })}
+                      className="sc-input mt-1"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Test d'envoi SMS direct */}
+              <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                <p className="text-xs font-bold text-slate-800">Tester l’envoi d’un SMS pour cette boutique</p>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    type="tel"
+                    placeholder="Ex: +223 70 00 00 00"
+                    value={smsModal.testPhone}
+                    onChange={(e) => setSmsModal({ ...smsModal, testPhone: e.target.value })}
+                    className="sc-input flex-1"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy || !smsModal.testPhone.trim()}
+                    onClick={() => void handleTestSmsFromAdmin()}
+                    className="sc-btn-ghost shrink-0 text-xs"
+                  >
+                    Envoyer un SMS de test
+                  </button>
+                </div>
+                {smsModal.testResult ? (
+                  <p
+                    className={`rounded-xl border px-3 py-2 text-xs font-semibold ${
+                      smsModal.testResult.ok
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                        : 'border-red-200 bg-red-50 text-red-900'
+                    }`}
+                  >
+                    {smsModal.testResult.text}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setSmsModal(null)}
+                  className="sc-btn-ghost w-full sm:w-auto"
+                >
+                  Fermer
+                </button>
+                <button type="submit" disabled={busy} className="sc-btn-primary w-full sm:w-auto">
+                  {busy ? 'Enregistrement…' : 'Enregistrer la passerelle SMS'}
                 </button>
               </div>
             </form>
