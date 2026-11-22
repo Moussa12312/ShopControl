@@ -1,0 +1,69 @@
+# Blueprint Render.com — Déploiement Gratuit ShopControl (API + Web) avec Neon.tech PostgreSQL
+# Aucune carte bancaire requise sur Neon.tech + Render Free Web Services.
+
+services:
+  # 1. Backend API NestJS (Control Plane + Bases Boutiques sur Neon PostgreSQL)
+  - type: web
+    name: shopcontrol-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.api
+    plan: free
+    region: frankfurt
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PORT
+        value: "4000"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: ENABLE_SWAGGER
+        value: "false"
+      # À renseigner depuis votre projet gratuit Neon.tech (https://console.neon.tech) :
+      - key: POSTGRES_HOST
+        sync: false
+      - key: POSTGRES_PORT
+        value: "5432"
+      - key: POSTGRES_USER
+        sync: false
+      - key: POSTGRES_PASSWORD
+        sync: false
+      - key: POSTGRES_CONTROL_DB
+        value: neondb
+      - key: DATABASE_URL
+        sync: false
+      - key: POSTGRES_ADMIN_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      # Secrets générés automatiquement par Render :
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: TOTP_ENCRYPTION_KEY
+        value: "a3f9c2e81b4d70659f1234a8c7e6d5b49012ef34ab56cd7890ef1234567890ab"
+      - key: BOOTSTRAP_SUPER_ADMIN_EMAIL
+        value: "superadmin@shopcontrol.local"
+      - key: BOOTSTRAP_SUPER_ADMIN_PASSWORD
+        sync: false
+      - key: BOOTSTRAP_SUPER_ADMIN_NAME
+        value: "Super Admin ShopControl"
+
+  # 2. Frontend Web Next.js (PWA Android/iOS + Vitrine QR + Caisse POS)
+  - type: web
+    name: shopcontrol-web
+    runtime: docker
+    dockerfilePath: ./Dockerfile.web
+    plan: free
+    region: frankfurt
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      # URL interne ou publique du service shopcontrol-api sur Render (ex: https://shopcontrol-api.onrender.com)
+      - key: API_INTERNAL_URL
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false

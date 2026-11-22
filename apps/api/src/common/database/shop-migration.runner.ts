@@ -38,7 +38,15 @@ export async function runShopMigrations(shopDatabaseUrl: string): Promise<ShopMi
     .map((d) => d.name)
     .sort();
 
-  const client = new Client({ connectionString: shopDatabaseUrl });
+  const isRemoteSsl =
+    shopDatabaseUrl.includes('sslmode=require') ||
+    (!shopDatabaseUrl.includes('@localhost') &&
+      !shopDatabaseUrl.includes('@127.0.0.1') &&
+      !shopDatabaseUrl.includes('@postgres:'));
+  const client = new Client({
+    connectionString: shopDatabaseUrl,
+    ...(isRemoteSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+  });
   await client.connect();
 
   const appliedVersions: string[] = [];

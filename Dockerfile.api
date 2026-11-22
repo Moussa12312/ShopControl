@@ -46,4 +46,4 @@ WORKDIR /app/apps/api
 EXPOSE 4000
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["node", "dist/src/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=prisma/control/schema.prisma && node dist/prisma/control/seed.js && node dist/prisma/shop/migrate-all-shops.js && node dist/src/main.js"]

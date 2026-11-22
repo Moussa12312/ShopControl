@@ -18,9 +18,17 @@ async function main(): Promise<void> {
 
     const encodedUser = encodeURIComponent(env.POSTGRES_USER);
     const encodedPass = encodeURIComponent(env.POSTGRES_PASSWORD);
+    const isLocalHost =
+      env.POSTGRES_HOST === 'localhost' ||
+      env.POSTGRES_HOST === '127.0.0.1' ||
+      env.POSTGRES_HOST === 'postgres';
+    const sslParam =
+      env.DATABASE_URL.includes('sslmode=require') || (!isLocalHost && env.POSTGRES_HOST.includes('.'))
+        ? '&sslmode=require'
+        : '';
 
     for (const shop of shops) {
-      const url = `postgresql://${encodedUser}:${encodedPass}@${env.POSTGRES_HOST}:${env.POSTGRES_PORT}/${shop.dbName}?schema=public&connection_limit=2`;
+      const url = `postgresql://${encodedUser}:${encodedPass}@${env.POSTGRES_HOST}:${env.POSTGRES_PORT}/${shop.dbName}?schema=public&connection_limit=2${sslParam}`;
       try {
         const result = await runShopMigrations(url);
         await control.shop.update({

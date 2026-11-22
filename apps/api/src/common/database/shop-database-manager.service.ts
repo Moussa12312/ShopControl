@@ -75,7 +75,30 @@ export class ShopDatabaseManagerService implements OnModuleDestroy {
     const limit = connectionLimit ?? env.SHOP_DB_CONNECTION_LIMIT;
     const encodedUser = encodeURIComponent(env.POSTGRES_USER);
     const encodedPass = encodeURIComponent(env.POSTGRES_PASSWORD);
-    return `postgresql://${encodedUser}:${encodedPass}@${env.POSTGRES_HOST}:${env.POSTGRES_PORT}/${dbName}?schema=public&connection_limit=${limit}&pool_timeout=10`;
+    const isLocalHost =
+      env.POSTGRES_HOST === 'localhost' ||
+      env.POSTGRES_HOST === '127.0.0.1' ||
+      env.POSTGRES_HOST === 'postgres';
+    const sslParam =
+      env.DATABASE_URL.includes('sslmode=require') || (!isLocalHost && env.POSTGRES_HOST.includes('.'))
+        ? '&sslmode=require'
+        : '';
+    return `postgresql://${encodedUser}:${encodedPass}@${env.POSTGRES_HOST}:${env.POSTGRES_PORT}/${dbName}?schema=public&connection_limit=${limit}&pool_timeout=10${sslParam}`;
+  }
+
+  private buildAdminPgClientConfig() {
+    const env = getEnv();
+    const isLocalHost =
+      env.POSTGRES_HOST === 'localhost' ||
+      env.POSTGRES_HOST === '127.0.0.1' ||
+      env.POSTGRES_HOST === 'postgres';
+    const needsSsl =
+      env.POSTGRES_ADMIN_URL.includes('sslmode=require') ||
+      (!isLocalHost && env.POSTGRES_HOST.includes('.'));
+    return {
+      connectionString: env.POSTGRES_ADMIN_URL,
+      ...(needsSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+    };
   }
 
   /**
@@ -83,10 +106,9 @@ export class ShopDatabaseManagerService implements OnModuleDestroy {
    * versionnées (dont le trigger d'audit immuable), et initialise `shop_local_config`.
    */
   async provisionShopDatabase(input: ShopProvisionInput): Promise<{ dbName: string; schemaVersion: string }> {
-    const env = getEnv();
     this.assertSafeDatabaseName(input.dbName);
 
-    const adminClient = new Client({ connectionString: env.POSTGRES_ADMIN_URL });
+    const adminClient = new Client(this.buildAdminPgClientConfig());
     await adminClient.connect();
     try {
       const exists = await adminClient.query(
