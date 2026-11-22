@@ -1,5 +1,5 @@
-const CACHE_NAME = 'shopcontrol-shell-v12';
-const STATIC_CACHE_NAME = 'shopcontrol-static-v12';
+const CACHE_NAME = 'shopcontrol-shell-v14';
+const STATIC_CACHE_NAME = 'shopcontrol-static-v14';
 
 const PRECACHE_URLS = [
   '/',
@@ -78,17 +78,16 @@ self.addEventListener('fetch', (event) => {
   if (isStaticAsset) {
     event.respondWith(
       caches.open(STATIC_CACHE_NAME).then((cache) =>
-        cache.match(request).then((cached) => {
-          if (cached) return cached;
-          return fetch(request)
-            .then((networkRes) => {
-              if (networkRes.ok) {
-                cache.put(request, networkRes.clone());
-              }
-              return networkRes;
-            })
-            .catch(() => cached || new Response('', { status: 404 }));
-        }),
+        fetch(request)
+          .then((networkRes) => {
+            if (networkRes.ok) {
+              cache.put(request, networkRes.clone());
+            }
+            return networkRes;
+          })
+          .catch(() =>
+            cache.match(request).then((cached) => cached || new Response('', { status: 404 })),
+          ),
       ),
     );
     return;

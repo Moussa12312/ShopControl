@@ -23,9 +23,14 @@ export function NetworkStatusProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Enregistrement du Service Worker PWA (Option B)
+    // Enregistrement du Service Worker PWA (Option B) avec vérification immédiate de mise à jour
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+      navigator.serviceWorker
+        .register('/sw.js', { updateViaCache: 'none' })
+        .then((reg) => {
+          void reg.update();
+        })
+        .catch(() => undefined);
     }
 
     const updateOnline = () => setIsOnline(navigator.onLine);

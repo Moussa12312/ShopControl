@@ -762,7 +762,7 @@ export default function AdminPlatformPage() {
                 onChange={(e) => setPayForm({ ...payForm, merchantId: e.target.value })}
                 className="sc-input"
               >
-                {merchants.map((m) => (
+                {(Array.isArray(merchants) ? merchants : []).map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name}
                   </option>
