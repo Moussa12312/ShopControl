@@ -1,5 +1,5 @@
-const CACHE_NAME = 'shopcontrol-shell-v19';
-const STATIC_CACHE_NAME = 'shopcontrol-static-v19';
+const CACHE_NAME = 'shopcontrol-shell-v20';
+const STATIC_CACHE_NAME = 'shopcontrol-static-v20';
 
 const PRECACHE_URLS = [
   '/',

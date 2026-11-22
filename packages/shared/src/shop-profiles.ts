@@ -886,8 +886,8 @@ export function canShopDeliver(
   const primary = normalizeShopType(shopType);
   const rawList = Array.isArray(enabledShopTypes)
     ? enabledShopTypes.filter((t): t is ShopType =>
-        typeof t === 'string' && (SHOP_TYPES as readonly string[]).includes(t),
-      )
+      typeof t === 'string' && (SHOP_TYPES as readonly string[]).includes(t),
+    )
     : [];
   const types = Array.from(new Set<ShopType>([primary, ...rawList]));
   // Si la boutique est uniquement une Boutique de rue (STREET_SHOP), la livraison est désactivée
@@ -1046,8 +1046,8 @@ export function normalizeBusinessProfile(
 
   const rawEnabledTypes = Array.isArray(obj.enabledShopTypes)
     ? obj.enabledShopTypes.filter((t): t is ShopType =>
-        typeof t === 'string' && (SHOP_TYPES as readonly string[]).includes(t),
-      )
+      typeof t === 'string' && (SHOP_TYPES as readonly string[]).includes(t),
+    )
     : [];
   const enabledShopTypes: ShopType[] = Array.from(
     new Set<ShopType>([safeType, ...rawEnabledTypes]),
@@ -1124,7 +1124,7 @@ export function normalizeBusinessProfile(
     allowDelivery,
     storefrontLayout:
       typeof obj.storefrontLayout === 'string' &&
-      (STOREFRONT_LAYOUTS as readonly string[]).includes(obj.storefrontLayout)
+        (STOREFRONT_LAYOUTS as readonly string[]).includes(obj.storefrontLayout)
         ? (obj.storefrontLayout as StorefrontLayout)
         : preset.storefrontLayout,
     defaultUnits:

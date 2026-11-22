@@ -426,7 +426,7 @@ export function AppShell({
           }
           touchStartXRef.current = null;
         }}
-        className={`no-print overscroll-none fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-white/[0.07] bg-forest-950 text-slate-200 transition-all duration-200 ${sidebarWidthClass} ${
+        className={`no-print overscroll-none fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-white/[0.07] bg-forest-950 pt-[env(safe-area-inset-top,0px)] text-slate-200 transition-all duration-200 ${sidebarWidthClass} ${
           mobileOpen
             ? `${mobileCollapsed ? 'w-[68px]' : 'w-64'} translate-x-0 shadow-2xl`
             : 'w-64 -translate-x-full lg:translate-x-0'
@@ -600,7 +600,8 @@ export function AppShell({
 
       {/* Header FIXE Obsidian Emerald — profil cliquable & sélecteur Supervision/Gestion */}
       <header
-        className={`no-print fixed left-0 right-0 top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-white/[0.08] bg-forest-950/95 px-3 text-white backdrop-blur-md transition-all duration-200 sm:px-5 ${headerLeftClass}`}
+        className={`no-print fixed left-0 right-0 top-0 z-30 flex min-h-14 items-center justify-between gap-2 border-b border-white/[0.08] bg-forest-950/95 px-3 pt-[env(safe-area-inset-top,0px)] text-white backdrop-blur-md transition-all duration-200 sm:px-5 ${headerLeftClass}`}
+        style={{ height: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
       >
         {/* Gauche : Hamburger mobile + Titre page active */}
         <div className="flex min-w-0 items-center gap-2">
@@ -713,7 +714,10 @@ export function AppShell({
             </button>
 
             {notifOpen ? (
-              <div className="fixed inset-x-3 top-[60px] z-50 rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80">
+              <div
+                className="fixed inset-x-3 z-50 rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80"
+                style={{ top: 'calc(3.75rem + env(safe-area-inset-top, 0px))' }}
+              >
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                   <h3 className="text-xs font-bold text-slate-900">
                     Notifications {unreadCount > 0 ? `(${unreadCount})` : ''}
@@ -791,7 +795,10 @@ export function AppShell({
             </button>
 
             {profileOpen ? (
-              <div className="fixed inset-x-3 top-[60px] z-50 rounded-2xl border border-slate-200 bg-white p-1.5 text-slate-900 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-60">
+              <div
+                className="fixed inset-x-3 z-50 rounded-2xl border border-slate-200 bg-white p-1.5 text-slate-900 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-60"
+                style={{ top: 'calc(3.75rem + env(safe-area-inset-top, 0px))' }}
+              >
                 <div className="border-b border-slate-100 px-3 py-2.5">
                   <p className="truncate text-xs font-bold text-slate-900">{user.fullName}</p>
                   <p className="truncate text-[11px] text-slate-500">{user.email}</p>
@@ -874,9 +881,10 @@ export function AppShell({
         </div>
       </header>
 
-      {/* Contenu principal décalé sous le header fixe (pt-14) et à droite du sidebar fixe */}
+      {/* Contenu principal décalé sous le header fixe (pt-14 + safe-area) et à droite du sidebar fixe */}
       <div
-        className={`flex min-h-screen min-w-0 flex-col pt-14 transition-all duration-200 ${contentOffsetClass}`}
+        className={`flex min-h-screen min-w-0 flex-col transition-all duration-200 ${contentOffsetClass}`}
+        style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
       >
         {/* Bandeaux d'alertes + Entête Obsidian Emerald présente sur TOUTES les pages */}
         <div className="no-print">
