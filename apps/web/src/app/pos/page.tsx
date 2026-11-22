@@ -34,6 +34,7 @@ import {
   TaxMode,
 } from '@shopcontrol/shared';
 import { apiFetch, ApiError } from '@/lib/api-client';
+import { PosGrowthPanel } from '@/components/commerce/PosGrowthPanel';
 import {
   cacheShopProducts,
   enqueueOfflineSale,
@@ -1476,6 +1477,15 @@ export default function PosPage() {
                         className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-mono"
                       />
                     </div>
+                  ) : null}
+
+                  {shopId ? (
+                    <PosGrowthPanel
+                      shopId={shopId}
+                      clientId={selectedClientId}
+                      methodCode={isDebt ? '' : paymentMethodCode}
+                      amountXof={totals ? Math.max(0, Math.min(totals.totalXof, effectivePaid)) : 0}
+                    />
                   ) : null}
 
                   {creditDue > 0 ? (
