@@ -16,7 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Crown,
-  Database,
+  Gift,  Database,
   Eye,
   FileSearch,
   FileText,
@@ -80,6 +80,7 @@ const OWNER_SUPERVISION_NAV: NavItem[] = [
   { href: '/owner/reports', label: 'Bilans & Exports', shortLabel: 'Bilans', group: 'Pilotage', icon: BarChart3, inMobileDock: true },
   { href: '/owner/subscription', label: 'Mon abonnement', shortLabel: 'Abonnement', group: 'Pilotage', icon: Crown },
   { href: '/owner/agents', label: 'Équipe & Agents', shortLabel: 'Agents', group: 'Organisation', icon: Users },
+  { href: '/owner/growth', label: 'Croissance & Compta', shortLabel: 'Croissance', group: 'Pilotage', icon: Gift },
   { href: '/owner/operators', label: 'Opérateurs', group: 'Organisation', icon: UserCheck },
   { href: '/messaging', label: 'Messagerie', shortLabel: 'Messages', group: 'Communication', icon: MessageSquare, inMobileDock: true },
 ];

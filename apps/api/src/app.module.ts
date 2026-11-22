@@ -35,6 +35,8 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { BillingJobsModule } from './modules/billing/billing-jobs.module';
+import { GrowthModule } from './modules/growth/growth.module';
+import { BackupModule } from './modules/backup/backup.module';
 
 @Module({
   imports: [
@@ -74,6 +76,8 @@ import { BillingJobsModule } from './modules/billing/billing-jobs.module';
     MessagingModule,
     PlatformModule,
     BillingJobsModule,
+    GrowthModule,
+    BackupModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

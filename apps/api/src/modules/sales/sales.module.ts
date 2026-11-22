@@ -49,6 +49,7 @@ import { AuditService } from '../audit/audit.service';
 import { CashService } from '../cash/cash.module';
 import { InventoryService } from '../inventory/inventory.module';
 import { NotificationsService } from '../notifications/notifications.module';
+import { GrowthService } from '../growth/growth.module';
 import { RequestMeta } from '../auth/auth.service';
 
 @Injectable()
@@ -60,6 +61,7 @@ export class SalesService {
     private readonly cashService: CashService,
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
+    private readonly growthService: GrowthService,
   ) {}
 
   private canReadCosts(user: AuthenticatedUser, shopId: string): boolean {
@@ -752,6 +754,16 @@ export class SalesService {
         targetPath: '/commerce/stock',
       });
     }
+
+    // Fidélité, commissions et SMS : exécutés en arrière-plan, sans jamais bloquer ni faire échouer la vente.
+    void this.growthService.onSaleCreated(shopId, {
+      id: createdSale.id,
+      saleNumber: createdSale.saleNumber,
+      totalXof: createdSale.totalXof,
+      clientId: createdSale.clientId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+    });
 
     return createdSale;
   }

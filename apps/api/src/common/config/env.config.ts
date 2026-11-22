@@ -63,6 +63,14 @@ const envSchema = z
     // Passerelle SMS / WhatsApp / e-mail (facultative) qui reçoit les relances destinées aux clients débiteurs.
     REMINDER_WEBHOOK_URL: z.string().url().optional().or(z.literal('').transform(() => undefined)),
     REMINDER_WEBHOOK_TOKEN: z.string().optional(),
+    // Sauvegarde quotidienne vers un canal Telegram privé.
+    BACKUP_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    BACKUP_TELEGRAM_BOT_TOKEN: z.string().optional().transform((v) => v || undefined),
+    BACKUP_TELEGRAM_CHAT_ID: z.string().optional().transform((v) => v || undefined),
+    PG_DUMP_PATH: z.string().default('pg_dump'),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
