@@ -190,25 +190,27 @@ export default function AdminPlatformPage() {
         apiFetch<PlatformPaymentRow[]>('/admin/platform-payments'),
         apiFetch<SupportTicketRow[]>('/support/tickets'),
         apiFetch<AnnouncementRow[]>('/admin/announcements'),
-        apiFetch<MerchantOpt[]>('/admin/merchants'),
+        apiFetch<MerchantOpt[] | { items: MerchantOpt[] }>('/admin/merchants?limit=100'),
         apiFetch<RenewalReq[]>('/admin/renewal-requests'),
       ]);
-      setRenewals(rq);
-      setPlans(pl);
+      const merchantList = Array.isArray(m) ? m : m.items ?? [];
+      setRenewals(Array.isArray(rq) ? rq : []);
+      const planList = Array.isArray(pl) ? pl : [];
+      setPlans(planList);
       const drafts: Record<string, PlatformPlanConfigRow & { featuresText: string }> = {};
-      for (const item of pl) {
+      for (const item of planList) {
         drafts[item.code] = {
           ...item,
           featuresText: (item.features || []).join('\n'),
         };
       }
       setPlanDrafts(drafts);
-      setSubs(s);
-      setPayments(p);
-      setTickets(t);
-      setAnnouncements(a);
-      setMerchants(m);
-      if (m[0]) setPayForm((f) => (f.merchantId ? f : { ...f, merchantId: m[0].id }));
+      setSubs(Array.isArray(s) ? s : []);
+      setPayments(Array.isArray(p) ? p : []);
+      setTickets(Array.isArray(t) ? t : []);
+      setAnnouncements(Array.isArray(a) ? a : []);
+      setMerchants(merchantList);
+      if (merchantList[0]) setPayForm((f) => (f.merchantId ? f : { ...f, merchantId: merchantList[0].id }));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur de chargement plateforme.');
     } finally {
