@@ -174,7 +174,10 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen w-full overflow-x-clip overscroll-none bg-porcelain-100 text-slate-900">
       {/* Navbar sticky Obsidian Emerald */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-forest-950/95 text-white backdrop-blur-md">
+      <header
+        className="sticky top-0 z-40 border-b border-white/10 bg-forest-950/95 text-white backdrop-blur-md"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:px-6">
           <Link href="/" className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-forest-700 text-sm font-black text-white ring-1 ring-white/20">
