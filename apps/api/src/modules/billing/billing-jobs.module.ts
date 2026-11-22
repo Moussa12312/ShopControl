@@ -3,6 +3,7 @@ import { getEnv } from '../../common/config/env.config';
 import { ControlPrismaService } from '../../common/database/control-prisma.service';
 import { ShopDatabaseManagerService } from '../../common/database/shop-database-manager.service';
 import { NotificationsService } from '../notifications/notifications.module';
+import { GrowthService } from '../growth/growth.module';
 
 const DAY_MS = 86_400_000;
 const TICK_MS = 15 * 60_000;
@@ -28,6 +29,7 @@ export class BillingJobsService implements OnModuleInit, OnModuleDestroy {
     private readonly controlPrisma: ControlPrismaService,
     private readonly shopDbManager: ShopDatabaseManagerService,
     private readonly notifications: NotificationsService,
+    private readonly growthService: GrowthService,
   ) {}
 
   onModuleInit(): void {
@@ -203,6 +205,7 @@ export class BillingJobsService implements OnModuleInit, OnModuleDestroy {
             `${fmtXof(r.remainingAmountXof)} est à régler ${diff >= 0 ? when : `— échue ${when}`}. Merci.`;
 
           const delivered = await this.sendClientReminder({
+            shopId: shop.id,
             shopName: shop.name,
             phone: r.client.phone,
             email: r.client.email,
@@ -242,25 +245,21 @@ export class BillingJobsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** Envoie la relance au client via la passerelle configurée. Retourne false si aucune passerelle n'est active. */
+  /** Envoie la relance au client via la passerelle SMS Cloud de la boutique (ou Webhook .env). */
   private async sendClientReminder(payload: {
+    shopId: string;
     shopName: string;
     phone: string;
     email: string | null;
     message: string;
   }): Promise<boolean> {
-    const env = getEnv();
-    if (!env.REMINDER_WEBHOOK_URL) return false;
     try {
-      const res = await fetch(env.REMINDER_WEBHOOK_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(env.REMINDER_WEBHOOK_TOKEN ? { Authorization: `Bearer ${env.REMINDER_WEBHOOK_TOKEN}` } : {}),
-        },
-        body: JSON.stringify({ type: 'DEBT_REMINDER', ...payload }),
-        signal: AbortSignal.timeout(8000),
-      });
+      const res = await this.growthService.sendMessageForShop(
+        payload.shopId,
+        payload.phone,
+        payload.message,
+        'DEBT_REMINDER',
+      );
       return res.ok;
     } catch (err) {
       this.logger.warn(`Passerelle de relance injoignable : ${(err as Error).message}`);

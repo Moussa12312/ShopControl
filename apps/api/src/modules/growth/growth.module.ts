@@ -33,11 +33,21 @@ import { computeCommissionXof, computeLoyaltyPoints, pickCommissionRule } from '
 
 const growthConfigSchema = z.object({
   smsEnabled: z.boolean().optional(),
+  smsProvider: z.enum(['WEBHOOK', 'ORANGE_MALI', 'TWILIO', 'TEXTBEE']).optional(),
+  smsSenderId: z.string().trim().max(30).optional(),
+  smsApiKey: z.string().trim().max(300).optional(),
+  smsApiSecret: z.string().trim().max(300).optional(),
+  smsWebhookUrl: z.string().url().max(400).or(z.literal('')).optional(),
   waveLink: z.string().url().max(300).or(z.literal('')).optional(),
   wavePhone: z.string().regex(/^[0-9+ ]{6,20}$/).or(z.literal('')).optional(),
   orangeMoneyCode: z.string().regex(/^[0-9A-Za-z #*+]{3,30}$/).or(z.literal('')).optional(),
 });
 type GrowthConfig = z.infer<typeof growthConfigSchema>;
+
+const testSmsSchema = z.object({
+  phone: z.string().trim().min(6).max(25),
+  message: z.string().trim().max(320).optional(),
+});
 
 const loyaltyRuleSchema = z.object({
   isEnabled: z.boolean(),
@@ -140,21 +150,152 @@ export class GrowthService {
     }
   }
 
-  // ----- SMS / WhatsApp
+  // ----- SMS / WhatsApp Cloud Multi-Fournisseurs (Orange SMS API Mali, Twilio, TextBee, Webhook)
 
-  async sendMessage(to: string, message: string, kind: string): Promise<boolean> {
+  private normalizeMaliPhone(raw: string): string {
+    const digits = raw.replace(/[^0-9+]/g, '');
+    if (digits.startsWith('+')) return digits;
+    if (digits.startsWith('00')) return `+${digits.slice(2)}`;
+    if (digits.length === 8) return `+223${digits}`;
+    if (digits.startsWith('223') && digits.length === 11) return `+${digits}`;
+    return `+${digits}`;
+  }
+
+  async sendMessageForShop(
+    shopId: string,
+    to: string,
+    message: string,
+    kind: string,
+  ): Promise<{ ok: boolean; provider: string; detail: string }> {
+    const cfg = await this.getConfig(shopId);
     const env = getEnv();
-    if (!env.REMINDER_WEBHOOK_URL) return false;
-    const res = await fetch(env.REMINDER_WEBHOOK_URL, {
+    const provider = cfg.smsProvider || 'WEBHOOK';
+    const recipient = this.normalizeMaliPhone(to);
+
+    if (provider === 'ORANGE_MALI') {
+      const clientId = cfg.smsApiKey?.trim();
+      const clientSecret = cfg.smsApiSecret?.trim();
+      const senderPhone = this.normalizeMaliPhone(cfg.smsSenderId?.trim() || '+22300000000');
+      if (!clientId || !clientSecret) {
+        return { ok: false, provider, detail: 'Client ID ou Client Secret Orange Developer manquant.' };
+      }
+      const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+      const tokenRes = await fetch('https://api.orange.com/oauth/v3/token', {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${basic}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+        },
+        body: 'grant_type=client_credentials',
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!tokenRes.ok) {
+        return { ok: false, provider, detail: `Échec authentification Orange OAuth (${tokenRes.status}).` };
+      }
+      const tokenJson = (await tokenRes.json()) as { access_token?: string };
+      if (!tokenJson.access_token) {
+        return { ok: false, provider, detail: 'Jeton OAuth Orange absent de la réponse.' };
+      }
+      const encodedSender = encodeURIComponent(`tel:${senderPhone}`);
+      const smsRes = await fetch(
+        `https://api.orange.com/smsmessaging/v1/outbound/${encodedSender}/requests`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenJson.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            outboundSMSMessageRequest: {
+              address: `tel:${recipient}`,
+              senderAddress: `tel:${senderPhone}`,
+              outboundSMSTextMessage: { message },
+            },
+          }),
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
+      return {
+        ok: smsRes.ok,
+        provider,
+        detail: smsRes.ok ? `SMS envoyé à ${recipient} via Orange SMS API.` : `Erreur Orange SMS (${smsRes.status}).`,
+      };
+    }
+
+    if (provider === 'TWILIO') {
+      const accountSid = cfg.smsApiKey?.trim();
+      const authToken = cfg.smsApiSecret?.trim();
+      const from = cfg.smsSenderId?.trim();
+      if (!accountSid || !authToken || !from) {
+        return { ok: false, provider, detail: 'Account SID, Auth Token ou numéro/Sender ID Twilio manquant.' };
+      }
+      const basic = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+      const form = new URLSearchParams({ To: recipient, From: from, Body: message });
+      const res = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Messages.json`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Basic ${basic}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: form.toString(),
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
+      return {
+        ok: res.ok,
+        provider,
+        detail: res.ok ? `SMS envoyé à ${recipient} via Twilio.` : `Erreur Twilio (${res.status}).`,
+      };
+    }
+
+    if (provider === 'TEXTBEE') {
+      const deviceId = cfg.smsSenderId?.trim();
+      const apiKey = cfg.smsApiKey?.trim();
+      if (!deviceId || !apiKey) {
+        return { ok: false, provider, detail: 'Device ID ou API Key TextBee manquant.' };
+      }
+      const res = await fetch(
+        `https://api.textbee.dev/api/v1/gateway/devices/${encodeURIComponent(deviceId)}/send-sms`,
+        {
+          method: 'POST',
+          headers: {
+            'x-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ recipients: [recipient], message }),
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
+      return {
+        ok: res.ok,
+        provider,
+        detail: res.ok ? `SMS envoyé à ${recipient} via TextBee Cloud.` : `Erreur TextBee (${res.status}).`,
+      };
+    }
+
+    // WEBHOOK générique (ou défini dans .env)
+    const targetUrl = cfg.smsWebhookUrl?.trim() || env.REMINDER_WEBHOOK_URL;
+    const token = cfg.smsApiKey?.trim() || env.REMINDER_WEBHOOK_TOKEN;
+    if (!targetUrl) {
+      return { ok: false, provider, detail: 'Aucune URL Webhook SMS configurée.' };
+    }
+    const res = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(env.REMINDER_WEBHOOK_TOKEN ? { Authorization: `Bearer ${env.REMINDER_WEBHOOK_TOKEN}` } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ to, message, kind }),
+      body: JSON.stringify({ to: recipient, message, kind, senderId: cfg.smsSenderId || undefined }),
       signal: AbortSignal.timeout(10_000),
     });
-    return res.ok;
+    return {
+      ok: res.ok,
+      provider,
+      detail: res.ok ? `SMS envoyé à ${recipient} via Webhook.` : `Erreur Webhook (${res.status}).`,
+    };
   }
 
   private async sendSaleSms(shopId: string, sale: SaleHookInput): Promise<void> {
@@ -168,7 +309,8 @@ export class GrowthService {
     ]);
     if (!buyer?.phone) return;
     const total = `${sale.totalXof.toLocaleString('fr-FR')} FCFA`;
-    await this.sendMessage(
+    await this.sendMessageForShop(
+      shopId,
       buyer.phone,
       `Merci ${buyer.fullName}. Achat de ${total} chez ${local?.shopName ?? 'notre boutique'} (réf. ${sale.saleNumber}).`,
       'SALE_CONFIRMATION',
@@ -551,6 +693,23 @@ export class GrowthController {
   @ApiOperation({ summary: 'Mettre à jour la configuration SMS / Mobile Money' })
   setConfig(@Param('shopId') shopId: string, @Body(new ZodValidationPipe(growthConfigSchema)) body: GrowthConfig) {
     return this.growth.setConfig(shopId, body);
+  }
+
+  @Post('growth/sms/test')
+  @Roles('OWNER')
+  @ApiOperation({ summary: 'Envoyer un SMS de test pour vérifier la passerelle Cloud configurée' })
+  async testSms(
+    @Param('shopId') shopId: string,
+    @Body(new ZodValidationPipe(testSmsSchema)) body: z.infer<typeof testSmsSchema>,
+  ) {
+    const res = await this.growth.sendMessageForShop(
+      shopId,
+      body.phone,
+      body.message || 'Test SMS ShopControl : votre passerelle SMS Cloud est bien connectée !',
+      'TEST_SMS',
+    );
+    if (!res.ok) throw new BadRequestException(res.detail);
+    return res;
   }
 
   @Get('loyalty')

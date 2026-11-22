@@ -26,6 +26,11 @@ interface LoyaltyOverview {
 }
 interface GrowthConfig {
   smsEnabled?: boolean;
+  smsProvider?: 'WEBHOOK' | 'ORANGE_MALI' | 'TWILIO' | 'TEXTBEE';
+  smsSenderId?: string;
+  smsApiKey?: string;
+  smsApiSecret?: string;
+  smsWebhookUrl?: string;
   waveLink?: string;
   wavePhone?: string;
   orangeMoneyCode?: string;
@@ -615,6 +620,8 @@ function CommissionsTab({ shopId, flash }: TabProps) {
 function MobileTab({ shopId, flash }: TabProps) {
   const [cfg, setCfg] = useState<GrowthConfig | null>(null);
   const [error, setError] = useState('');
+  const [testPhone, setTestPhone] = useState('');
+  const [testingSms, setTestingSms] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -637,24 +644,51 @@ function MobileTab({ shopId, flash }: TabProps) {
         shopId,
         body: {
           smsEnabled: Boolean(cfg.smsEnabled),
+          smsProvider: cfg.smsProvider || 'ORANGE_MALI',
+          smsSenderId: cfg.smsSenderId ?? '',
+          smsApiKey: cfg.smsApiKey ?? '',
+          smsApiSecret: cfg.smsApiSecret ?? '',
+          smsWebhookUrl: cfg.smsWebhookUrl ?? '',
           waveLink: cfg.waveLink ?? '',
           wavePhone: cfg.wavePhone ?? '',
           orangeMoneyCode: cfg.orangeMoneyCode ?? '',
         },
       });
-      flash(true, 'Configuration enregistrée.');
+      flash(true, 'Configuration Mobile Money & SMS Cloud enregistrée.');
     } catch (e) {
       flash(false, e);
+    }
+  };
+
+  const sendTest = async () => {
+    if (!testPhone.trim()) return;
+    setTestingSms(true);
+    try {
+      await save();
+      const res = await apiFetch<{ ok: boolean; detail: string }>(`/shops/${shopId}/growth/sms/test`, {
+        method: 'POST',
+        shopId,
+        body: { phone: testPhone.trim() },
+      });
+      flash(res.ok, res.detail);
+    } catch (e) {
+      flash(false, e);
+    } finally {
+      setTestingSms(false);
     }
   };
 
   if (error) return <ErrorState message={error} onRetry={load} />;
   if (!cfg) return <LoadingSkeleton />;
 
+  const provider = cfg.smsProvider || 'ORANGE_MALI';
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <section className={`${cardCls} space-y-3`}>
-        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900"><Smartphone className="h-4 w-4 text-brand-700" aria-hidden /> Paiement mobile (QR)</h2>
+        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+          <Smartphone className="h-4 w-4 text-brand-700" aria-hidden /> Paiement mobile (QR)
+        </h2>
         <Field label="Lien de paiement Wave Business" hint="Le montant est ajouté automatiquement au QR.">
           <input className={inputCls} placeholder="https://pay.wave.com/m/..." value={cfg.waveLink ?? ''} onChange={(e) => setCfg({ ...cfg, waveLink: e.target.value })} />
         </Field>
@@ -664,17 +698,120 @@ function MobileTab({ shopId, flash }: TabProps) {
         <Field label="Code marchand Orange Money">
           <input className={inputCls} value={cfg.orangeMoneyCode ?? ''} onChange={(e) => setCfg({ ...cfg, orangeMoneyCode: e.target.value })} />
         </Field>
+        <button className={btnCls} onClick={save}>Enregistrer Mobile Money</button>
       </section>
+
       <section className={`${cardCls} space-y-3`}>
-        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900"><MessageSquare className="h-4 w-4 text-brand-700" aria-hidden /> SMS / WhatsApp</h2>
+        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+          <MessageSquare className="h-4 w-4 text-brand-700" aria-hidden /> Passerelle SMS Cloud Automatique
+        </h2>
+
         <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input type="checkbox" className="h-4 w-4 accent-brand-700" checked={Boolean(cfg.smsEnabled)} onChange={(e) => setCfg({ ...cfg, smsEnabled: e.target.checked })} />
-          Envoyer un SMS de confirmation après chaque vente d’un client enregistré
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-brand-700"
+            checked={Boolean(cfg.smsEnabled)}
+            onChange={(e) => setCfg({ ...cfg, smsEnabled: e.target.checked })}
+          />
+          Envoyer un SMS automatique après chaque vente client et pour les relances de dettes
         </label>
-        <p className="text-xs text-slate-500">
-          Les messages passent par la passerelle définie côté serveur (variables REMINDER_WEBHOOK_URL / REMINDER_WEBHOOK_TOKEN). Les relances de dettes utilisent la même passerelle.
-        </p>
-        <button className={btnCls} onClick={save}>Enregistrer</button>
+
+        <Field label="Fournisseur SMS Cloud">
+          <select
+            className={inputCls}
+            value={provider}
+            onChange={(e) => setCfg({ ...cfg, smsProvider: e.target.value as GrowthConfig['smsProvider'] })}
+          >
+            <option value="ORANGE_MALI">Orange SMS API Mali (developer.orange.com)</option>
+            <option value="TWILIO">Twilio Cloud SMS (twilio.com)</option>
+            <option value="TEXTBEE">TextBee Cloud (textbee.dev)</option>
+            <option value="WEBHOOK">Webhook personnalisé / Autre fournisseur</option>
+          </select>
+        </Field>
+
+        {provider === 'ORANGE_MALI' && (
+          <div className="space-y-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+            <p className="text-xs text-slate-600">
+              Créez une application sur <strong>developer.orange.com</strong> (offre <em>SMS Mali</em>) puis copiez votre Client ID et Client Secret :
+            </p>
+            <Field label="Numéro expéditeur Orange Mali (ex: +22370000000)">
+              <input className={inputCls} placeholder="+22370000000" value={cfg.smsSenderId ?? ''} onChange={(e) => setCfg({ ...cfg, smsSenderId: e.target.value })} />
+            </Field>
+            <Field label="Client ID (Orange Developer)">
+              <input className={inputCls} placeholder="Votre Client ID" value={cfg.smsApiKey ?? ''} onChange={(e) => setCfg({ ...cfg, smsApiKey: e.target.value })} />
+            </Field>
+            <Field label="Client Secret (Orange Developer)">
+              <input type="password" className={inputCls} placeholder="Votre Client Secret" value={cfg.smsApiSecret ?? ''} onChange={(e) => setCfg({ ...cfg, smsApiSecret: e.target.value })} />
+            </Field>
+          </div>
+        )}
+
+        {provider === 'TWILIO' && (
+          <div className="space-y-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+            <p className="text-xs text-slate-600">
+              Renseignez vos identifiants depuis votre console <strong>Twilio</strong> :
+            </p>
+            <Field label="Numéro Twilio ou Sender ID (ex: ChakirShop ou +123456789)">
+              <input className={inputCls} placeholder="ChakirShop" value={cfg.smsSenderId ?? ''} onChange={(e) => setCfg({ ...cfg, smsSenderId: e.target.value })} />
+            </Field>
+            <Field label="Account SID">
+              <input className={inputCls} placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" value={cfg.smsApiKey ?? ''} onChange={(e) => setCfg({ ...cfg, smsApiKey: e.target.value })} />
+            </Field>
+            <Field label="Auth Token">
+              <input type="password" className={inputCls} placeholder="Votre Auth Token" value={cfg.smsApiSecret ?? ''} onChange={(e) => setCfg({ ...cfg, smsApiSecret: e.target.value })} />
+            </Field>
+          </div>
+        )}
+
+        {provider === 'TEXTBEE' && (
+          <div className="space-y-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+            <p className="text-xs text-slate-600">
+              Créez un compte gratuit sur <strong>textbee.dev</strong> puis copiez votre Device ID et API Key :
+            </p>
+            <Field label="Device ID">
+              <input className={inputCls} placeholder="ID de l’appareil TextBee" value={cfg.smsSenderId ?? ''} onChange={(e) => setCfg({ ...cfg, smsSenderId: e.target.value })} />
+            </Field>
+            <Field label="API Key">
+              <input type="password" className={inputCls} placeholder="Votre clé API TextBee" value={cfg.smsApiKey ?? ''} onChange={(e) => setCfg({ ...cfg, smsApiKey: e.target.value })} />
+            </Field>
+          </div>
+        )}
+
+        {provider === 'WEBHOOK' && (
+          <div className="space-y-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+            <Field label="URL Webhook SMS" hint="Recevra un POST JSON { to, message, kind }.">
+              <input className={inputCls} placeholder="https://..." value={cfg.smsWebhookUrl ?? ''} onChange={(e) => setCfg({ ...cfg, smsWebhookUrl: e.target.value })} />
+            </Field>
+            <Field label="Jeton Bearer (facultatif)">
+              <input type="password" className={inputCls} value={cfg.smsApiKey ?? ''} onChange={(e) => setCfg({ ...cfg, smsApiKey: e.target.value })} />
+            </Field>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <button className={btnCls} onClick={save}>Enregistrer la configuration SMS</button>
+        </div>
+
+        <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <p className="text-xs font-bold text-slate-800">Tester l’envoi d’un SMS maintenant</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="tel"
+              placeholder="Ex: +223 70 00 00 00"
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              className={`${inputCls} flex-1`}
+            />
+            <button
+              type="button"
+              disabled={testingSms || !testPhone.trim()}
+              onClick={() => void sendTest()}
+              className="sc-btn-ghost shrink-0 text-xs"
+            >
+              {testingSms ? 'Envoi…' : 'Envoyer un SMS de test'}
+            </button>
+          </div>
+        </div>
       </section>
     </div>
   );
