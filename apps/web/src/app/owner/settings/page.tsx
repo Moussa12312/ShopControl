@@ -21,15 +21,18 @@ import {
   MapPin,
   Plus,
   Trash2,
+  Clock,
 } from 'lucide-react';
 import {
   BusinessProfileConfig,
   DEFAULT_DELIVERY_CONFIG,
+  DEFAULT_OPENING_HOURS,
   DEFAULT_RECEIPT_SETTINGS,
   formatDateTimeInTimezone,
   formatXof,
   normalizeBusinessProfile,
   normalizeShopType,
+  OpeningHoursConfig,
   PLATFORM_MODULE_LABELS,
   PlatformModuleKey,
   SHOP_TYPE_SHORT_LABELS,
@@ -87,7 +90,26 @@ interface ShopDetail {
   status: string;
   receiptSettings?: Record<string, any> | null;
   deliveryConfig?: Record<string, any> | null;
+  openingHours?: Partial<OpeningHoursConfig> | null;
 }
+
+const WEEK_DAYS: Array<{ key: keyof OpeningHoursConfig; label: string; short: string }> = [
+  { key: 'mon', label: 'Lundi', short: 'Lun' },
+  { key: 'tue', label: 'Mardi', short: 'Mar' },
+  { key: 'wed', label: 'Mercredi', short: 'Mer' },
+  { key: 'thu', label: 'Jeudi', short: 'Jeu' },
+  { key: 'fri', label: 'Vendredi', short: 'Ven' },
+  { key: 'sat', label: 'Samedi', short: 'Sam' },
+  { key: 'sun', label: 'Dimanche', short: 'Dim' },
+];
+
+const EXAMPLE_DELIVERY_ZONES: Array<{ name: string; fee: number }> = [
+  { name: 'ACI 2000', fee: 1000 },
+  { name: 'Hamdallaye', fee: 1000 },
+  { name: 'Badalabougou', fee: 1000 },
+  { name: 'Baco-Djicoroni', fee: 1500 },
+  { name: 'Kalaban Coura', fee: 2000 },
+];
 
 interface SessionRow {
   id: string;
@@ -180,6 +202,7 @@ export default function OwnerSettingsPage() {
     outOfHoursMessage: DEFAULT_DELIVERY_CONFIG.outOfHoursMessage,
     maxOrderQty: 100,
     maxOrderAmountXof: 5_000_000,
+    openingHours: DEFAULT_OPENING_HOURS as OpeningHoursConfig,
   });
 
   const [newZoneName, setNewZoneName] = useState('');
@@ -199,6 +222,13 @@ export default function OwnerSettingsPage() {
     setNewZoneFee('');
   };
 
+  const updateDeliveryZone = (index: number, patch: Partial<{ name: string; feeXof: number }>) => {
+    setShopForm((prev) => ({
+      ...prev,
+      deliveryZones: prev.deliveryZones.map((z, i) => (i === index ? { ...z, ...patch } : z)),
+    }));
+  };
+
   const removeDeliveryZone = (index: number) => {
     setShopForm((prev) => ({
       ...prev,
@@ -214,6 +244,22 @@ export default function OwnerSettingsPage() {
     }));
   };
 
+  const updateDayOpeningHours = (
+    dayKey: keyof OpeningHoursConfig,
+    patch: Partial<{ open: string; close: string; closed: boolean }>,
+  ) => {
+    setShopForm((prev) => ({
+      ...prev,
+      openingHours: {
+        ...prev.openingHours,
+        [dayKey]: {
+          ...prev.openingHours[dayKey],
+          ...patch,
+        },
+      },
+    }));
+  };
+
   // Nouveau ticket support
   const [ticketForm, setTicketForm] = useState({ subject: '', priority: 'INFO', message: '' });
   const [replyByTicket, setReplyByTicket] = useState<Record<string, string>>({});
@@ -221,6 +267,16 @@ export default function OwnerSettingsPage() {
   const hydrateShopForm = useCallback((s: ShopDetail) => {
     const r = { ...DEFAULT_RECEIPT_SETTINGS, ...(s.receiptSettings || {}) };
     const d = { ...DEFAULT_DELIVERY_CONFIG, ...(s.deliveryConfig || {}) };
+    const rawHours = (s.openingHours || {}) as Partial<OpeningHoursConfig>;
+    const mergedHours: OpeningHoursConfig = {
+      mon: { ...DEFAULT_OPENING_HOURS.mon, ...(rawHours.mon || {}) },
+      tue: { ...DEFAULT_OPENING_HOURS.tue, ...(rawHours.tue || {}) },
+      wed: { ...DEFAULT_OPENING_HOURS.wed, ...(rawHours.wed || {}) },
+      thu: { ...DEFAULT_OPENING_HOURS.thu, ...(rawHours.thu || {}) },
+      fri: { ...DEFAULT_OPENING_HOURS.fri, ...(rawHours.fri || {}) },
+      sat: { ...DEFAULT_OPENING_HOURS.sat, ...(rawHours.sat || {}) },
+      sun: { ...DEFAULT_OPENING_HOURS.sun, ...(rawHours.sun || {}) },
+    };
     setShopForm({
       name: s.name || '',
       slug: s.slug || '',
@@ -247,6 +303,7 @@ export default function OwnerSettingsPage() {
       outOfHoursMessage: d.outOfHoursMessage || DEFAULT_DELIVERY_CONFIG.outOfHoursMessage,
       maxOrderQty: Number(d.maxOrderQty ?? 100),
       maxOrderAmountXof: Number(d.maxOrderAmountXof ?? 5_000_000),
+      openingHours: mergedHours,
     });
   }, []);
 
@@ -319,6 +376,7 @@ export default function OwnerSettingsPage() {
           address: shopForm.address.trim() || undefined,
           taxMode: shopForm.taxMode,
           defaultTaxRateBps: Math.round((Number(shopForm.taxRatePercent) || 0) * 100),
+          openingHours: shopForm.openingHours,
           receiptSettings: {
             slogan: shopForm.slogan.trim(),
             headerText: shopForm.headerText.trim(),
@@ -888,32 +946,13 @@ export default function OwnerSettingsPage() {
                           </span>
                         </div>
 
-                        {/* Suggestions rapides en 1 clic : Quartiers de Bamako */}
+                        {/* Suggestions rapides en 1 clic : 5 quartiers d'exemple */}
                         <div>
-                          <p className="mb-1.5 text-[11px] font-semibold text-slate-600">Ajout rapide de quartiers de Bamako :</p>
+                          <p className="mb-1.5 text-[11px] font-semibold text-slate-600">
+                            5 quartiers en exemple (cliquez pour ajouter, puis modifiez le nom ou le tarif ci-dessous) :
+                          </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {[
-                              { name: 'ACI 2000', fee: 1000 },
-                              { name: 'Hamdallaye', fee: 1000 },
-                              { name: 'Badalabougou', fee: 1000 },
-                              { name: 'Hippodrome', fee: 1000 },
-                              { name: 'Korofina', fee: 1500 },
-                              { name: 'Baco-Djicoroni', fee: 1500 },
-                              { name: 'Torokorobougou', fee: 1000 },
-                              { name: 'Daoudabougou', fee: 1500 },
-                              { name: 'Faladié', fee: 1500 },
-                              { name: 'Yirimadio', fee: 2000 },
-                              { name: 'Sotuba', fee: 2000 },
-                              { name: 'Magnambougou', fee: 1500 },
-                              { name: 'Kalaban Coura', fee: 2000 },
-                              { name: 'Sébénikoro', fee: 2000 },
-                              { name: 'Lafiabougou', fee: 1500 },
-                              { name: 'Djélibougou', fee: 1500 },
-                              { name: 'Niaréla', fee: 1000 },
-                              { name: 'Medina Coura', fee: 1000 },
-                              { name: 'Missira', fee: 1000 },
-                              { name: 'Banankabougou', fee: 2000 },
-                            ].map((preset) => {
+                            {EXAMPLE_DELIVERY_ZONES.map((preset) => {
                               const already = shopForm.deliveryZones.some(
                                 (z) => z.name.toLowerCase() === preset.name.toLowerCase(),
                               );
@@ -941,7 +980,7 @@ export default function OwnerSettingsPage() {
                           <div className="sm:col-span-6">
                             <input
                               type="text"
-                              placeholder="Nom du quartier (ex: ACI 2000, Badalabougou, Hamdallaye...)"
+                              placeholder="Autre quartier (ex: Korofina, Sotuba, Yirimadio...)"
                               value={newZoneName}
                               onChange={(e) => setNewZoneName(e.target.value)}
                               className="sc-input text-xs"
@@ -971,26 +1010,41 @@ export default function OwnerSettingsPage() {
                           </div>
                         </div>
 
-                        {/* Liste des quartiers */}
+                        {/* Liste des quartiers (nom et tarif modifiables directement) */}
                         {shopForm.deliveryZones.length > 0 ? (
-                          <div className="max-h-60 divide-y divide-slate-200 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                          <div className="max-h-72 divide-y divide-slate-200 overflow-y-auto rounded-xl border border-slate-200 bg-white">
                             {shopForm.deliveryZones.map((zone, idx) => (
                               <div
-                                key={`${zone.name}_${idx}`}
-                                className="flex items-center justify-between p-2.5 text-xs"
+                                key={idx}
+                                className="flex flex-col gap-2 p-2.5 text-xs sm:flex-row sm:items-center sm:justify-between"
                               >
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                                  <span className="font-bold text-slate-900">{zone.name}</span>
+                                <div className="flex flex-1 items-center gap-2">
+                                  <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                  <input
+                                    type="text"
+                                    aria-label="Nom du quartier"
+                                    value={zone.name}
+                                    onChange={(e) => updateDeliveryZone(idx, { name: e.target.value })}
+                                    className="sc-input py-1.5 text-xs font-bold text-slate-900"
+                                  />
                                 </div>
-                                <div className="flex items-center gap-3">
-                                  <span className="rounded-lg bg-emerald-50 px-2.5 py-1 font-extrabold text-emerald-800">
-                                    {formatXof(zone.feeXof)}
-                                  </span>
+                                <div className="flex items-center justify-end gap-2">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={100}
+                                    aria-label="Tarif de livraison (FCFA)"
+                                    value={zone.feeXof}
+                                    onChange={(e) =>
+                                      updateDeliveryZone(idx, { feeXof: Math.max(0, Math.round(Number(e.target.value) || 0)) })
+                                    }
+                                    className="sc-input w-28 py-1.5 text-right text-xs font-extrabold text-emerald-800 tabular"
+                                  />
+                                  <span className="text-[11px] font-semibold text-slate-500">FCFA</span>
                                   <button
                                     type="button"
                                     onClick={() => removeDeliveryZone(idx)}
-                                    className="rounded-lg p-1 text-rose-500 hover:bg-rose-50"
+                                    className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50"
                                     title="Supprimer ce quartier"
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -1006,6 +1060,89 @@ export default function OwnerSettingsPage() {
                         )}
                       </div>
                     ) : null}
+
+                    {/* Horaires d'ouverture & de fermeture */}
+                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 sm:p-4">
+                      <div>
+                        <h4 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-800">
+                          <Clock className="h-4 w-4 text-brand-700" />
+                          Horaires d’ouverture &amp; de fermeture
+                        </h4>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          Affichés sur votre vitrine QR publique et utilisés pour identifier les commandes passées hors horaires.
+                        </p>
+                      </div>
+
+                      <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
+                        {WEEK_DAYS.map(({ key, label }) => {
+                          const day = shopForm.openingHours[key];
+                          return (
+                            <div
+                              key={key}
+                              className="flex flex-col gap-2 p-2.5 text-xs sm:flex-row sm:items-center sm:justify-between"
+                            >
+                              <div className="flex items-center justify-between sm:w-44">
+                                <span className="font-bold text-slate-900">{label}</span>
+                                <label className="inline-flex items-center gap-1.5 font-semibold text-slate-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={!day.closed}
+                                    onChange={(e) => updateDayOpeningHours(key, { closed: !e.target.checked })}
+                                    className="h-4 w-4 accent-brand-700"
+                                  />
+                                  <span>{day.closed ? 'Fermé' : 'Ouvert'}</span>
+                                </label>
+                              </div>
+
+                              {day.closed ? (
+                                <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-center text-xs font-semibold text-slate-500">
+                                  Boutique fermée ce jour
+                                </span>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="time"
+                                    aria-label={`Heure d’ouverture ${label}`}
+                                    value={day.open}
+                                    onChange={(e) => updateDayOpeningHours(key, { open: e.target.value })}
+                                    className="sc-input w-28 py-1.5 text-xs tabular"
+                                  />
+                                  <span className="text-slate-400">à</span>
+                                  <input
+                                    type="time"
+                                    aria-label={`Heure de fermeture ${label}`}
+                                    value={day.close}
+                                    onChange={(e) => updateDayOpeningHours(key, { close: e.target.value })}
+                                    className="sc-input w-28 py-1.5 text-xs tabular"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-12 sm:items-center">
+                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 sm:col-span-5">
+                          <input
+                            type="checkbox"
+                            checked={shopForm.allowOutOfHoursOrders}
+                            onChange={(e) => setShopForm({ ...shopForm, allowOutOfHoursOrders: e.target.checked })}
+                            className="h-4 w-4 accent-brand-700"
+                          />
+                          Autoriser les commandes vitrine hors horaires
+                        </label>
+                        <div className="sm:col-span-7">
+                          <input
+                            type="text"
+                            value={shopForm.outOfHoursMessage}
+                            onChange={(e) => setShopForm({ ...shopForm, outOfHoursMessage: e.target.value })}
+                            placeholder="Message affiché hors horaires..."
+                            className="sc-input py-1.5 text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
 
                     <div className="flex justify-end pt-2">
                       {!supportGrantId ? (
