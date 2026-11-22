@@ -163,6 +163,16 @@ export default function PosPage() {
   const [taxMode, setTaxMode] = useState<TaxMode>('NONE');
   const [taxRateBps, setTaxRateBps] = useState(0);
   const [pendingOffline, setPendingOffline] = useState<OfflineOperationItem[]>([]);
+  const [activePromos, setActivePromos] = useState<
+    Array<{ id: string; name: string; discountPercent: number; appliesToAll: boolean; productIds: string[] }>
+  >([]);
+
+  useEffect(() => {
+    if (!shopId) return;
+    apiFetch<typeof activePromos>(`/shops/${shopId}/promotions/active`, { shopId, requiresOnline: false })
+      .then(setActivePromos)
+      .catch(() => setActivePromos([]));
+  }, [shopId]);
 
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -285,17 +295,26 @@ export default function PosPage() {
   const totals = useMemo(() => {
     if (cart.length === 0) return null;
     return calculateSaleTotals({
-      lines: cart.map((c) => ({
-        quantity: c.customAmountXof && c.customAmountXof > 0 ? 1 : c.quantity,
-        unitPriceXof: resolveCartItemUnitPrice(c),
-      })),
+      lines: cart.map((c) => {
+        // Même règle que le serveur : meilleure promotion active du produit, sans cumul.
+        const promoPct = activePromos.reduce(
+          (best, p) =>
+            (p.appliesToAll || p.productIds.includes(c.product.id)) && p.discountPercent > best ? p.discountPercent : best,
+          0,
+        );
+        return {
+          quantity: c.customAmountXof && c.customAmountXof > 0 ? 1 : c.quantity,
+          unitPriceXof: resolveCartItemUnitPrice(c),
+          ...(promoPct > 0 ? { discountType: 'PERCENT' as const, discountValue: promoPct } : {}),
+        };
+      }),
       globalDiscountType: discountPercent > 0 ? 'PERCENT' : 'NONE',
       globalDiscountValue: discountPercent,
       taxMode,
       defaultTaxRateBps: taxRateBps,
       cashRoundingStep: paymentMethodCode === 'CASH' ? cashRoundingStep : 0,
     });
-  }, [cart, discountPercent, taxMode, taxRateBps, paymentMethodCode, cashRoundingStep]);
+  }, [cart, discountPercent, taxMode, taxRateBps, paymentMethodCode, cashRoundingStep, activePromos]);
 
   const isDebt = paymentMethodCode === DEBT_METHOD;
   const activeMethod = isDebt
@@ -1477,6 +1496,13 @@ export default function PosPage() {
                         className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-mono"
                       />
                     </div>
+                  ) : null}
+
+                  {activePromos.length > 0 ? (
+                    <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900">
+                      Promotion en cours : {activePromos.map((p) => `${p.name} (−${p.discountPercent} %)`).join(', ')} —
+                      appliquée automatiquement.
+                    </p>
                   ) : null}
 
                   {shopId ? (

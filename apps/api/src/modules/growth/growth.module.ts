@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Global,
   Injectable,
@@ -60,6 +61,17 @@ const commissionRuleSchema = z.object({
 });
 
 const redeemSchema = z.object({ rewardId: z.string().uuid() });
+const promotionSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    discountPercent: z.number().gt(0).max(100),
+    appliesToAll: z.boolean(),
+    productIds: z.array(z.string().uuid()).max(500).default([]),
+    startsAt: z.string().datetime(),
+    endsAt: z.string().datetime(),
+  })
+  .refine((v) => new Date(v.endsAt) > new Date(v.startsAt), { message: 'La fin doit être après le début.', path: ['endsAt'] })
+  .refine((v) => v.appliesToAll || v.productIds.length > 0, { message: 'Choisissez au moins un produit.', path: ['productIds'] });
 const markPaidSchema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/),
   agentUserId: z.string().uuid(),
@@ -351,6 +363,88 @@ export class GrowthService {
     return { updated: res.count };
   }
 
+  // ----- Annulation de vente : retire commission non payée et points gagnés
+
+  async reverseSale(shopId: string, saleId: string): Promise<void> {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+    // Une commission déjà payée est conservée : à régulariser manuellement avec l'agent.
+    await client.commissionLedger.deleteMany({ where: { saleId, paidAt: null } });
+
+    const [earns, alreadyReversed] = await Promise.all([
+      client.loyaltyTransaction.findMany({ where: { saleId, type: 'EARN' } }),
+      client.loyaltyTransaction.findFirst({ where: { saleId, type: 'ADJUST' } }),
+    ]);
+    if (alreadyReversed) return;
+    for (const earn of earns) {
+      await client.$transaction(async (tx) => {
+        const account = await tx.loyaltyAccount.findUnique({ where: { id: earn.accountId } });
+        if (!account) return;
+        await tx.loyaltyAccount.update({
+          where: { id: account.id },
+          data: {
+            currentPoints: Math.max(0, account.currentPoints - earn.points),
+            lifetimePoints: Math.max(0, account.lifetimePoints - earn.points),
+          },
+        });
+        await tx.loyaltyTransaction.create({
+          data: { accountId: account.id, saleId, type: 'ADJUST', points: -earn.points, note: 'Vente annulée' },
+        });
+      });
+    }
+  }
+
+  // ----- Promotions programmées
+
+  async listPromotions(shopId: string) {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+    const rows = await client.promotion.findMany({ orderBy: { startsAt: 'desc' } });
+    return rows.map((p) => ({ ...p, discountPercent: Number(p.discountPercent) }));
+  }
+
+  async activePromotions(shopId: string) {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+    const now = new Date();
+    const rows = await client.promotion.findMany({
+      where: { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } },
+    });
+    return rows.map((p) => ({
+      id: p.id,
+      name: p.name,
+      discountPercent: Number(p.discountPercent),
+      appliesToAll: p.appliesToAll,
+      productIds: p.productIds,
+      endsAt: p.endsAt,
+    }));
+  }
+
+  async createPromotion(shopId: string, input: z.infer<typeof promotionSchema>) {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+    await client.promotion.create({
+      data: {
+        name: input.name,
+        discountPercent: input.discountPercent,
+        appliesToAll: input.appliesToAll,
+        productIds: input.appliesToAll ? [] : input.productIds,
+        startsAt: new Date(input.startsAt),
+        endsAt: new Date(input.endsAt),
+      },
+    });
+    return this.listPromotions(shopId);
+  }
+
+  async setPromotionActive(shopId: string, id: string, isActive: boolean) {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+    const res = await client.promotion.updateMany({ where: { id }, data: { isActive } });
+    if (res.count === 0) throw new NotFoundException('Promotion introuvable.');
+    return this.listPromotions(shopId);
+  }
+
+  async deletePromotion(shopId: string, id: string) {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+    await client.promotion.deleteMany({ where: { id } });
+    return this.listPromotions(shopId);
+  }
+
   // ----- Mobile Money (QR)
 
   async mobileMoneyQr(shopId: string, method: string, amountXof: number) {
@@ -532,6 +626,48 @@ export class GrowthController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.growth.markPaid(shopId, body.month, body.agentUserId, user.userId);
+  }
+
+  @Get('promotions')
+  @Roles('OWNER')
+  @ApiOperation({ summary: 'Lister les promotions programmées' })
+  promotions(@Param('shopId') shopId: string) {
+    return this.growth.listPromotions(shopId);
+  }
+
+  @Get('promotions/active')
+  @Roles('OWNER', 'AGENT')
+  @ApiOperation({ summary: 'Promotions en cours (appliquées automatiquement aux ventes)' })
+  activePromotions(@Param('shopId') shopId: string) {
+    return this.growth.activePromotions(shopId);
+  }
+
+  @Post('promotions')
+  @Roles('OWNER')
+  @ApiOperation({ summary: 'Créer une promotion programmée' })
+  createPromotion(
+    @Param('shopId') shopId: string,
+    @Body(new ZodValidationPipe(promotionSchema)) body: z.infer<typeof promotionSchema>,
+  ) {
+    return this.growth.createPromotion(shopId, body);
+  }
+
+  @Put('promotions/:id/active')
+  @Roles('OWNER')
+  @ApiOperation({ summary: 'Activer ou suspendre une promotion' })
+  setPromotionActive(
+    @Param('shopId') shopId: string,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(z.object({ isActive: z.boolean() }))) body: { isActive: boolean },
+  ) {
+    return this.growth.setPromotionActive(shopId, id, body.isActive);
+  }
+
+  @Delete('promotions/:id')
+  @Roles('OWNER')
+  @ApiOperation({ summary: 'Supprimer une promotion' })
+  deletePromotion(@Param('shopId') shopId: string, @Param('id') id: string) {
+    return this.growth.deletePromotion(shopId, id);
   }
 
   @Get('payments/mobile-money/qr')

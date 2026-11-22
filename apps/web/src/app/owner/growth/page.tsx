@@ -1,17 +1,18 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Banknote, Cloud, FileSpreadsheet, Gift, MessageSquare, Smartphone } from 'lucide-react';
+import { Banknote, Cloud, FileSpreadsheet, Gift, MessageSquare, Smartphone, Tag } from 'lucide-react';
 import { formatXof } from '@shopcontrol/shared';
 import { apiFetch, API_BASE_URL, ApiError } from '@/lib/api-client';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { AppShell } from '@/components/layout/AppShell';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateViews';
 
-type TabKey = 'loyalty' | 'commissions' | 'mobile' | 'ohada' | 'backup';
+type TabKey = 'loyalty' | 'promotions' | 'commissions' | 'mobile' | 'ohada' | 'backup';
 
 const TABS: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
   { key: 'loyalty', label: 'Fidélité', icon: Gift },
+  { key: 'promotions', label: 'Promotions', icon: Tag },
   { key: 'commissions', label: 'Commissions', icon: Banknote },
   { key: 'mobile', label: 'Mobile Money & SMS', icon: Smartphone },
   { key: 'ohada', label: 'Comptabilité OHADA', icon: FileSpreadsheet },
@@ -150,6 +151,7 @@ export default function GrowthPage() {
         ) : (
           <>
             {tab === 'loyalty' && <LoyaltyTab shopId={shopId} flash={flash} />}
+            {tab === 'promotions' && <PromotionsTab shopId={shopId} flash={flash} />}
             {tab === 'commissions' && <CommissionsTab shopId={shopId} flash={flash} />}
             {tab === 'mobile' && <MobileTab shopId={shopId} flash={flash} />}
             {tab === 'ohada' && <OhadaTab shopId={shopId} flash={flash} />}
@@ -282,6 +284,179 @@ function LoyaltyTab({ shopId, flash }: TabProps) {
           </Field>
         </div>
         <button className={btnCls} disabled={reward.name.trim().length < 2} onClick={addReward}>Ajouter la récompense</button>
+      </section>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- Promotions */
+
+interface PromotionRow {
+  id: string;
+  name: string;
+  discountPercent: number;
+  appliesToAll: boolean;
+  productIds: string[];
+  startsAt: string;
+  endsAt: string;
+  isActive: boolean;
+}
+interface ProductOption {
+  id: string;
+  name: string;
+}
+
+const toLocalInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+
+function PromotionsTab({ shopId, flash }: TabProps) {
+  const [rows, setRows] = useState<PromotionRow[] | null>(null);
+  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({
+    name: '',
+    discountPercent: 10,
+    appliesToAll: true,
+    productIds: [] as string[],
+    startsAt: toLocalInput(new Date()),
+    endsAt: toLocalInput(new Date(Date.now() + 7 * 86_400_000)),
+  });
+
+  const load = useCallback(async () => {
+    try {
+      const [p, prods] = await Promise.all([
+        apiFetch<PromotionRow[]>(`/shops/${shopId}/promotions`, { shopId }),
+        apiFetch<ProductOption[] | { items: ProductOption[] }>(`/shops/${shopId}/products`, { shopId }),
+      ]);
+      setRows(p);
+      setProducts(Array.isArray(prods) ? prods : prods.items ?? []);
+      setError('');
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Chargement impossible.');
+    }
+  }, [shopId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const create = async () => {
+    try {
+      await apiFetch(`/shops/${shopId}/promotions`, {
+        method: 'POST',
+        shopId,
+        body: {
+          ...form,
+          startsAt: new Date(form.startsAt).toISOString(),
+          endsAt: new Date(form.endsAt).toISOString(),
+        },
+      });
+      flash(true, 'Promotion créée.');
+      setForm({ ...form, name: '', productIds: [] });
+      void load();
+    } catch (e) {
+      flash(false, e);
+    }
+  };
+
+  const toggle = async (p: PromotionRow) => {
+    try {
+      await apiFetch(`/shops/${shopId}/promotions/${p.id}/active`, { method: 'PUT', shopId, body: { isActive: !p.isActive } });
+      void load();
+    } catch (e) {
+      flash(false, e);
+    }
+  };
+
+  const remove = async (p: PromotionRow) => {
+    if (!window.confirm(`Supprimer la promotion « ${p.name} » ?`)) return;
+    try {
+      await apiFetch(`/shops/${shopId}/promotions/${p.id}`, { method: 'DELETE', shopId });
+      void load();
+    } catch (e) {
+      flash(false, e);
+    }
+  };
+
+  if (error) return <ErrorState message={error} onRetry={load} />;
+  if (!rows) return <LoadingSkeleton />;
+
+  const now = Date.now();
+  const status = (p: PromotionRow) =>
+    !p.isActive ? 'Suspendue' : now < Date.parse(p.startsAt) ? 'À venir' : now > Date.parse(p.endsAt) ? 'Terminée' : 'En cours';
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <section className={`${cardCls} space-y-3`}>
+        <h2 className="text-sm font-bold text-white">Nouvelle promotion</h2>
+        <p className="text-xs text-slate-400">
+          Appliquée automatiquement à la caisse entre les deux dates. Une remise saisie à la main sur un article remplace la promotion.
+        </p>
+        <Field label="Nom (ex. Soldes de fin d’année)">
+          <input className={inputCls} value={form.name} maxLength={120} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <Field label="Remise (%)">
+          <input type="number" min={1} max={100} step={0.5} className={inputCls} value={form.discountPercent} onChange={(e) => setForm({ ...form, discountPercent: Number(e.target.value) })} />
+        </Field>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Début"><input type="datetime-local" className={inputCls} value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} /></Field>
+          <Field label="Fin"><input type="datetime-local" className={inputCls} value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} /></Field>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-200">
+          <input type="checkbox" checked={form.appliesToAll} onChange={(e) => setForm({ ...form, appliesToAll: e.target.checked })} />
+          Toute la boutique
+        </label>
+        {!form.appliesToAll && (
+          <Field label="Produits concernés (Ctrl/Cmd pour en choisir plusieurs)">
+            <select
+              multiple
+              size={6}
+              className={inputCls}
+              value={form.productIds}
+              onChange={(e) => setForm({ ...form, productIds: Array.from(e.target.selectedOptions, (o) => o.value) })}
+            >
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <button
+          className={btnCls}
+          disabled={form.name.trim().length < 2 || (!form.appliesToAll && form.productIds.length === 0)}
+          onClick={create}
+        >
+          Créer la promotion
+        </button>
+      </section>
+
+      <section className={`${cardCls} space-y-3`}>
+        <h2 className="text-sm font-bold text-white">Promotions</h2>
+        {rows.length === 0 ? (
+          <p className="text-sm text-slate-400">Aucune promotion pour le moment.</p>
+        ) : (
+          <ul className="space-y-2">
+            {rows.map((p) => (
+              <li key={p.id} className="space-y-1 rounded-xl bg-white/5 p-3 text-sm text-slate-200">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">{p.name} · −{p.discountPercent} %</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]">{status(p)}</span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  {new Date(p.startsAt).toLocaleString('fr-FR')} → {new Date(p.endsAt).toLocaleString('fr-FR')} ·{' '}
+                  {p.appliesToAll ? 'Toute la boutique' : `${p.productIds.length} produit(s)`}
+                </p>
+                <div className="flex gap-2 pt-1">
+                  <button className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold hover:bg-white/20" onClick={() => toggle(p)}>
+                    {p.isActive ? 'Suspendre' : 'Réactiver'}
+                  </button>
+                  <button className="rounded-lg bg-red-500/20 px-3 py-1 text-xs font-semibold text-red-200 hover:bg-red-500/30" onClick={() => remove(p)}>
+                    Supprimer
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

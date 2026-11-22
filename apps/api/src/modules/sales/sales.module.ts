@@ -50,6 +50,7 @@ import { CashService } from '../cash/cash.module';
 import { InventoryService } from '../inventory/inventory.module';
 import { NotificationsService } from '../notifications/notifications.module';
 import { GrowthService } from '../growth/growth.module';
+import { promoPercentFor } from '../growth/growth.calc';
 import { RequestMeta } from '../auth/auth.service';
 
 @Injectable()
@@ -206,6 +207,17 @@ export class SalesService {
         discountValue: number;
       }> = [];
 
+      const now = new Date();
+      const activePromos = (
+        await tx.promotion.findMany({
+          where: { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } },
+        })
+      ).map((p) => ({
+        discountPercent: Number(p.discountPercent),
+        appliesToAll: p.appliesToAll,
+        productIds: p.productIds,
+      }));
+
       for (const reqLine of input.lines) {
         const product = await tx.product.findUnique({
           where: { id: reqLine.productId },
@@ -325,6 +337,10 @@ export class SalesService {
           displayName = `${baseDisplayName} (${decStr} ${product.unit})`;
         }
 
+        // Promotion programmée : appliquée automatiquement si aucune remise manuelle n'est saisie sur la ligne.
+        const manualType = reqLine.discountType || 'NONE';
+        const promoPercent = manualType === 'NONE' ? promoPercentFor(activePromos, product.id) : 0;
+
         resolvedLines.push({
           productId: product.id,
           variantId: reqLine.variantId ?? null,
@@ -342,8 +358,8 @@ export class SalesService {
           warrantyEndsAt,
           unitPriceXof,
           unitCostXof,
-          discountType: reqLine.discountType || 'NONE',
-          discountValue: reqLine.discountValue || 0,
+          discountType: promoPercent > 0 ? 'PERCENT' : manualType,
+          discountValue: promoPercent > 0 ? promoPercent : reqLine.discountValue || 0,
         });
       }
 
@@ -363,7 +379,11 @@ export class SalesService {
       });
 
       // 3. Vérification permission et plafond de remise pour un Agent (Section 5.3)
-      if (actor.role === 'AGENT' && calc.discountTotalXof > 0) {
+      // Seules les remises saisies manuellement sont soumises à permission/plafond ; les promotions du propriétaire ne le sont pas.
+      const hasManualDiscount =
+        (input.globalDiscountType || 'NONE') !== 'NONE' ||
+        input.lines.some((l: { discountType?: string }) => (l.discountType || 'NONE') !== 'NONE');
+      if (actor.role === 'AGENT' && hasManualDiscount && calc.discountTotalXof > 0) {
         const access = actor.shopAccesses.find((s) => s.shopId === shopId);
         if (!access?.permissions['sales:discount']) {
           throw new ForbiddenException({
@@ -903,6 +923,8 @@ export class SalesService {
       userAgent: meta.userAgent,
       correlationId: meta.correlationId,
     });
+
+    void this.growthService.reverseSale(shopId, cancelled.id).catch(() => undefined);
 
     return cancelled;
   }

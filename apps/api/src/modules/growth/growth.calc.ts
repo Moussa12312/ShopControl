@@ -20,3 +20,18 @@ export function computeCommissionXof(totalXof: number, rule: CommissionRuleLike)
   if (totalXof < rule.minSaleXof) return 0;
   return Math.floor((totalXof * rule.percentBps) / 10_000);
 }
+
+export interface PromoLike {
+  discountPercent: number;
+  appliesToAll: boolean;
+  productIds: string[];
+}
+
+/** Meilleure remise applicable à un produit parmi les promotions actives (pas de cumul). */
+export function promoPercentFor(promos: PromoLike[], productId: string): number {
+  let best = 0;
+  for (const p of promos) {
+    if ((p.appliesToAll || p.productIds.includes(productId)) && p.discountPercent > best) best = p.discountPercent;
+  }
+  return best;
+}
