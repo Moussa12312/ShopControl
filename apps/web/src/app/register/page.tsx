@@ -624,6 +624,29 @@ export default function RegisterMerchantPage() {
                             <CheckCircle2 className="h-4 w-4 shrink-0 text-limeglow-400" />
                           ) : null}
                         </div>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {t === 'STREET_SHOP' ? (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                active
+                                  ? 'bg-limeglow-400/20 text-limeglow-300'
+                                  : 'bg-amber-100 text-amber-900'
+                              }`}
+                            >
+                              Retrait boutique uniquement (Sans livraison)
+                            </span>
+                          ) : (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                active
+                                  ? 'bg-white/15 text-emerald-100'
+                                  : 'bg-emerald-50 text-emerald-800'
+                              }`}
+                            >
+                              Retrait + Livraison à domicile
+                            </span>
+                          )}
+                        </div>
                         <p
                           className={`mt-1 line-clamp-2 text-[11px] leading-snug ${
                             active ? 'text-emerald-100/85' : 'text-slate-500'

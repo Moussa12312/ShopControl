@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import {
   BusinessProfileConfig,
+  canShopDeliver,
   DEFAULT_CURRENCY,
   DEFAULT_DAILY_REPORT_TIME,
   DEFAULT_DELIVERY_CONFIG,
@@ -128,11 +129,25 @@ export class ShopsService {
     const dbName = this.shopDbManager.buildShopDatabaseName(shopId);
     const shopType = normalizeShopType(input.shopType);
     const businessProfile = normalizeBusinessProfile(shopType, input.businessProfile);
+    const allowDelivery = canShopDeliver(shopType, businessProfile.enabledShopTypes);
     const currency = input.currency || merchant.currency || DEFAULT_CURRENCY;
     const timezone = input.timezone || merchant.defaultTimezone || DEFAULT_TIMEZONE;
     const dailyReportTime = input.dailyReportTime || DEFAULT_DAILY_REPORT_TIME;
     const openingHours = input.openingHours ?? DEFAULT_OPENING_HOURS;
     const paymentMethods = input.paymentMethods ?? DEFAULT_PAYMENT_METHODS;
+    const rawDeliveryCfg = {
+      ...DEFAULT_DELIVERY_CONFIG,
+      ...((input.deliveryConfig as object) || {}),
+    } as Record<string, unknown>;
+    const normalizedDeliveryConfig = allowDelivery
+      ? rawDeliveryCfg
+      : {
+          ...rawDeliveryCfg,
+          pickupEnabled: true,
+          deliveryEnabled: false,
+          defaultDeliveryFeeXof: 0,
+          deliveryZones: [],
+        };
 
     const shop = await this.controlPrisma.shop.create({
       data: {
@@ -157,7 +172,7 @@ export class ShopsService {
         requireOperatorPin: input.requireOperatorPin ?? false,
         openingHours: openingHours as object,
         paymentMethods: paymentMethods as object,
-        deliveryConfig: { ...DEFAULT_DELIVERY_CONFIG, ...((input.deliveryConfig as object) || {}) } as object,
+        deliveryConfig: normalizedDeliveryConfig as object,
         receiptSettings: { ...DEFAULT_RECEIPT_SETTINGS, ...((input.receiptSettings as object) || {}) } as object,
       },
     });
@@ -392,6 +407,33 @@ export class ShopsService {
       nextBusinessProfile = normalizeBusinessProfile(nextShopType);
     }
 
+    const effectiveProfileForDelivery =
+      nextBusinessProfile ?? normalizeBusinessProfile(nextShopType, existing.businessProfile);
+    const allowDeliveryOnUpdate = canShopDeliver(
+      nextShopType,
+      effectiveProfileForDelivery.enabledShopTypes,
+    );
+    const shouldUpdateDeliveryConfig =
+      input.deliveryConfig !== undefined || !allowDeliveryOnUpdate;
+    const mergedDeliveryConfig = shouldUpdateDeliveryConfig
+      ? (() => {
+          const base = {
+            ...DEFAULT_DELIVERY_CONFIG,
+            ...((existing.deliveryConfig as object) || {}),
+            ...((input.deliveryConfig as object) || {}),
+          } as Record<string, unknown>;
+          return allowDeliveryOnUpdate
+            ? base
+            : {
+                ...base,
+                pickupEnabled: true,
+                deliveryEnabled: false,
+                defaultDeliveryFeeXof: 0,
+                deliveryZones: [],
+              };
+        })()
+      : undefined;
+
     const updated = await this.controlPrisma.$transaction(async (tx) => {
       if (slugChanged) {
         // Supprime une éventuelle ancienne redirection si la boutique reprend un ancien slug qui lui appartenait
@@ -431,14 +473,8 @@ export class ShopsService {
           ...(input.paymentMethods !== undefined
             ? { paymentMethods: input.paymentMethods as object }
             : {}),
-          ...(input.deliveryConfig !== undefined
-            ? {
-              deliveryConfig: {
-                ...DEFAULT_DELIVERY_CONFIG,
-                ...((existing.deliveryConfig as object) || {}),
-                ...(input.deliveryConfig as object),
-              } as object,
-            }
+          ...(mergedDeliveryConfig !== undefined
+            ? { deliveryConfig: mergedDeliveryConfig as object }
             : {}),
           ...(input.receiptSettings !== undefined
             ? {

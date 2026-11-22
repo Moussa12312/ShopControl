@@ -607,6 +607,17 @@ export default function OwnerShopsPage() {
                               </span>
                             ) : null}
                           </div>
+                          <div className="mt-0.5">
+                            <span
+                              className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                                t === 'STREET_SHOP'
+                                  ? 'bg-amber-100 text-amber-900'
+                                  : 'bg-emerald-50 text-emerald-800'
+                              }`}
+                            >
+                              {t === 'STREET_SHOP' ? 'Retrait uniquement' : 'Retrait + Livraison'}
+                            </span>
+                          </div>
                           <p
                             className={`mt-0.5 line-clamp-2 text-[10px] leading-snug ${
                               selected && !alreadyActive ? 'text-emerald-100/85' : 'text-slate-500'

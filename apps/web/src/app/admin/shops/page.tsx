@@ -648,6 +648,23 @@ export default function AdminShopsPage() {
                           className="h-4 w-4 accent-limeglow-400"
                         />
                       </div>
+                      <div className="mt-1">
+                        <span
+                          className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                            st === 'STREET_SHOP'
+                              ? checked
+                                ? 'bg-amber-400/20 text-amber-200'
+                                : 'bg-amber-100 text-amber-900'
+                              : checked
+                                ? 'bg-white/15 text-emerald-100'
+                                : 'bg-emerald-50 text-emerald-800'
+                          }`}
+                        >
+                          {st === 'STREET_SHOP'
+                            ? 'Retrait boutique uniquement (Sans livraison)'
+                            : 'Retrait + Livraison à domicile'}
+                        </span>
+                      </div>
                       <p
                         className={`mt-1 text-[10px] leading-snug ${
                           checked ? 'text-emerald-100/85' : 'text-slate-500'

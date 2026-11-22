@@ -19,8 +19,10 @@ import * as argon2 from 'argon2';
 import {
   adminCreateShopSchema,
   adminUpdateShopTypesSchema,
+  canShopDeliver,
   createMerchantSchema,
   createSupportAccessSchema,
+  DEFAULT_DELIVERY_CONFIG,
   normalizeBusinessProfile,
   normalizeShopType,
   SHOP_TYPE_SHORT_LABELS,
@@ -454,12 +456,28 @@ export class AdminService {
     const nextProfile = normalizeBusinessProfile(primaryType, {
       enabledShopTypes: enabledTypes,
     });
+    const allowDelivery = canShopDeliver(primaryType, enabledTypes);
+    const currentDeliveryCfg = {
+      ...DEFAULT_DELIVERY_CONFIG,
+      ...((existing.deliveryConfig as object) || {}),
+    } as Record<string, unknown>;
 
     const updated = await this.controlPrisma.shop.update({
       where: { id: shopId },
       data: {
         shopType: primaryType,
         businessProfile: nextProfile as object,
+        ...(!allowDelivery
+          ? {
+              deliveryConfig: {
+                ...currentDeliveryCfg,
+                pickupEnabled: true,
+                deliveryEnabled: false,
+                defaultDeliveryFeeXof: 0,
+                deliveryZones: [],
+              } as object,
+            }
+          : {}),
       },
     });
 

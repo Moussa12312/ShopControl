@@ -576,7 +576,9 @@ export default function OrdersPage() {
                         className="sc-btn-lime text-xs"
                       >
                         <CheckCircle2 className="h-3.5 w-3.5" />
-                        Remettre & Encaisser (Vente + Ticket)
+                        {o.fulfillmentMode === 'PICKUP'
+                          ? 'Remettre au client & Encaisser'
+                          : 'Remettre & Encaisser (Vente + Ticket)'}
                       </button>
                       <button
                         type="button"

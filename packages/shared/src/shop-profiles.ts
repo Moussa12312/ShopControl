@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 export const SHOP_TYPES = [
-  'FASHION',
+  'STREET_SHOP',
   'GROCERY',
+  'FASHION',
   'COSMETICS',
   'HARDWARE',
   'ELECTRONICS',
@@ -15,8 +16,9 @@ export const STOREFRONT_LAYOUTS = ['GALLERY', 'QUICK_LIST', 'TECH_SPEC'] as cons
 export type StorefrontLayout = (typeof STOREFRONT_LAYOUTS)[number];
 
 export const SHOP_TYPE_LABELS: Record<ShopType, string> = {
+  STREET_SHOP: 'Boutique de rue (Détail & Retrait en boutique)',
+  GROCERY: 'Alimentation générale & Supérette (Retrait & Livraison)',
   FASHION: 'Mode, Vêtements, Chaussures & Accessoires',
-  GROCERY: 'Boutique de rue & Alimentation générale',
   COSMETICS: 'Cosmétique, Beauté, Hygiène & Parfumerie',
   HARDWARE: 'Quincaillerie, Matériaux BTP & Outillage',
   ELECTRONICS: 'Électronique, Téléphonie, Info & Électroménager',
@@ -25,8 +27,9 @@ export const SHOP_TYPE_LABELS: Record<ShopType, string> = {
 };
 
 export const SHOP_TYPE_SHORT_LABELS: Record<ShopType, string> = {
+  STREET_SHOP: 'Boutique de rue (Retrait)',
+  GROCERY: 'Alimentation & Supérette',
   FASHION: 'Mode & Vêtements',
-  GROCERY: 'Boutique de rue / Alimentation',
   COSMETICS: 'Cosmétique & Hygiène',
   HARDWARE: 'Quincaillerie & BTP',
   ELECTRONICS: 'Électronique & Téléphonie',
@@ -35,10 +38,12 @@ export const SHOP_TYPE_SHORT_LABELS: Record<ShopType, string> = {
 };
 
 export const SHOP_TYPE_DESCRIPTIONS: Record<ShopType, string> = {
+  STREET_SHOP:
+    'Vente au comptoir & vitrine QR en retrait sur place uniquement : sucre/riz au kg & au montant (ex: 100 F, 250 F), huile au litre, boîtes/sachets.',
+  GROCERY:
+    'Alimentation & supérette avec retrait en boutique ET livraison à domicile (quartiers & tarifs) : produits frais, DLC, packs/cartons & codes-barres.',
   FASHION:
     'Habits (tailles XS-3XL), chaussures (pointures 36-46), tissus/bazin au mètre, montres, lunettes, casquettes & sacs.',
-  GROCERY:
-    'Mix boutique de rue : céréales/sucre au kg & au montant (ex: 250 F), huiles au litre, lait/conserves à la boîte & au carton, boissons & hygiène.',
   COSMETICS:
     'Pommades, laits, crèmes & shampoings (ml/g + DLC), parfums, maquillage/mèches (teintes & longueurs), brosses à dents & savons (pièce / douzaine).',
   HARDWARE:
@@ -119,7 +124,7 @@ export const CATEGORY_SELLING_MODE_SPECS: Record<CategorySellingMode, CategorySe
     label: 'Vente au Poids (kg / g) + Sac (Gros) + Vente au montant (ex: 250 F)',
     shortLabel: 'Au Poids (kg) · Sac · Montant',
     description: 'Sucre, riz, farine, mil, sel, haricot, arachide… Vendu au kg, en sac ou au montant libre.',
-    shopTypes: ['GROCERY', 'GENERAL'],
+    shopTypes: ['STREET_SHOP', 'GROCERY', 'GENERAL'],
     defaultUnit: 'kg',
     suggestedUnits: ['kg', 'g', 'sachet', 'pot'],
     defaultBulkUnitLabel: 'sac',
@@ -143,7 +148,7 @@ export const CATEGORY_SELLING_MODE_SPECS: Record<CategorySellingMode, CategorySe
     label: 'Vente au Litre (L / bouteille) + Bidon (Gros) + Vente au montant',
     shortLabel: 'Au Litre (L) · Bidon · Montant',
     description: 'Huile alimentaire, lait liquide, miel, vinaigre… Vendu au litre, en bidon ou au montant libre.',
-    shopTypes: ['GROCERY', 'GENERAL'],
+    shopTypes: ['STREET_SHOP', 'GROCERY', 'GENERAL'],
     defaultUnit: 'L',
     suggestedUnits: ['L', 'bouteille', 'sachet', 'cl'],
     defaultBulkUnitLabel: 'bidon',
@@ -167,7 +172,7 @@ export const CATEGORY_SELLING_MODE_SPECS: Record<CategorySellingMode, CategorySe
     label: 'À la Boîte / Sachet / Bouteille + Carton/Pack (Gros) + Péremption (DLC)',
     shortLabel: 'Boîte/Bouteille · Carton · DLC',
     description: 'Lait en boîte, sardines, pâtes, tomate, cubes, biscuits, eau, jus, sodas, yaourts, œufs.',
-    shopTypes: ['GROCERY', 'GENERAL'],
+    shopTypes: ['STREET_SHOP', 'GROCERY', 'GENERAL'],
     defaultUnit: 'boîte',
     suggestedUnits: ['boîte', 'sachet', 'bouteille', 'paquet', 'pot', 'pièce', 'alvéole'],
     defaultBulkUnitLabel: 'carton',
@@ -191,7 +196,7 @@ export const CATEGORY_SELLING_MODE_SPECS: Record<CategorySellingMode, CategorySe
     label: 'À la Pièce / Paquet + Douzaine / Carton (Gros)',
     shortLabel: 'Pièce / Paquet · Douzaine / Carton',
     description: 'Brosses à dents, savons, lessive OMO, javel, piles, visserie, fournitures.',
-    shopTypes: ['GROCERY', 'COSMETICS', 'HARDWARE', 'GENERAL'],
+    shopTypes: ['STREET_SHOP', 'GROCERY', 'COSMETICS', 'HARDWARE', 'GENERAL'],
     defaultUnit: 'pièce',
     suggestedUnits: ['pièce', 'paquet', 'sachet', 'boîte', 'kg'],
     defaultBulkUnitLabel: 'douzaine',
@@ -501,7 +506,7 @@ export const CATEGORY_SELLING_MODE_SPECS: Record<CategorySellingMode, CategorySe
     label: 'Article standard à la pièce (Photo, Nom, Description, Prix & Stock)',
     shortLabel: 'Standard à la pièce',
     description: 'Articles courants vendus simplement à l’unité ou par pièce.',
-    shopTypes: ['FASHION', 'GROCERY', 'COSMETICS', 'HARDWARE', 'ELECTRONICS', 'AUTOMOTIVE', 'GENERAL'],
+    shopTypes: ['STREET_SHOP', 'FASHION', 'GROCERY', 'COSMETICS', 'HARDWARE', 'ELECTRONICS', 'AUTOMOTIVE', 'GENERAL'],
     defaultUnit: 'pièce',
     suggestedUnits: ['pièce', 'unité', 'paquet', 'boîte'],
     defaultBulkUnitLabel: null,
@@ -529,6 +534,33 @@ export interface SuggestedCategoryTemplate {
 }
 
 export const SHOP_TYPE_CATEGORY_TEMPLATES: Record<ShopType, SuggestedCategoryTemplate[]> = {
+  STREET_SHOP: [
+    {
+      name: 'Céréales, Sucre & Vrac au Poids',
+      sellingMode: 'WEIGHT_BULK',
+      description: 'Sucre, riz, farine, mil, sel, haricot (au kg, sac ou montant libre ex: 100 F, 250 F)',
+    },
+    {
+      name: 'Huiles & Liquides au Litre',
+      sellingMode: 'VOLUME_BULK',
+      description: 'Huile, lait liquide, miel, vinaigre (au litre, bouteille, bidon ou montant)',
+    },
+    {
+      name: 'Lait, Conserves & Épicerie',
+      sellingMode: 'PIECE_CARTON_DLC',
+      description: 'Lait en boîte/sachet, sardines, pâtes, tomate, cubes Maggi, thé, biscuits',
+    },
+    {
+      name: 'Boissons, Eau & Produits frais',
+      sellingMode: 'PIECE_CARTON_DLC',
+      description: 'Eau, jus, sodas, yaourts, œufs, beurre (unité, pack, casier ou alvéole)',
+    },
+    {
+      name: 'Hygiène & Entretien maison',
+      sellingMode: 'PIECE_CARTON',
+      description: 'Brosse à dents, savon, OMO, eau de Javel, piles, papier toilette (pièce / douzaine)',
+    },
+  ],
   GROCERY: [
     {
       name: 'Céréales, Sucre & Vrac au Poids',
@@ -696,6 +728,7 @@ export const SHOP_TYPE_CATEGORY_TEMPLATES: Record<ShopType, SuggestedCategoryTem
 };
 
 export const SHOP_TYPE_SUGGESTED_CATEGORIES: Record<ShopType, string[]> = {
+  STREET_SHOP: SHOP_TYPE_CATEGORY_TEMPLATES.STREET_SHOP.map((c) => c.name),
   FASHION: SHOP_TYPE_CATEGORY_TEMPLATES.FASHION.map((c) => c.name),
   GROCERY: SHOP_TYPE_CATEGORY_TEMPLATES.GROCERY.map((c) => c.name),
   COSMETICS: SHOP_TYPE_CATEGORY_TEMPLATES.COSMETICS.map((c) => c.name),
@@ -715,6 +748,7 @@ export const businessProfileSchema = z.object({
   enableSerialWarranty: z.boolean().default(false),
   enableBrandModel: z.boolean().default(false),
   enableFastPosFavorites: z.boolean().default(false),
+  allowDelivery: z.boolean().default(true),
   storefrontLayout: z.enum(STOREFRONT_LAYOUTS).default('GALLERY'),
   defaultUnits: z.array(z.string().trim().min(1).max(24)).max(15).default(['unité']),
   enabledShopTypes: z.array(z.enum(SHOP_TYPES)).optional(),
@@ -723,6 +757,21 @@ export const businessProfileSchema = z.object({
 export type BusinessProfileConfig = z.infer<typeof businessProfileSchema>;
 
 export const SHOP_TYPE_PRESETS: Record<ShopType, BusinessProfileConfig> = {
+  STREET_SHOP: {
+    enableSizes: false,
+    enableColors: false,
+    enableMultiPhotos: false,
+    enableBulkUnits: true,
+    enableAmountSale: true,
+    enableExpiryTracking: true,
+    enableSerialWarranty: false,
+    enableBrandModel: false,
+    enableFastPosFavorites: true,
+    allowDelivery: false,
+    storefrontLayout: 'QUICK_LIST',
+    defaultUnits: ['kg', 'g', 'L', 'boîte', 'sachet', 'bouteille', 'paquet', 'pièce', 'pot'],
+    enabledShopTypes: ['STREET_SHOP'],
+  },
   FASHION: {
     enableSizes: true,
     enableColors: true,
@@ -733,6 +782,7 @@ export const SHOP_TYPE_PRESETS: Record<ShopType, BusinessProfileConfig> = {
     enableSerialWarranty: false,
     enableBrandModel: true,
     enableFastPosFavorites: false,
+    allowDelivery: true,
     storefrontLayout: 'GALLERY',
     defaultUnits: ['pièce', 'paire', 'ensemble', 'mètre', 'complet'],
     enabledShopTypes: ['FASHION'],
@@ -747,6 +797,7 @@ export const SHOP_TYPE_PRESETS: Record<ShopType, BusinessProfileConfig> = {
     enableSerialWarranty: false,
     enableBrandModel: false,
     enableFastPosFavorites: true,
+    allowDelivery: true,
     storefrontLayout: 'QUICK_LIST',
     defaultUnits: ['kg', 'g', 'L', 'boîte', 'sachet', 'bouteille', 'paquet', 'pièce', 'pot'],
     enabledShopTypes: ['GROCERY'],
@@ -761,6 +812,7 @@ export const SHOP_TYPE_PRESETS: Record<ShopType, BusinessProfileConfig> = {
     enableSerialWarranty: false,
     enableBrandModel: true,
     enableFastPosFavorites: true,
+    allowDelivery: true,
     storefrontLayout: 'GALLERY',
     defaultUnits: ['flacon', 'pot', 'tube', 'pièce', 'paquet', 'boîte'],
     enabledShopTypes: ['COSMETICS'],
@@ -775,6 +827,7 @@ export const SHOP_TYPE_PRESETS: Record<ShopType, BusinessProfileConfig> = {
     enableSerialWarranty: true,
     enableBrandModel: true,
     enableFastPosFavorites: true,
+    allowDelivery: true,
     storefrontLayout: 'QUICK_LIST',
     defaultUnits: ['pièce', 'sac', 'barre', 'mètre', 'm²', 'pot', 'kg', 'rouleau', 'boîte'],
     enabledShopTypes: ['HARDWARE'],
@@ -789,6 +842,7 @@ export const SHOP_TYPE_PRESETS: Record<ShopType, BusinessProfileConfig> = {
     enableSerialWarranty: true,
     enableBrandModel: true,
     enableFastPosFavorites: false,
+    allowDelivery: true,
     storefrontLayout: 'TECH_SPEC',
     defaultUnits: ['pièce', 'kit', 'pack', 'unité'],
     enabledShopTypes: ['ELECTRONICS'],
@@ -803,6 +857,7 @@ export const SHOP_TYPE_PRESETS: Record<ShopType, BusinessProfileConfig> = {
     enableSerialWarranty: true,
     enableBrandModel: true,
     enableFastPosFavorites: false,
+    allowDelivery: true,
     storefrontLayout: 'TECH_SPEC',
     defaultUnits: ['unité', 'pièce', 'paire', 'bidon', 'L'],
     enabledShopTypes: ['AUTOMOTIVE'],
@@ -817,11 +872,27 @@ export const SHOP_TYPE_PRESETS: Record<ShopType, BusinessProfileConfig> = {
     enableSerialWarranty: true,
     enableBrandModel: true,
     enableFastPosFavorites: true,
+    allowDelivery: true,
     storefrontLayout: 'GALLERY',
     defaultUnits: ['pièce', 'unité', 'boîte', 'paquet', 'kg', 'L', 'mètre'],
     enabledShopTypes: ['GENERAL'],
   },
 };
+
+export function canShopDeliver(
+  shopType: unknown,
+  enabledShopTypes?: readonly unknown[] | null,
+): boolean {
+  const primary = normalizeShopType(shopType);
+  const rawList = Array.isArray(enabledShopTypes)
+    ? enabledShopTypes.filter((t): t is ShopType =>
+        typeof t === 'string' && (SHOP_TYPES as readonly string[]).includes(t),
+      )
+    : [];
+  const types = Array.from(new Set<ShopType>([primary, ...rawList]));
+  // Si la boutique est uniquement une Boutique de rue (STREET_SHOP), la livraison est désactivée
+  return types.some((t) => SHOP_TYPE_PRESETS[t].allowDelivery);
+}
 
 export function normalizeShopType(raw: unknown): ShopType {
   if (typeof raw === 'string' && (SHOP_TYPES as readonly string[]).includes(raw)) {
@@ -900,6 +971,7 @@ export function normalizeCategorySellingMode(
   switch (fallbackShopType) {
     case 'FASHION':
       return 'APPAREL_SIZE_COLOR';
+    case 'STREET_SHOP':
     case 'GROCERY':
       return 'PIECE_CARTON_DLC';
     case 'COSMETICS':
@@ -995,6 +1067,7 @@ export function normalizeBusinessProfile(
         enableSerialWarranty: acc.enableSerialWarranty || p.enableSerialWarranty,
         enableBrandModel: acc.enableBrandModel || p.enableBrandModel,
         enableFastPosFavorites: acc.enableFastPosFavorites || p.enableFastPosFavorites,
+        allowDelivery: acc.allowDelivery || p.allowDelivery,
         defaultUnits: Array.from(new Set([...acc.defaultUnits, ...p.defaultUnits])),
       };
     },
@@ -1008,9 +1081,12 @@ export function normalizeBusinessProfile(
       enableSerialWarranty: preset.enableSerialWarranty,
       enableBrandModel: preset.enableBrandModel,
       enableFastPosFavorites: preset.enableFastPosFavorites,
+      allowDelivery: preset.allowDelivery,
       defaultUnits: [...preset.defaultUnits],
     },
   );
+
+  const allowDelivery = canShopDeliver(safeType, enabledShopTypes);
 
   return {
     enableSizes:
@@ -1045,6 +1121,7 @@ export function normalizeBusinessProfile(
       typeof obj.enableFastPosFavorites === 'boolean'
         ? obj.enableFastPosFavorites
         : mergedFromTypes.enableFastPosFavorites,
+    allowDelivery,
     storefrontLayout:
       typeof obj.storefrontLayout === 'string' &&
       (STOREFRONT_LAYOUTS as readonly string[]).includes(obj.storefrontLayout)

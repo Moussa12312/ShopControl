@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import {
   BusinessProfileConfig,
+  canShopDeliver,
   formatDateTimeInTimezone,
   formatXof,
   FulfillmentMode,
@@ -201,9 +202,14 @@ interface CustomerProfileData {
 
 export function StorefrontClient({ initialData }: { initialData: StorefrontData }) {
   const { shop, categories, products, isOpenNow } = initialData;
-  const deliveryCfg = shop.deliveryConfig;
   const shopType = normalizeShopType(shop.shopType);
   const profile = normalizeBusinessProfile(shopType, shop.businessProfile);
+  const allowDelivery = canShopDeliver(shopType, profile.enabledShopTypes);
+  const deliveryCfg = {
+    ...shop.deliveryConfig,
+    pickupEnabled: allowDelivery ? shop.deliveryConfig.pickupEnabled : true,
+    deliveryEnabled: allowDelivery ? shop.deliveryConfig.deliveryEnabled : false,
+  };
   const layout = profile.storefrontLayout;
 
   const [search, setSearch] = useState('');
@@ -1812,50 +1818,62 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                   </div>
 
                   {/* Mode retrait / livraison */}
-                  <div
-                    className={`grid gap-2 ${
-                      deliveryCfg.pickupEnabled && deliveryCfg.deliveryEnabled
-                        ? 'grid-cols-2'
-                        : 'grid-cols-1'
-                    }`}
-                  >
-                    {deliveryCfg.pickupEnabled ? (
-                      <button
-                        type="button"
-                        onClick={() => setFulfillmentMode('PICKUP')}
-                        className={`flex flex-col items-center gap-1 rounded-2xl border p-3 text-xs font-bold transition ${
-                          fulfillmentMode === 'PICKUP'
-                            ? 'border-forest-900 bg-forest-900 text-white'
-                            : 'border-slate-200 bg-white text-slate-700'
-                        }`}
-                      >
-                        <ShoppingBag className="h-4 w-4" />
-                        <span>Retrait boutique</span>
-                        <span className="text-[10px] opacity-75">Gratuit</span>
-                      </button>
-                    ) : null}
-                    {deliveryCfg.deliveryEnabled ? (
-                      <button
-                        type="button"
-                        onClick={() => setFulfillmentMode('DELIVERY')}
-                        className={`flex flex-col items-center gap-1 rounded-2xl border p-3 text-xs font-bold transition ${
-                          fulfillmentMode === 'DELIVERY'
-                            ? 'border-forest-900 bg-forest-900 text-white'
-                            : 'border-slate-200 bg-white text-slate-700'
-                        }`}
-                      >
-                        <Truck className="h-4 w-4" />
-                        <span>Livraison</span>
-                        <span className="text-[10px] opacity-75">
-                          {deliveryDistrict.trim() && matchedZone
-                            ? `+${formatXof(matchedZone.feeXof)}`
-                            : deliveryCfg.deliveryZones && deliveryCfg.deliveryZones.length > 0
-                              ? `dès ${formatXof(Math.min(...deliveryCfg.deliveryZones.map((z) => z.feeXof)))}`
-                              : `+${formatXof(deliveryCfg.defaultDeliveryFeeXof)}`}
-                        </span>
-                      </button>
-                    ) : null}
-                  </div>
+                  {!allowDelivery ? (
+                    <div className="flex items-center justify-between rounded-2xl border border-forest-900 bg-forest-900 px-3.5 py-2.5 text-xs font-bold text-white">
+                      <span className="inline-flex items-center gap-2">
+                        <ShoppingBag className="h-4 w-4 text-limeglow-400" />
+                        <span>Retrait directement à la boutique</span>
+                      </span>
+                      <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-extrabold text-limeglow-300">
+                        Retrait gratuit
+                      </span>
+                    </div>
+                  ) : (
+                    <div
+                      className={`grid gap-2 ${
+                        deliveryCfg.pickupEnabled && deliveryCfg.deliveryEnabled
+                          ? 'grid-cols-2'
+                          : 'grid-cols-1'
+                      }`}
+                    >
+                      {deliveryCfg.pickupEnabled ? (
+                        <button
+                          type="button"
+                          onClick={() => setFulfillmentMode('PICKUP')}
+                          className={`flex flex-col items-center gap-1 rounded-2xl border p-3 text-xs font-bold transition ${
+                            fulfillmentMode === 'PICKUP'
+                              ? 'border-forest-900 bg-forest-900 text-white'
+                              : 'border-slate-200 bg-white text-slate-700'
+                          }`}
+                        >
+                          <ShoppingBag className="h-4 w-4" />
+                          <span>Retrait boutique</span>
+                          <span className="text-[10px] opacity-75">Gratuit</span>
+                        </button>
+                      ) : null}
+                      {deliveryCfg.deliveryEnabled ? (
+                        <button
+                          type="button"
+                          onClick={() => setFulfillmentMode('DELIVERY')}
+                          className={`flex flex-col items-center gap-1 rounded-2xl border p-3 text-xs font-bold transition ${
+                            fulfillmentMode === 'DELIVERY'
+                              ? 'border-forest-900 bg-forest-900 text-white'
+                              : 'border-slate-200 bg-white text-slate-700'
+                          }`}
+                        >
+                          <Truck className="h-4 w-4" />
+                          <span>Livraison</span>
+                          <span className="text-[10px] opacity-75">
+                            {deliveryDistrict.trim() && matchedZone
+                              ? `+${formatXof(matchedZone.feeXof)}`
+                              : deliveryCfg.deliveryZones && deliveryCfg.deliveryZones.length > 0
+                                ? `dès ${formatXof(Math.min(...deliveryCfg.deliveryZones.map((z) => z.feeXof)))}`
+                                : `+${formatXof(deliveryCfg.defaultDeliveryFeeXof)}`}
+                          </span>
+                        </button>
+                      ) : null}
+                    </div>
+                  )}
 
                   {/* Coordonnées sans compte */}
                   <div className="space-y-2.5 border-t border-slate-100 pt-3">

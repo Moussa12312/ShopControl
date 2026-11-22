@@ -28,6 +28,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import * as QRCode from 'qrcode';
 import {
   blockPhoneSchema,
+  canShopDeliver,
   completeOrderToSaleSchema,
   createPublicOrderSchema,
   customerLoginSchema,
@@ -170,10 +171,22 @@ export class OrdersService {
       };
     }
 
-    const deliveryConfig: DeliveryConfig = {
+    const shopType = normalizeShopType(shop.shopType);
+    const businessProfile = normalizeBusinessProfile(shopType, shop.businessProfile);
+    const allowDelivery = canShopDeliver(shopType, businessProfile.enabledShopTypes);
+    const rawDeliveryConfig: DeliveryConfig = {
       ...DEFAULT_DELIVERY_CONFIG,
       ...((shop.deliveryConfig as Partial<DeliveryConfig>) || {}),
     };
+    const deliveryConfig: DeliveryConfig = allowDelivery
+      ? rawDeliveryConfig
+      : {
+          ...rawDeliveryConfig,
+          pickupEnabled: true,
+          deliveryEnabled: false,
+          defaultDeliveryFeeXof: 0,
+          deliveryZones: [],
+        };
     const receiptSettings = {
       ...DEFAULT_RECEIPT_SETTINGS,
       ...((shop.receiptSettings as Record<string, unknown>) || {}),
@@ -312,7 +325,6 @@ export class OrdersService {
       });
     }
 
-    const shopType = normalizeShopType(shop.shopType);
     return {
       redirectToSlug: null,
       available: true,
@@ -323,7 +335,7 @@ export class OrdersService {
         name: shop.name,
         slug: shop.slug,
         shopType,
-        businessProfile: normalizeBusinessProfile(shopType, shop.businessProfile),
+        businessProfile,
         logoUrl: shop.logoUrl,
         slogan: (receiptSettings as any).slogan || '',
         phone: shop.phone,
@@ -404,18 +416,39 @@ export class OrdersService {
       });
     }
 
-    const deliveryConfig: DeliveryConfig = {
+    const shopType = normalizeShopType(shop.shopType);
+    const businessProfile = normalizeBusinessProfile(shopType, shop.businessProfile);
+    const allowDelivery = canShopDeliver(shopType, businessProfile.enabledShopTypes);
+
+    if (!allowDelivery && input.fulfillmentMode === 'DELIVERY') {
+      throw new BadRequestException({
+        code: 'STREET_SHOP_PICKUP_ONLY',
+        message: 'Cette boutique de rue propose uniquement le retrait sur place en boutique.',
+      });
+    }
+
+    const rawDeliveryConfig: DeliveryConfig = {
       ...DEFAULT_DELIVERY_CONFIG,
       ...((shop.deliveryConfig as Partial<DeliveryConfig>) || {}),
     };
+    const deliveryConfig: DeliveryConfig = allowDelivery
+      ? rawDeliveryConfig
+      : {
+          ...rawDeliveryConfig,
+          pickupEnabled: true,
+          deliveryEnabled: false,
+          defaultDeliveryFeeXof: 0,
+          deliveryZones: [],
+        };
+    const effectiveFulfillmentMode = allowDelivery ? input.fulfillmentMode : 'PICKUP';
 
-    if (input.fulfillmentMode === 'PICKUP' && !deliveryConfig.pickupEnabled) {
+    if (effectiveFulfillmentMode === 'PICKUP' && !deliveryConfig.pickupEnabled) {
       throw new BadRequestException({
         code: 'FULFILLMENT_DISABLED',
         message: 'Le retrait en boutique n’est pas activé pour cette boutique.',
       });
     }
-    if (input.fulfillmentMode === 'DELIVERY') {
+    if (effectiveFulfillmentMode === 'DELIVERY') {
       if (!deliveryConfig.deliveryEnabled) {
         throw new BadRequestException({
           code: 'FULFILLMENT_DISABLED',
@@ -572,7 +605,7 @@ export class OrdersService {
     }
 
     let deliveryFeeXof = 0;
-    if (input.fulfillmentMode === 'DELIVERY') {
+    if (effectiveFulfillmentMode === 'DELIVERY') {
       const matchedZone = (deliveryConfig.deliveryZones || []).find(
         (z) => z.name.toLowerCase() === (input.deliveryDistrict || '').trim().toLowerCase(),
       );
@@ -605,12 +638,12 @@ export class OrdersService {
         orderNumber,
         secretToken,
         status: 'NEW',
-        fulfillmentMode: input.fulfillmentMode,
+        fulfillmentMode: effectiveFulfillmentMode,
         clientId: linkedClientId,
         clientName: input.clientName.trim(),
         clientPhone: cleanPhone,
-        deliveryAddress: input.fulfillmentMode === 'DELIVERY' ? input.deliveryAddress?.trim() || null : null,
-        deliveryDistrict: input.fulfillmentMode === 'DELIVERY' ? input.deliveryDistrict?.trim() || null : null,
+        deliveryAddress: effectiveFulfillmentMode === 'DELIVERY' ? input.deliveryAddress?.trim() || null : null,
+        deliveryDistrict: effectiveFulfillmentMode === 'DELIVERY' ? input.deliveryDistrict?.trim() || null : null,
         deliveryNotes: input.deliveryNotes?.trim() || null,
         deliveryFeeXof,
         subtotalXof,

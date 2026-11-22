@@ -56,6 +56,14 @@ interface MinimalLookupOrder {
   updatedAt: string;
 }
 
+function getTrackedOrderStatusLabel(status: OnlineOrderStatus, fulfillmentMode?: string): string {
+  if (fulfillmentMode === 'PICKUP') {
+    if (status === 'READY') return 'Prête à retirer à la boutique';
+    if (status === 'COMPLETED') return 'Retirée à la boutique';
+  }
+  return ONLINE_ORDER_STATUS_LABELS[status] || status;
+}
+
 export default function PublicTrackOrderPage() {
   const params = useParams<{ slug: string }>();
   const searchParams = useSearchParams();
@@ -164,21 +172,21 @@ export default function PublicTrackOrderPage() {
                 </h1>
               </div>
               <span className="rounded-full bg-forest-900 px-3.5 py-1.5 text-xs font-extrabold text-limeglow-400">
-                {ONLINE_ORDER_STATUS_LABELS[fullData.order.status]}
+                {getTrackedOrderStatusLabel(fullData.order.status, fullData.order.fulfillmentMode)}
               </span>
             </div>
 
             {/* Frise chronologique */}
             <div className="space-y-2.5">
               <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
-                Suivi de l’avancement
+                Suivi de l’avancement ({fullData.order.fulfillmentMode === 'PICKUP' ? 'Retrait en boutique' : 'Livraison à domicile'})
               </p>
               {fullData.order.statusEvents.map((ev, idx) => (
                 <div key={idx} className="flex items-start gap-3 text-xs">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
                   <div>
                     <p className="font-bold text-slate-900">
-                      {ONLINE_ORDER_STATUS_LABELS[ev.toStatus]}
+                      {getTrackedOrderStatusLabel(ev.toStatus, fullData.order.fulfillmentMode)}
                     </p>
                     {ev.reason ? <p className="text-slate-600">{ev.reason}</p> : null}
                     <p className="text-[11px] text-slate-400">

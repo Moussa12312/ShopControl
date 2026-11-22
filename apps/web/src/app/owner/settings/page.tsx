@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import {
   BusinessProfileConfig,
+  canShopDeliver,
   DEFAULT_DELIVERY_CONFIG,
   DEFAULT_OPENING_HOURS,
   DEFAULT_RECEIPT_SETTINGS,
@@ -472,6 +473,12 @@ export default function OwnerSettingsPage() {
   };
 
   const currentShop = shopList.find((s) => s.id === activeShopId) || null;
+  const currentShopCanDeliver = currentShop
+    ? canShopDeliver(
+        currentShop.shopType,
+        normalizeBusinessProfile(currentShop.shopType, currentShop.businessProfile).enabledShopTypes,
+      )
+    : true;
 
   return (
     <AppShell
@@ -852,49 +859,62 @@ export default function OwnerSettingsPage() {
                       </h2>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <label className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-porcelain-50 p-3 text-xs font-bold text-slate-800">
-                        <input
-                          type="checkbox"
-                          checked={shopForm.pickupEnabled}
-                          onChange={(e) =>
-                            setShopForm({ ...shopForm, pickupEnabled: e.target.checked })
-                          }
-                          className="h-4 w-4 accent-brand-700"
-                        />
-                        Autoriser le retrait en boutique
-                      </label>
-                      <label className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-porcelain-50 p-3 text-xs font-bold text-slate-800">
-                        <input
-                          type="checkbox"
-                          checked={shopForm.deliveryEnabled}
-                          onChange={(e) =>
-                            setShopForm({ ...shopForm, deliveryEnabled: e.target.checked })
-                          }
-                          className="h-4 w-4 accent-brand-700"
-                        />
-                        Proposer la livraison client
-                      </label>
-                    </div>
+                    {!currentShopCanDeliver ? (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold text-amber-950">
+                        <p className="font-extrabold">
+                          🏪 Boutique de rue — Retrait en boutique uniquement
+                        </p>
+                        <p className="mt-1 font-normal text-amber-900">
+                          Votre boutique est configurée en <strong>Boutique de rue</strong> : vos clients commandent en ligne sur la vitrine QR et récupèrent leurs achats directement au comptoir (0 frais de livraison).
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-porcelain-50 p-3 text-xs font-bold text-slate-800">
+                          <input
+                            type="checkbox"
+                            checked={shopForm.pickupEnabled}
+                            onChange={(e) =>
+                              setShopForm({ ...shopForm, pickupEnabled: e.target.checked })
+                            }
+                            className="h-4 w-4 accent-brand-700"
+                          />
+                          Autoriser le retrait en boutique
+                        </label>
+                        <label className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-porcelain-50 p-3 text-xs font-bold text-slate-800">
+                          <input
+                            type="checkbox"
+                            checked={shopForm.deliveryEnabled}
+                            onChange={(e) =>
+                              setShopForm({ ...shopForm, deliveryEnabled: e.target.checked })
+                            }
+                            className="h-4 w-4 accent-brand-700"
+                          />
+                          Proposer la livraison client
+                        </label>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700">
-                          Frais livraison (XOF)
-                        </label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={shopForm.defaultDeliveryFeeXof}
-                          onChange={(e) =>
-                            setShopForm({
-                              ...shopForm,
-                              defaultDeliveryFeeXof: Number(e.target.value),
-                            })
-                          }
-                          className="sc-input mt-1 tabular"
-                        />
-                      </div>
+                      {currentShopCanDeliver ? (
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700">
+                            Frais livraison (XOF)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={shopForm.defaultDeliveryFeeXof}
+                            onChange={(e) =>
+                              setShopForm({
+                                ...shopForm,
+                                defaultDeliveryFeeXof: Number(e.target.value),
+                              })
+                            }
+                            className="sc-input mt-1 tabular"
+                          />
+                        </div>
+                      ) : null}
                       <div>
                         <label className="block text-xs font-semibold text-slate-700">
                           Qté max / commande
@@ -929,7 +949,7 @@ export default function OwnerSettingsPage() {
                     </div>
 
                     {/* Tarifs par Quartier / Zone de livraison */}
-                    {shopForm.deliveryEnabled ? (
+                    {currentShopCanDeliver && shopForm.deliveryEnabled ? (
                       <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 sm:p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
