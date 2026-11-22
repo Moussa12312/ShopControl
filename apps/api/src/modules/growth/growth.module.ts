@@ -26,6 +26,7 @@ import { ControlPrismaService } from '../../common/database/control-prisma.servi
 import { ShopDatabaseManagerService } from '../../common/database/shop-database-manager.service';
 import { ShopScopeGuard } from '../../common/guards/shop-scope.guard';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
+import { computeCommissionXof, computeLoyaltyPoints, pickCommissionRule } from './growth.calc';
 
 /* ------------------------------------------------------------------ Schémas */
 
@@ -243,7 +244,7 @@ export class GrowthService {
     const client = await this.shopDbManager.getClientForShop(shopId);
     const rule = await client.loyaltyRule.findFirst();
     if (!rule?.isEnabled || sale.totalXof < rule.minSaleXof) return;
-    const points = Math.floor(sale.totalXof / 100) * rule.pointsPer100Xof;
+    const points = computeLoyaltyPoints(sale.totalXof, rule.pointsPer100Xof, rule.minSaleXof);
     if (points <= 0) return;
 
     await client.$transaction(async (tx) => {
@@ -289,9 +290,9 @@ export class GrowthService {
       where: { isActive: true, OR: [{ agentUserId: sale.actorUserId }, { agentUserId: null }] },
     });
     // La règle propre à l'agent prime sur la règle globale.
-    const rule = rules.find((r) => r.agentUserId === sale.actorUserId) ?? rules.find((r) => r.agentUserId === null);
-    if (!rule || sale.totalXof < rule.minSaleXof) return;
-    const earned = Math.floor((sale.totalXof * rule.percentBps) / 10_000);
+    const rule = pickCommissionRule(rules, sale.actorUserId);
+    if (!rule) return;
+    const earned = computeCommissionXof(sale.totalXof, rule);
     if (earned <= 0) return;
     const now = new Date();
     await client.commissionLedger.create({
