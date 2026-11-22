@@ -1,3 +1,13 @@
+---
+title: ShopControl
+emoji: 🛍️
+colorFrom: green
+colorTo: emerald
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # ShopControl — Plateforme SaaS Multi-Boutiques & E-commerce QR (Lots 1 à 11)
 
 Plateforme web SaaS complète de gestion commerciale multi-boutiques et d’e-commerce par QR code, bâtie avec une **isolation physique par base de données PostgreSQL dédiée par boutique**, un journal d’audit immuable chaîné SHA-256, des profils métiers multi-secteurs (Mode, Boutique de quartier / Alimentation, Cosmétique, Électronique, Commerce général), des tickets thermiques 58/80 mm & PDF, des transferts inter-boutiques supervisés et un comptoir PWA résilient hors-ligne (Option B).
