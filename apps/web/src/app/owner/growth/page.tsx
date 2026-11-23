@@ -14,7 +14,7 @@ const TABS: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
   { key: 'loyalty', label: 'Fidélité', icon: Gift },
   { key: 'promotions', label: 'Promotions', icon: Tag },
   { key: 'commissions', label: 'Commissions', icon: Banknote },
-  { key: 'mobile', label: 'Mobile Money & SMS', icon: Smartphone },
+  { key: 'mobile', label: 'Notifications SMS', icon: MessageSquare },
   { key: 'ohada', label: 'Comptabilité OHADA', icon: FileSpreadsheet },
   { key: 'backup', label: 'Sauvegarde', icon: Cloud },
 ];
@@ -639,12 +639,9 @@ function MobileTab({ shopId, flash }: TabProps) {
         shopId,
         body: {
           smsEnabled: Boolean(cfg.smsEnabled),
-          waveLink: cfg.waveLink ?? '',
-          wavePhone: cfg.wavePhone ?? '',
-          orangeMoneyCode: cfg.orangeMoneyCode ?? '',
         },
       });
-      flash(true, 'Configuration enregistrée.');
+      flash(true, 'Paramètres SMS enregistrés.');
       void load();
     } catch (e) {
       flash(false, e);
@@ -655,24 +652,8 @@ function MobileTab({ shopId, flash }: TabProps) {
   if (!cfg) return <LoadingSkeleton />;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <section className={`${cardCls} space-y-3`}>
-        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-          <Smartphone className="h-4 w-4 text-brand-700" aria-hidden /> Paiement mobile (QR)
-        </h2>
-        <Field label="Lien de paiement Wave Business" hint="Le montant est ajouté automatiquement au QR.">
-          <input className={inputCls} placeholder="https://pay.wave.com/m/..." value={cfg.waveLink ?? ''} onChange={(e) => setCfg({ ...cfg, waveLink: e.target.value })} />
-        </Field>
-        <Field label="Numéro Wave marchand">
-          <input className={inputCls} inputMode="tel" value={cfg.wavePhone ?? ''} onChange={(e) => setCfg({ ...cfg, wavePhone: e.target.value })} />
-        </Field>
-        <Field label="Code marchand Orange Money">
-          <input className={inputCls} value={cfg.orangeMoneyCode ?? ''} onChange={(e) => setCfg({ ...cfg, orangeMoneyCode: e.target.value })} />
-        </Field>
-        <button className={btnCls} onClick={save}>Enregistrer</button>
-      </section>
-
-      <section className={`${cardCls} space-y-3`}>
+    <div className="max-w-2xl">
+      <section className={`${cardCls} space-y-4`}>
         <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
           <MessageSquare className="h-4 w-4 text-brand-700" aria-hidden /> Notifications SMS Clients
         </h2>
