@@ -291,7 +291,10 @@ export default function RegisterMerchantPage() {
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#f4f8f7] lg:grid lg:grid-cols-12 lg:bg-white">
       {/* En-tête compact sur Mobile (< lg) + Panneau complet sur Desktop (lg:col-span-5) */}
-      <div className="obsidian-hero flex flex-col justify-between px-4 py-4 text-white sm:px-8 sm:py-6 lg:col-span-5 lg:min-h-screen lg:px-10 lg:py-10">
+      <div
+        className="obsidian-hero flex flex-col justify-between px-4 py-4 text-white sm:px-8 sm:py-6 lg:col-span-5 lg:min-h-screen lg:px-10 lg:py-10"
+        style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))' }}
+      >
         <div className="space-y-4 lg:space-y-6">
           <div className="flex items-center justify-between gap-2">
             <Link href="/" className="flex min-w-0 items-center gap-2.5 hover:opacity-90 sm:gap-3">

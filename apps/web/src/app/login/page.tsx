@@ -98,7 +98,10 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#f4f8f7] lg:grid lg:grid-cols-12 lg:bg-white">
       {/* Panneau gauche Obsidian Emerald (compact sur mobile, plein écran sur desktop) */}
-      <div className="obsidian-hero flex flex-col justify-between px-4 py-5 text-white sm:px-8 sm:py-7 lg:col-span-5 lg:min-h-screen lg:px-12 lg:py-12">
+      <div
+        className="obsidian-hero flex flex-col justify-between px-4 py-5 text-white sm:px-8 sm:py-7 lg:col-span-5 lg:min-h-screen lg:px-12 lg:py-12"
+        style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top, 0px))' }}
+      >
         <div>
           <div className="flex items-center justify-between gap-2">
             <Link href="/" className="flex items-center gap-3 hover:opacity-90">
