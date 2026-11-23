@@ -616,7 +616,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   return (
     <div className="min-h-screen w-full overflow-x-clip overscroll-none bg-porcelain-100 pb-28 sm:pb-24">
       {/* Barre supérieure fixe & 100% responsive mobile + desktop (respecte la barre de statut mobile) */}
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-forest-950/95 pt-[env(safe-area-inset-top,0px)] text-white backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-forest-950 pt-[env(safe-area-inset-top,0px)] text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2.5">
             {shop.logoUrl ? (

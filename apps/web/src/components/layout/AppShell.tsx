@@ -600,7 +600,7 @@ export function AppShell({
 
       {/* Header FIXE Obsidian Emerald — profil cliquable & sélecteur Supervision/Gestion */}
       <header
-        className={`no-print fixed left-0 right-0 top-0 z-30 flex min-h-14 items-center justify-between gap-2 border-b border-white/[0.08] bg-forest-950/95 px-3 pt-[env(safe-area-inset-top,0px)] text-white backdrop-blur-md transition-all duration-200 sm:px-5 ${headerLeftClass}`}
+        className={`no-print fixed left-0 right-0 top-0 z-30 flex min-h-14 items-center justify-between gap-2 border-b border-white/[0.08] bg-forest-950 px-3 pt-[env(safe-area-inset-top,0px)] text-white transition-all duration-200 sm:px-5 ${headerLeftClass}`}
         style={{ height: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
       >
         {/* Gauche : Hamburger mobile + Titre page active */}
@@ -1006,7 +1006,7 @@ export function AppShell({
         {/* Dock mobile natif fixé en bas (< lg) — Obsidian Emerald */}
         <nav
           aria-label="Navigation rapide mobile"
-          className="no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950/95 px-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 text-[10px] font-semibold text-[#8aa8a2] backdrop-blur-md lg:hidden"
+          className="no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950 px-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 text-[10px] font-semibold text-[#8aa8a2] lg:hidden"
         >
           {mobileDockItems.map((item) => {
             const Icon = item.icon;
