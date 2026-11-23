@@ -902,22 +902,35 @@ export function AppShell({
                 ) : null}
 
                 <div className="py-1">
-                  <Link
-                    href={profileHref}
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
-                  >
-                    <User className="h-4 w-4 text-slate-400" />
-                    <span>Mon profil</span>
-                  </Link>
-                  <Link
-                    href={settingsHref}
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
-                  >
-                    <Settings className="h-4 w-4 text-slate-400" />
-                    <span>Paramètres</span>
-                  </Link>
+                  {profileHref !== settingsHref ? (
+                    <>
+                      <Link
+                        href={profileHref}
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                      >
+                        <User className="h-4 w-4 text-slate-400" />
+                        <span>Mon profil</span>
+                      </Link>
+                      <Link
+                        href={settingsHref}
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                      >
+                        <Settings className="h-4 w-4 text-slate-400" />
+                        <span>Paramètres</span>
+                      </Link>
+                    </>
+                  ) : (
+                    <Link
+                      href={settingsHref}
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                    >
+                      <Settings className="h-4 w-4 text-slate-400" />
+                      <span>Paramètres du compte</span>
+                    </Link>
+                  )}
                 </div>
 
                 <div className="border-t border-slate-100 pt-1">

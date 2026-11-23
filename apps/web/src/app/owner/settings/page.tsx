@@ -486,7 +486,7 @@ export default function OwnerSettingsPage() {
       title="Paramètres, Logo & Boutique"
       subtitle="Personnalisez l’identité visuelle (logo, coordonnées, tickets, vitrine QR), votre abonnement et votre sécurité."
       headerActions={
-        <div className="grid w-full grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-forest-800/80 p-0.5 text-[11px] font-semibold sm:inline-flex sm:w-auto sm:rounded-full sm:text-xs">
+        <div className="grid w-full grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-forest-900/90 p-1 text-[11px] font-semibold sm:inline-flex sm:w-auto sm:rounded-full sm:text-xs">
           {(
             [
               { id: 'shop', label: 'Logo & Boutique', shortLabel: 'Boutique', icon: Store },
@@ -503,10 +503,10 @@ export default function OwnerSettingsPage() {
                   setTab(t.id);
                   setSavedMsg(null);
                 }}
-                className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-xl px-2 py-1.5 font-bold transition sm:gap-1.5 sm:rounded-full sm:px-3 ${
+                className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-xl px-2 py-2 font-bold transition sm:gap-1.5 sm:rounded-full sm:px-3 sm:py-1.5 ${
                   tab === t.id
                     ? 'bg-white text-forest-950 shadow-sm'
-                    : 'text-[#8aa8a2] hover:text-white'
+                    : 'text-[#8aa8a2] hover:text-white hover:bg-white/5'
                 }`}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -518,7 +518,7 @@ export default function OwnerSettingsPage() {
         </div>
       }
     >
-      <div className="space-y-5">
+      <div className="space-y-5 max-w-full overflow-x-hidden">
 
         {savedMsg ? (
           <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
@@ -1038,33 +1038,35 @@ export default function OwnerSettingsPage() {
                                 key={idx}
                                 className="flex flex-col gap-2 p-2.5 text-xs sm:flex-row sm:items-center sm:justify-between"
                               >
-                                <div className="flex flex-1 items-center gap-2">
+                                <div className="flex flex-1 items-center gap-2 min-w-0">
                                   <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                                   <input
                                     type="text"
                                     aria-label="Nom du quartier"
                                     value={zone.name}
                                     onChange={(e) => updateDeliveryZone(idx, { name: e.target.value })}
-                                    className="sc-input py-1.5 text-xs font-bold text-slate-900"
+                                    className="sc-input py-1.5 text-xs font-bold text-slate-900 min-w-0 flex-1"
                                   />
                                 </div>
-                                <div className="flex items-center justify-end gap-2">
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    step={100}
-                                    aria-label="Tarif de livraison (FCFA)"
-                                    value={zone.feeXof}
-                                    onChange={(e) =>
-                                      updateDeliveryZone(idx, { feeXof: Math.max(0, Math.round(Number(e.target.value) || 0)) })
-                                    }
-                                    className="sc-input w-28 py-1.5 text-right text-xs font-extrabold text-emerald-800 tabular"
-                                  />
-                                  <span className="text-[11px] font-semibold text-slate-500">FCFA</span>
+                                <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                                  <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step={100}
+                                      aria-label="Tarif de livraison (FCFA)"
+                                      value={zone.feeXof}
+                                      onChange={(e) =>
+                                        updateDeliveryZone(idx, { feeXof: Math.max(0, Math.round(Number(e.target.value) || 0)) })
+                                      }
+                                      className="sc-input flex-1 sm:w-28 py-1.5 text-right text-xs font-extrabold text-emerald-800 tabular"
+                                    />
+                                    <span className="text-[11px] font-semibold text-slate-500">FCFA</span>
+                                  </div>
                                   <button
                                     type="button"
                                     onClick={() => removeDeliveryZone(idx)}
-                                    className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50"
+                                    className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 shrink-0"
                                     title="Supprimer ce quartier"
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -1101,7 +1103,7 @@ export default function OwnerSettingsPage() {
                               key={key}
                               className="flex flex-col gap-2 p-2.5 text-xs sm:flex-row sm:items-center sm:justify-between"
                             >
-                              <div className="flex items-center justify-between sm:w-44">
+                              <div className="flex items-center justify-between w-full sm:w-44">
                                 <span className="font-bold text-slate-900">{label}</span>
                                 <label className="inline-flex items-center gap-1.5 font-semibold text-slate-600">
                                   <input
@@ -1115,25 +1117,25 @@ export default function OwnerSettingsPage() {
                               </div>
 
                               {day.closed ? (
-                                <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-center text-xs font-semibold text-slate-500">
+                                <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-center text-xs font-semibold text-slate-500 w-full sm:w-auto">
                                   Boutique fermée ce jour
                                 </span>
                               ) : (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
                                   <input
                                     type="time"
                                     aria-label={`Heure d’ouverture ${label}`}
                                     value={day.open}
                                     onChange={(e) => updateDayOpeningHours(key, { open: e.target.value })}
-                                    className="sc-input w-28 py-1.5 text-xs tabular"
+                                    className="sc-input flex-1 sm:w-28 py-1.5 text-xs tabular text-center"
                                   />
-                                  <span className="text-slate-400">à</span>
+                                  <span className="text-slate-400 font-medium">à</span>
                                   <input
                                     type="time"
                                     aria-label={`Heure de fermeture ${label}`}
                                     value={day.close}
                                     onChange={(e) => updateDayOpeningHours(key, { close: e.target.value })}
-                                    className="sc-input w-28 py-1.5 text-xs tabular"
+                                    className="sc-input flex-1 sm:w-28 py-1.5 text-xs tabular text-center"
                                   />
                                 </div>
                               )}
@@ -1142,15 +1144,15 @@ export default function OwnerSettingsPage() {
                         })}
                       </div>
 
-                      <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-12 sm:items-center">
+                      <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-12 sm:items-center">
                         <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 sm:col-span-5">
                           <input
                             type="checkbox"
                             checked={shopForm.allowOutOfHoursOrders}
                             onChange={(e) => setShopForm({ ...shopForm, allowOutOfHoursOrders: e.target.checked })}
-                            className="h-4 w-4 accent-brand-700"
+                            className="h-4 w-4 accent-brand-700 shrink-0"
                           />
-                          Autoriser les commandes vitrine hors horaires
+                          <span>Autoriser les commandes vitrine hors horaires</span>
                         </label>
                         <div className="sm:col-span-7">
                           <input
@@ -1158,7 +1160,7 @@ export default function OwnerSettingsPage() {
                             value={shopForm.outOfHoursMessage}
                             onChange={(e) => setShopForm({ ...shopForm, outOfHoursMessage: e.target.value })}
                             placeholder="Message affiché hors horaires..."
-                            className="sc-input py-1.5 text-xs"
+                            className="sc-input py-1.5 text-xs w-full"
                           />
                         </div>
                       </div>
@@ -1318,13 +1320,13 @@ export default function OwnerSettingsPage() {
                         {subData.payments.slice(0, 5).map((p) => (
                           <div
                             key={p.id}
-                            className="flex items-center justify-between rounded-xl bg-porcelain-50 px-3 py-2"
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 rounded-xl bg-porcelain-50 px-3 py-2"
                           >
-                            <span>
+                            <span className="min-w-0 break-words">
                               <strong>{p.periodLabel}</strong> · {p.paymentMethodCode}
                               {p.reference ? ` (${p.reference})` : ''}
                             </span>
-                            <span className="font-bold text-emerald-700 tabular">
+                            <span className="font-bold text-emerald-700 tabular shrink-0">
                               {formatXof(p.amountXof)}
                             </span>
                           </div>
