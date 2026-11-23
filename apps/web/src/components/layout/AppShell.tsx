@@ -170,6 +170,53 @@ export function AppShell({
   const profileRef = useRef<HTMLDivElement | null>(null);
   const touchStartXRef = useRef<number | null>(null);
 
+  // Masque le dock inférieur mobile dès que l'utilisateur saisit du texte (clavier virtuel)
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        setKeyboardVisible(true);
+      }
+    };
+
+    const handleFocusOut = () => {
+      setKeyboardVisible(false);
+    };
+
+    const vv = window.visualViewport;
+    const handleViewportResize = () => {
+      if (vv) {
+        // Sur Android et iOS, l'ouverture du clavier réduit significativement la hauteur visible
+        const isKeyboard = window.innerHeight - vv.height > 150;
+        setKeyboardVisible(isKeyboard);
+      }
+    };
+
+    window.addEventListener('focusin', handleFocusIn);
+    window.addEventListener('focusout', handleFocusOut);
+    if (vv) {
+      vv.addEventListener('resize', handleViewportResize);
+    }
+
+    return () => {
+      window.removeEventListener('focusin', handleFocusIn);
+      window.removeEventListener('focusout', handleFocusOut);
+      if (vv) {
+        vv.removeEventListener('resize', handleViewportResize);
+      }
+    };
+  }, []);
+
   // Fermeture des menus déroulants au clic extérieur
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -1003,10 +1050,12 @@ export function AppShell({
           </footer>
         </main>
 
-        {/* Dock mobile natif fixé en bas (< lg) — Obsidian Emerald */}
+        {/* Dock mobile natif fixé en bas (< lg) — Obsidian Emerald (se rétracte à l'ouverture du clavier virtuel) */}
         <nav
           aria-label="Navigation rapide mobile"
-          className="no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950 px-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 text-[10px] font-semibold text-[#8aa8a2] lg:hidden"
+          className={`no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950 px-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 text-[10px] font-semibold text-[#8aa8a2] transition-all duration-200 ease-out lg:hidden ${
+            keyboardVisible ? 'translate-y-full pointer-events-none opacity-0' : 'translate-y-0 opacity-100'
+          }`}
         >
           {mobileDockItems.map((item) => {
             const Icon = item.icon;
