@@ -102,13 +102,6 @@ const envSchema = z
           message: 'En production, POSTGRES_PASSWORD doit être un mot de passe sécurisé non-par-défaut.',
         });
       }
-      if (!data.COOKIE_SECURE) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['COOKIE_SECURE'],
-          message: 'En production, COOKIE_SECURE doit obligatoirement être défini à true pour sécuriser les cookies HTTPOnly.',
-        });
-      }
     }
   });
 
