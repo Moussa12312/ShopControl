@@ -717,7 +717,15 @@ export function AppShell({
 
           {/* Sélecteur de boutique (OWNER) */}
           {isOwnerLike && shops.length > 0 ? (
-            <div className="flex items-center">
+            <div className="flex items-center gap-1.5 rounded-full border border-white/15 bg-forest-800/90 py-1 pl-2 pr-2.5 text-xs font-semibold text-white hover:border-limeglow-400/60 sm:py-1.5 sm:pl-2.5 sm:pr-3">
+              {brandLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={brandLogoUrl}
+                  alt={brandTitle}
+                  className="h-4 w-4 shrink-0 rounded-full border border-white/20 bg-white object-contain"
+                />
+              ) : null}
               <label htmlFor="shop-selector" className="sr-only">
                 Sélectionner une boutique
               </label>
@@ -725,7 +733,7 @@ export function AppShell({
                 id="shop-selector"
                 value={selectedShopId}
                 onChange={(e) => setSelectedShopId(e.target.value)}
-                className="max-w-[115px] truncate rounded-full border border-white/15 bg-forest-800/90 px-2.5 py-1.5 text-xs font-semibold text-white hover:border-limeglow-400/60 sm:max-w-[175px] sm:px-3"
+                className="max-w-[105px] truncate bg-transparent font-semibold text-white focus:outline-none sm:max-w-[165px]"
               >
                 {ownerMode === 'supervision' ? (
                   <option value="ALL" className="bg-forest-900 text-white">

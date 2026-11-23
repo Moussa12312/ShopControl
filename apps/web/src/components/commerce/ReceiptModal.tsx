@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Download, Printer, Share2, X } from 'lucide-react';
 import { formatDateTimeInTimezone, formatXof } from '@shopcontrol/shared';
 import { apiFetch, API_BASE_URL } from '@/lib/api-client';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 export interface SaleDocumentView {
   id: string;
@@ -30,9 +31,15 @@ export function ReceiptModal({
   onClose: () => void;
   onUpdated?: (doc: SaleDocumentView) => void;
 }) {
+  const { shops } = useAuth();
+  const currentShop = shops.find((s) => s.shopId === shopId);
   const snap = document.snapshot || {};
   const shop = snap.shop || {};
   const cfg = snap.receiptSettings || {};
+  const effectiveLogoUrl = shop.logoUrl || currentShop?.logoUrl || null;
+  const effectiveShopName = shop.name || currentShop?.shopName || 'BOUTIQUE';
+  const effectiveAddress = shop.address || currentShop?.address || null;
+  const effectivePhone = shop.phone || currentShop?.phone || null;
   const [paperWidth, setPaperWidth] = useState<58 | 80>(cfg.paperWidthMm === 58 ? 58 : 80);
   const [printing, setPrinting] = useState(false);
   const [currentDoc, setCurrentDoc] = useState<SaleDocumentView>(document);
@@ -158,23 +165,23 @@ export function ReceiptModal({
 
             {/* En-tête Boutique + Logo */}
             <div className="text-center">
-              {cfg.showLogo !== false && shop.logoUrl ? (
+              {cfg.showLogo !== false && effectiveLogoUrl ? (
                 <div className="mb-2 flex justify-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={shop.logoUrl}
-                    alt={shop.name || 'Logo'}
+                    src={effectiveLogoUrl}
+                    alt={effectiveShopName}
                     className="h-14 max-w-[140px] object-contain"
                   />
                 </div>
               ) : null}
               <p className="text-sm font-black uppercase tracking-tight text-slate-950">
-                {shop.name || 'BOUTIQUE'}
+                {effectiveShopName}
               </p>
               {cfg.slogan ? <p className="text-[10px] italic text-slate-600">{cfg.slogan}</p> : null}
               {cfg.headerText ? <p className="mt-0.5 text-[10px] text-slate-700">{cfg.headerText}</p> : null}
-              {shop.address ? <p className="text-[10px] text-slate-600">{shop.address}</p> : null}
-              {shop.phone ? <p className="text-[10px] text-slate-600">Tél : {shop.phone}</p> : null}
+              {effectiveAddress ? <p className="text-[10px] text-slate-600">{effectiveAddress}</p> : null}
+              {effectivePhone ? <p className="text-[10px] text-slate-600">Tél : {effectivePhone}</p> : null}
             </div>
 
             <div className="my-3 border-y border-dashed border-slate-300 py-2 text-center">

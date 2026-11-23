@@ -57,6 +57,8 @@ export function ShopPickerInline({
 
   const isDark = variant === 'dark';
 
+  const activeShop = shops.find((s) => s.shopId === shopId);
+
   return (
     <div
       className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs shadow-sm sm:px-3 ${
@@ -65,7 +67,16 @@ export function ShopPickerInline({
           : 'border-slate-200/90 bg-white text-slate-800'
       }`}
     >
-      <Store className={`h-3.5 w-3.5 shrink-0 ${isDark ? 'text-limeglow-400' : 'text-brand-600'}`} />
+      {activeShop?.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={activeShop.logoUrl}
+          alt={activeShop.shopName}
+          className="h-3.5 w-3.5 shrink-0 rounded-full border border-white/20 bg-white object-contain"
+        />
+      ) : (
+        <Store className={`h-3.5 w-3.5 shrink-0 ${isDark ? 'text-limeglow-400' : 'text-brand-600'}`} />
+      )}
       <select
         value={shopId}
         onChange={(e) => onChange(e.target.value)}

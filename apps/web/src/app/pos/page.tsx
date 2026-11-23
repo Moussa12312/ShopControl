@@ -1195,8 +1195,22 @@ export default function PosPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2 font-bold text-slate-900">
-                      <ShoppingCart className="h-5 w-5 text-brand-700" />
-                      <span>Panier ({cart.reduce((a, b) => a + b.quantity, 0)})</span>
+                      {activeShop?.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={activeShop.logoUrl}
+                          alt={activeShop.shopName || 'Logo'}
+                          className="h-8 w-8 rounded-xl border border-slate-200 bg-white object-contain p-0.5 shadow-2xs"
+                        />
+                      ) : (
+                        <ShoppingCart className="h-5 w-5 text-brand-700" />
+                      )}
+                      <div>
+                        <span className="leading-tight">Panier ({cart.reduce((a, b) => a + b.quantity, 0)})</span>
+                        {activeShop?.shopName ? (
+                          <p className="text-[10px] font-medium text-slate-500 leading-none mt-0.5">{activeShop.shopName}</p>
+                        ) : null}
+                      </div>
                     </div>
                     {cart.length > 0 ? (
                       <button
