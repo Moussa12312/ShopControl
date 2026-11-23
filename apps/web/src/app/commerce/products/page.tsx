@@ -1235,13 +1235,13 @@ export default function ProductsPage() {
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-porcelain-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-4 py-3.5">Produit & Catégorie</th>
+                    <th className="px-4 py-3.5 whitespace-nowrap">Produit & Catégorie</th>
                     <th className="px-4 py-3.5">Caractéristiques</th>
-                    <th className="px-4 py-3.5">Prix vente</th>
-                    {canReadCost ? <th className="px-4 py-3.5">Coût (CMP)</th> : null}
-                    <th className="px-4 py-3.5">Stock dispo</th>
-                    <th className="px-4 py-3.5">Vitrine</th>
-                    {canWrite ? <th className="px-4 py-3.5 text-right">Action</th> : null}
+                    <th className="px-4 py-3.5 whitespace-nowrap">Prix vente</th>
+                    {canReadCost ? <th className="px-4 py-3.5 whitespace-nowrap">Coût (CMP)</th> : null}
+                    <th className="px-4 py-3.5 whitespace-nowrap">Stock dispo</th>
+                    <th className="px-4 py-3.5 whitespace-nowrap">Vitrine</th>
+                    {canWrite ? <th className="px-4 py-3.5 text-right whitespace-nowrap">Action</th> : null}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1371,23 +1371,23 @@ export default function ProductsPage() {
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-3 font-extrabold text-slate-900 tabular">
+                        <td className="px-4 py-3 font-extrabold text-slate-900 tabular whitespace-nowrap">
                           {formatXof(p.salePriceXof)}
                         </td>
                         {canReadCost ? (
-                          <td className="px-4 py-3 text-xs text-slate-600 tabular">
+                          <td className="px-4 py-3 text-xs text-slate-600 tabular whitespace-nowrap">
                             {p.costPriceXof !== null ? (
                               formatXof(p.costPriceXof)
                             ) : (
-                              <span className="rounded-lg bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">
+                              <span className="rounded-lg bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 whitespace-nowrap">
                                 Estimé
                               </span>
                             )}
                           </td>
                         ) : null}
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span
-                            className={`font-extrabold tabular ${p.stockAvailable <= 0
+                            className={`font-extrabold tabular whitespace-nowrap ${p.stockAvailable <= 0
                               ? 'text-rose-600'
                               : p.stockAvailable <= p.alertThreshold
                                 ? 'text-amber-700'
@@ -1397,9 +1397,9 @@ export default function ProductsPage() {
                             {p.stockAvailableDecimal ?? p.stockAvailable} {p.unit}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span
-                            className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${p.status === 'PUBLISHED'
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ${p.status === 'PUBLISHED'
                               ? 'bg-emerald-50 text-emerald-700'
                               : p.status === 'DRAFT'
                                 ? 'bg-slate-100 text-slate-600'
@@ -1410,8 +1410,8 @@ export default function ProductsPage() {
                           </span>
                         </td>
                         {canWrite ? (
-                          <td className="px-4 py-3 text-right">
-                            <div className="inline-flex items-center gap-1.5">
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
                               <button
                                 type="button"
                                 onClick={() => setBarcodeTarget(p)}
@@ -1682,10 +1682,10 @@ export default function ProductsPage() {
                       </div>
                       <div>
                         <div className="flex items-center justify-between gap-2">
-                          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 whitespace-nowrap">
                             <span>SKU / Référence *</span>
                             {!editing && !skuManual ? (
-                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-extrabold text-emerald-800">
+                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-extrabold text-emerald-800 whitespace-nowrap">
                                 Auto
                               </span>
                             ) : null}
@@ -1697,7 +1697,7 @@ export default function ProductsPage() {
                                 setSkuManual(false);
                                 setCodeSeed(Math.floor(1000 + Math.random() * 9000));
                               }}
-                              className="inline-flex !min-h-0 items-center gap-1 text-[10px] font-bold text-brand-700 hover:underline"
+                              className="inline-flex !min-h-0 items-center gap-1 text-[10px] font-bold text-brand-700 hover:underline whitespace-nowrap"
                             >
                               <RefreshCw className="h-3 w-3" />
                               Regénérer
@@ -1788,7 +1788,7 @@ export default function ProductsPage() {
                       </h4>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-4">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <div>
                         <label className="block text-xs font-semibold text-slate-700">
                           Prix de vente par {form.unit || activeSpec.defaultUnit} (XOF) *
@@ -1846,10 +1846,10 @@ export default function ProductsPage() {
                       </div>
                       <div>
                         <div className="flex items-center justify-between gap-2">
-                          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 whitespace-nowrap">
                             <span>Code-barres (EAN-13)</span>
                             {!editing && !barcodeManual ? (
-                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-extrabold text-emerald-800">
+                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-extrabold text-emerald-800 whitespace-nowrap">
                                 Auto
                               </span>
                             ) : null}
@@ -1861,7 +1861,7 @@ export default function ProductsPage() {
                                 setBarcodeManual(false);
                                 setCodeSeed(Math.floor(1000 + Math.random() * 9000));
                               }}
-                              className="inline-flex !min-h-0 items-center gap-1 text-[10px] font-bold text-brand-700 hover:underline"
+                              className="inline-flex !min-h-0 items-center gap-1 text-[10px] font-bold text-brand-700 hover:underline whitespace-nowrap"
                             >
                               <RefreshCw className="h-3 w-3" />
                               Regénérer
