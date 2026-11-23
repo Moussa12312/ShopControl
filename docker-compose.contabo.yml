@@ -1,0 +1,73 @@
+services:
+  shopcontrol_postgres:
+    image: postgres:16-alpine
+    container_name: shopcontrol_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shopcontrol
+      POSTGRES_PASSWORD: ShopControl_Db_2026_SecurePassword
+      POSTGRES_CONTROL_DB: shopcontrol_control
+    volumes:
+      - shopcontrol_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shopcontrol -d shopcontrol_control"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - shopcontrol_net
+
+  shopcontrol_redis:
+    image: redis:7-alpine
+    container_name: shopcontrol_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    networks:
+      - shopcontrol_net
+
+  shopcontrol_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shopcontrol_app
+    restart: unless-stopped
+    depends_on:
+      shopcontrol_postgres:
+        condition: service_healthy
+      shopcontrol_redis:
+        condition: service_started
+    ports:
+      - "3200:7860"
+    environment:
+      NODE_ENV: production
+      PORT: "7860"
+      API_PORT: "4000"
+      API_INTERNAL_URL: "http://127.0.0.1:4000"
+      POSTGRES_HOST: shopcontrol_postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: shopcontrol
+      POSTGRES_PASSWORD: ShopControl_Db_2026_SecurePassword
+      POSTGRES_CONTROL_DB: shopcontrol_control
+      DATABASE_URL: "postgresql://shopcontrol:ShopControl_Db_2026_SecurePassword@shopcontrol_postgres:5432/shopcontrol_control?schema=public"
+      POSTGRES_ADMIN_URL: "postgresql://shopcontrol:ShopControl_Db_2026_SecurePassword@shopcontrol_postgres:5432/postgres"
+      REDIS_URL: "redis://shopcontrol_redis:6379"
+      JWT_ACCESS_SECRET: "9f8e7d6c5b4a392817263544536271809f8e7d6c5b4a39281726354453627180"
+      JWT_REFRESH_SECRET: "1a2b3c4d5e6f7081920a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcd"
+      TOTP_ENCRYPTION_KEY: "a3f9c2e81b4d70659f1234a8c7e6d5b49012ef34ab56cd7890ef1234567890ab"
+      COOKIE_SECURE: "false"
+      CORS_ORIGINS: "http://169.58.101.183:3200,https://shopcontrol.duckdns.org"
+      BOOTSTRAP_SUPER_ADMIN_EMAIL: "chakirunisphereai@gmail.com"
+      BOOTSTRAP_SUPER_ADMIN_PASSWORD: "ShopControl@2026!"
+      BOOTSTRAP_SUPER_ADMIN_NAME: "Moussa Coulibaly"
+    volumes:
+      - shopcontrol_uploads:/app/apps/api/uploads
+    networks:
+      - shopcontrol_net
+
+volumes:
+  shopcontrol_pgdata:
+  shopcontrol_uploads:
+
+networks:
+  shopcontrol_net:
+    driver: bridge
