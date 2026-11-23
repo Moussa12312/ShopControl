@@ -16,8 +16,6 @@ interface LoyaltyOverview {
 interface Props {
   shopId: string;
   clientId: string;
-  methodCode: string;
-  amountXof: number;
 }
 
 /**

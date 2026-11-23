@@ -1526,8 +1526,6 @@ export default function PosPage() {
                     <PosGrowthPanel
                       shopId={shopId}
                       clientId={selectedClientId}
-                      methodCode={isDebt ? '' : paymentMethodCode}
-                      amountXof={totals ? Math.max(0, Math.min(totals.totalXof, effectivePaid)) : 0}
                     />
                   ) : null}
 

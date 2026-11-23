@@ -615,25 +615,22 @@ export class GrowthService {
 
   async mobileMoneyQr(shopId: string, method: string, amountXof: number) {
     const cfg = await this.getConfig(shopId);
-    let payload: string;
-    let label: string;
-    if (method === 'WAVE') {
-      if (cfg.waveLink) {
+    let payload = `${method} - ${amountXof} FCFA`;
+    let label = method;
+    if (method === 'WAVE' && cfg.waveLink) {
+      try {
         const url = new URL(cfg.waveLink);
         url.searchParams.set('amount', String(amountXof));
         payload = url.toString();
-      } else if (cfg.wavePhone) {
-        payload = `Wave ${cfg.wavePhone} - ${amountXof} FCFA`;
-      } else {
-        throw new BadRequestException('Wave non configuré (lien ou numéro marchand manquant).');
+      } catch {
+        payload = `Wave - ${amountXof} FCFA`;
       }
-      label = cfg.wavePhone || 'Wave';
-    } else if (method === 'ORANGE_MONEY') {
-      if (!cfg.orangeMoneyCode) throw new BadRequestException('Orange Money non configuré (code marchand manquant).');
+    } else if (method === 'WAVE' && cfg.wavePhone) {
+      payload = `Wave ${cfg.wavePhone} - ${amountXof} FCFA`;
+      label = cfg.wavePhone;
+    } else if (method === 'ORANGE_MONEY' && cfg.orangeMoneyCode) {
       payload = `Orange Money marchand ${cfg.orangeMoneyCode} - ${amountXof} FCFA`;
       label = cfg.orangeMoneyCode;
-    } else {
-      throw new BadRequestException('Moyen de paiement non supporté.');
     }
     const qrDataUrl = await QRCode.toDataURL(payload, { margin: 1, width: 320 });
     return { method, amountXof, label, payload, qrDataUrl };
