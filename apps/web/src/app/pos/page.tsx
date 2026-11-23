@@ -2136,8 +2136,8 @@ export default function PosPage() {
                         </span>
                       ) : null}
                       {v.stockAvailable != null ? (
-                        <span className={`mt-1 text-[10px] font-semibold ${v.stockAvailable <= 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                          Stock : {v.stockAvailable}
+                        <span className={`mt-1 text-[10px] font-semibold ${v.stockAvailable <= 0 ? (variantTarget.stockAvailable > 0 ? 'text-amber-700' : 'text-rose-600') : 'text-emerald-700'}`}>
+                          Stock : {v.stockAvailable > 0 ? v.stockAvailable : (variantTarget.stockAvailable > 0 ? `${v.stockAvailable} (Global : ${variantTarget.stockAvailable})` : 0)}
                         </span>
                       ) : null}
                     </button>

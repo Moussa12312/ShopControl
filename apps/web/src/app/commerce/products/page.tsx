@@ -2092,31 +2092,40 @@ export default function ProductsPage() {
                         Aucune variante créée (le stock et le code-barres s'appliquent au produit principal).
                       </p>
                     ) : (
-                      <div className="space-y-2 overflow-x-auto">
-                        <table className="min-w-full divide-y divide-slate-200 text-xs">
-                          <thead>
-                            <tr className="text-left font-bold uppercase tracking-wider text-slate-500">
-                              <th className="py-2 pr-2">Nom variante</th>
-                              {!editing ? <th className="py-2 px-2 text-center w-24">Stock init.</th> : null}
-                              <th className="py-2 px-2 w-28">Prix vente (XOF)</th>
-                              <th className="py-2 px-2">Code-barres EAN-13</th>
-                              <th className="py-2 px-2 text-center w-20">Seuil</th>
-                              <th className="py-2 pl-2 text-right">Suppr.</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {form.variants.map((v, vIdx) => (
-                              <tr key={`v-${vIdx}`}>
-                                <td className="py-2 pr-2">
-                                  <input
-                                    value={v.name}
-                                    onChange={(e) => updateVariant(vIdx, { name: e.target.value })}
-                                    placeholder="Ex: Taille M / Noir"
-                                    className="sc-input bg-white py-1 text-xs"
-                                  />
-                                </td>
+                      <div className="space-y-3">
+                        {/* Vue Mobile : Fiches variantes empilées */}
+                        <div className="space-y-2.5 sm:hidden">
+                          {form.variants.map((v, vIdx) => (
+                            <div
+                              key={`vm-${vIdx}`}
+                              className="rounded-xl border border-slate-200 bg-white p-3 space-y-2 shadow-2xs"
+                            >
+                              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-1.5">
+                                <span className="text-xs font-bold text-slate-800">
+                                  Variante #{vIdx + 1}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeVariant(vIdx)}
+                                  className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                  title="Supprimer la variante"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-semibold text-slate-600">Nom variante</label>
+                                <input
+                                  value={v.name}
+                                  onChange={(e) => updateVariant(vIdx, { name: e.target.value })}
+                                  placeholder="Ex: Taille 42 / Noir"
+                                  className="sc-input mt-0.5 bg-slate-50 py-1.5 text-xs"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
                                 {!editing ? (
-                                  <td className="py-2 px-2 w-24">
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-slate-600">Stock initial</label>
                                     <input
                                       type="number"
                                       min={0}
@@ -2126,11 +2135,12 @@ export default function ProductsPage() {
                                           initialStockQty: Number(e.target.value) || 0,
                                         })
                                       }
-                                      className="sc-input bg-white py-1 text-center text-xs tabular"
+                                      className="sc-input mt-0.5 bg-slate-50 py-1.5 text-xs text-center tabular"
                                     />
-                                  </td>
+                                  </div>
                                 ) : null}
-                                <td className="py-2 px-2 w-28">
+                                <div className={editing ? 'col-span-2' : ''}>
+                                  <label className="text-[11px] font-semibold text-slate-600">Prix vente (XOF)</label>
                                   <input
                                     type="number"
                                     min={0}
@@ -2140,20 +2150,24 @@ export default function ProductsPage() {
                                         salePriceXof: Number(e.target.value) || 0,
                                       })
                                     }
-                                    className="sc-input bg-white py-1 text-xs tabular"
+                                    className="sc-input mt-0.5 bg-slate-50 py-1.5 text-xs tabular"
                                   />
-                                </td>
-                                <td className="py-2 px-2">
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-3 gap-2">
+                                <div className="col-span-2">
+                                  <label className="text-[11px] font-semibold text-slate-600">Code EAN-13</label>
                                   <input
                                     value={v.barcode || ''}
                                     onChange={(e) =>
                                       updateVariant(vIdx, { barcode: e.target.value })
                                     }
-                                    placeholder="EAN-13 auto..."
-                                    className="sc-input bg-white py-1 text-xs font-mono"
+                                    placeholder="Auto EAN-13..."
+                                    className="sc-input mt-0.5 bg-slate-50 py-1.5 text-xs font-mono"
                                   />
-                                </td>
-                                <td className="py-2 px-2 w-20">
+                                </div>
+                                <div>
+                                  <label className="text-[11px] font-semibold text-slate-600">Seuil alerte</label>
                                   <input
                                     type="number"
                                     min={0}
@@ -2163,22 +2177,103 @@ export default function ProductsPage() {
                                         alertThreshold: Number(e.target.value) || 0,
                                       })
                                     }
-                                    className="sc-input bg-white py-1 text-center text-xs tabular"
+                                    className="sc-input mt-0.5 bg-slate-50 py-1.5 text-xs text-center tabular"
                                   />
-                                </td>
-                                <td className="py-2 pl-2 text-right">
-                                  <button
-                                    type="button"
-                                    onClick={() => removeVariant(vIdx)}
-                                    className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </td>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Vue Tablette & Desktop : Table scrollable fluide */}
+                        <div className="hidden sm:block overflow-x-auto">
+                          <table className="min-w-[620px] w-full divide-y divide-slate-200 text-xs">
+                            <thead>
+                              <tr className="text-left font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                                <th className="py-2 pr-2">Nom variante</th>
+                                {!editing ? <th className="py-2 px-2 text-center w-24">Stock init.</th> : null}
+                                <th className="py-2 px-2 w-28">Prix vente (XOF)</th>
+                                <th className="py-2 px-2">Code-barres EAN-13</th>
+                                <th className="py-2 px-2 text-center w-20">Seuil</th>
+                                <th className="py-2 pl-2 text-right">Suppr.</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {form.variants.map((v, vIdx) => (
+                                <tr key={`v-${vIdx}`}>
+                                  <td className="py-2 pr-2">
+                                    <input
+                                      value={v.name}
+                                      onChange={(e) => updateVariant(vIdx, { name: e.target.value })}
+                                      placeholder="Ex: Taille M / Noir"
+                                      className="sc-input bg-white py-1 text-xs"
+                                    />
+                                  </td>
+                                  {!editing ? (
+                                    <td className="py-2 px-2 w-24">
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={v.initialStockQty ?? 0}
+                                        onChange={(e) =>
+                                          updateVariant(vIdx, {
+                                            initialStockQty: Number(e.target.value) || 0,
+                                          })
+                                        }
+                                        className="sc-input bg-white py-1 text-center text-xs tabular"
+                                      />
+                                    </td>
+                                  ) : null}
+                                  <td className="py-2 px-2 w-28">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={v.salePriceXof}
+                                      onChange={(e) =>
+                                        updateVariant(vIdx, {
+                                          salePriceXof: Number(e.target.value) || 0,
+                                        })
+                                      }
+                                      className="sc-input bg-white py-1 text-xs tabular"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-2">
+                                    <input
+                                      value={v.barcode || ''}
+                                      onChange={(e) =>
+                                        updateVariant(vIdx, { barcode: e.target.value })
+                                      }
+                                      placeholder="EAN-13 auto..."
+                                      className="sc-input bg-white py-1 text-xs font-mono"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-2 w-20">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={v.alertThreshold}
+                                      onChange={(e) =>
+                                        updateVariant(vIdx, {
+                                          alertThreshold: Number(e.target.value) || 0,
+                                        })
+                                      }
+                                      className="sc-input bg-white py-1 text-center text-xs tabular"
+                                    />
+                                  </td>
+                                  <td className="py-2 pl-2 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => removeVariant(vIdx)}
+                                      className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
                   </div>

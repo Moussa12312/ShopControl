@@ -244,9 +244,19 @@ export class CatalogService {
     return {
       items: products.map((p) => {
         const baseBal = p.stockBalances.find((b) => b.variantKey === 'BASE');
-        const stockPhysical = baseBal?.physicalQty ?? 0;
+        let totalVariantPhys = 0;
+        let totalVariantRes = 0;
+        for (const v of p.variants) {
+          const vBal = p.stockBalances.find((b) => b.variantKey === v.id);
+          totalVariantPhys += vBal?.physicalQty ?? 0;
+          totalVariantRes += vBal?.reservedQty ?? 0;
+        }
+
+        const basePhys = baseBal?.physicalQty ?? 0;
+        const baseRes = baseBal?.reservedQty ?? 0;
+        const stockPhysical = basePhys + totalVariantPhys;
         const stockRemainderMilli = baseBal?.fractionalRemainderMilli ?? 0;
-        const stockReserved = baseBal?.reservedQty ?? 0;
+        const stockReserved = baseRes + totalVariantRes;
         const stockPhysicalDecimal = Number(
           ((stockPhysical * 1000 + stockRemainderMilli) / 1000).toFixed(3),
         );

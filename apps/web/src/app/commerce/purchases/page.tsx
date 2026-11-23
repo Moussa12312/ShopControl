@@ -35,6 +35,12 @@ interface ProductOpt {
   costPriceXof: number | null;
   bulkUnitLabel?: string | null;
   unitsPerBulk?: number | null;
+  variants?: Array<{
+    id: string;
+    name: string;
+    sku: string;
+    costPriceXof: number | null;
+  }>;
 }
 
 interface PurchaseOrderRow {
@@ -155,9 +161,19 @@ export default function PurchasesPage() {
 
   useEffect(() => {
     if (poProductId && products.length > 0) {
-      const found = products.find((p) => p.id === poProductId);
-      if (found && found.costPriceXof && found.costPriceXof > 0) {
-        setPoUnitCost(found.costPriceXof);
+      const [actualProdId, actualVarId] = poProductId.split('::');
+      const found = products.find((p) => p.id === actualProdId);
+      if (found) {
+        if (actualVarId && found.variants) {
+          const vFound = found.variants.find((v) => v.id === actualVarId);
+          if (vFound && vFound.costPriceXof && vFound.costPriceXof > 0) {
+            setPoUnitCost(vFound.costPriceXof);
+            return;
+          }
+        }
+        if (found.costPriceXof && found.costPriceXof > 0) {
+          setPoUnitCost(found.costPriceXof);
+        }
       }
     }
   }, [poProductId, products]);
@@ -192,6 +208,7 @@ export default function PurchasesPage() {
     e.preventDefault();
     if (!shopId) return;
     setBusy(true);
+    const [actualProdId, actualVarId] = poProductId.split('::');
     try {
       await apiFetch(`/shops/${shopId}/purchases`, {
         method: 'POST',
@@ -199,7 +216,14 @@ export default function PurchasesPage() {
         operatorId: activeOperator?.id,
         body: {
           supplierId: poSupplierId,
-          items: [{ productId: poProductId, orderedQty: poQty, unitCostXof: poUnitCost }],
+          items: [
+            {
+              productId: actualProdId,
+              ...(actualVarId ? { variantId: actualVarId } : {}),
+              orderedQty: poQty,
+              unitCostXof: poUnitCost,
+            },
+          ],
         },
       });
       setShowNewPo(false);
@@ -237,18 +261,22 @@ export default function PurchasesPage() {
     e.preventDefault();
     if (!shopId || !receiveTarget) return;
     const items = receiveTarget.items
-      .map((i) => ({
-        purchaseOrderItemId: i.id,
-        receivedQty: Math.round(Number(receiveQtys[i.id]) || 0),
-        unitCostXof: Math.round(Number(receiveCosts[i.id]) || i.unitCostXof),
-        receivedInBulk: Boolean(receiveInBulkMap[i.id]),
-        ...(receiveExpiryMap[i.id]?.trim()
-          ? {
-              expiryDate: new Date(`${receiveExpiryMap[i.id].trim()}T23:59:59.000Z`).toISOString(),
-            }
-          : {}),
-        ...(receiveBatchMap[i.id]?.trim() ? { batchNumber: receiveBatchMap[i.id].trim() } : {}),
-      }))
+      .map((i) => {
+        const rem = Math.max(0, i.orderedQty - i.receivedQty);
+        const qty = receiveQtys[i.id] !== undefined ? receiveQtys[i.id] : rem;
+        return {
+          purchaseOrderItemId: i.id,
+          receivedQty: Math.round(Number(qty) || 0),
+          unitCostXof: Math.round(Number(receiveCosts[i.id]) || i.unitCostXof),
+          receivedInBulk: Boolean(receiveInBulkMap[i.id]),
+          ...(receiveExpiryMap[i.id]?.trim()
+            ? {
+                expiryDate: new Date(`${receiveExpiryMap[i.id].trim()}T23:59:59.000Z`).toISOString(),
+              }
+            : {}),
+          ...(receiveBatchMap[i.id]?.trim() ? { batchNumber: receiveBatchMap[i.id].trim() } : {}),
+        };
+      })
       .filter((i) => i.receivedQty > 0);
     if (items.length === 0) return;
 
@@ -491,11 +519,25 @@ export default function PurchasesPage() {
                 onChange={(e) => setPoProductId(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               >
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.sku})
-                  </option>
-                ))}
+                {products.flatMap((p) => {
+                  if (p.variants && p.variants.length > 0) {
+                    return [
+                      <option key={p.id} value={p.id}>
+                        {p.name} (Stock global / sans variante)
+                      </option>,
+                      ...p.variants.map((v) => (
+                        <option key={`${p.id}::${v.id}`} value={`${p.id}::${v.id}`}>
+                          {p.name} — {v.name} ({v.sku || p.sku})
+                        </option>
+                      )),
+                    ];
+                  }
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.sku})
+                    </option>
+                  );
+                })}
               </select>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -575,7 +617,7 @@ export default function PurchasesPage() {
                             type="number"
                             min={0}
                             max={rem}
-                            value={receiveQtys[item.id] ?? 0}
+                            value={receiveQtys[item.id] !== undefined ? receiveQtys[item.id] : rem}
                             onChange={(e) =>
                               setReceiveQtys({ ...receiveQtys, [item.id]: Number(e.target.value) || 0 })
                             }

@@ -215,17 +215,17 @@ export function BarcodeLabelsModal({
                 return (
                   <div
                     key={item.id}
-                    className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${
+                    className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-xl border transition-colors gap-3 ${
                       isSelected
                         ? 'bg-white/5 border-[#a3e635]/40'
                         : 'bg-black/20 border-[#1b3d3b]/60 opacity-60'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <button
                         type="button"
                         onClick={() => toggleSelect(item.id)}
-                        className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${
+                        className={`w-5 h-5 shrink-0 rounded flex items-center justify-center border transition-colors ${
                           isSelected
                             ? 'bg-[#a3e635] border-[#a3e635] text-[#051413]'
                             : 'border-white/30 bg-black/40'
@@ -233,32 +233,32 @@ export function BarcodeLabelsModal({
                       >
                         {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                       </button>
-                      <div>
-                        <div className="font-bold text-sm text-white flex items-center gap-2">
-                          <span>{item.name}</span>
+                      <div className="min-w-0">
+                        <div className="font-bold text-sm text-white flex flex-wrap items-center gap-2">
+                          <span className="truncate">{item.name}</span>
                           {item.variantName && (
                             <span className="text-[11px] px-2 py-0.5 rounded bg-[#a3e635]/20 text-[#a3e635] font-semibold">
                               {item.variantName}
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-white/60 flex items-center gap-3 mt-0.5 font-mono">
+                        <div className="text-xs text-white/60 flex flex-wrap items-center gap-2 sm:gap-3 mt-0.5 font-mono">
                           <span>SKU: {item.sku}</span>
                           <span>EAN: {item.barcode}</span>
-                          <span className="text-[#a3e635] font-sans font-bold">
+                          <span className="text-[#a3e635] font-sans font-bold whitespace-nowrap">
                             {formatXof(item.salePriceXof)}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-white/60">Exemplaires :</span>
-                      <div className="flex items-center bg-black/40 border border-[#1b3d3b] rounded-lg">
+                    <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t border-white/5 sm:border-t-0">
+                      <span className="text-xs text-white/60 whitespace-nowrap">Exemplaires :</span>
+                      <div className="flex items-center bg-black/40 border border-[#1b3d3b] rounded-lg shrink-0">
                         <button
                           type="button"
                           onClick={() => updateCopies(item.id, -1)}
-                          className="p-1 hover:text-[#a3e635] transition-colors"
+                          className="p-1.5 hover:text-[#a3e635] transition-colors"
                         >
                           <Minus className="w-3.5 h-3.5" />
                         </button>
@@ -268,7 +268,7 @@ export function BarcodeLabelsModal({
                         <button
                           type="button"
                           onClick={() => updateCopies(item.id, 1)}
-                          className="p-1 hover:text-[#a3e635] transition-colors"
+                          className="p-1.5 hover:text-[#a3e635] transition-colors"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>
