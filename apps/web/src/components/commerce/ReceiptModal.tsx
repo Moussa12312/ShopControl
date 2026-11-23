@@ -38,8 +38,8 @@ export function ReceiptModal({
   const cfg = snap.receiptSettings || {};
   const effectiveLogoUrl = shop.logoUrl || currentShop?.logoUrl || null;
   const effectiveShopName = shop.name || currentShop?.shopName || 'BOUTIQUE';
-  const effectiveAddress = shop.address || currentShop?.address || null;
-  const effectivePhone = shop.phone || currentShop?.phone || null;
+  const effectiveAddress = shop.address || null;
+  const effectivePhone = shop.phone || null;
   const [paperWidth, setPaperWidth] = useState<58 | 80>(cfg.paperWidthMm === 58 ? 58 : 80);
   const [printing, setPrinting] = useState(false);
   const [currentDoc, setCurrentDoc] = useState<SaleDocumentView>(document);
