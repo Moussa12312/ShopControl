@@ -567,10 +567,11 @@ export class PlatformService {
     const sub = await this.getOrInitSubscription(req.merchantId);
     const plan = await this.controlPrisma.platformPlanConfig.findUnique({ where: { code: req.planCode } });
     const now = new Date();
-    // Essai en cours ou période échue : la nouvelle période démarre maintenant ; sinon on prolonge.
-    const trialRunning = sub.trialEndsAt && new Date(sub.trialEndsAt) > now;
+    // Si l'essai ou l'abonnement en cours n'est pas encore expiré (currentEnd > now),
+    // la nouvelle période s'ajoute à la suite de la date limite (currentEnd) pour ne perdre aucun jour d'essai gratuit.
+    // Si la période est déjà échue (currentEnd <= now), le calcul repart d'aujourd'hui (now).
     const currentEnd = new Date(sub.currentPeriodEnd);
-    const base = trialRunning || currentEnd < now ? now : currentEnd;
+    const base = currentEnd > now ? currentEnd : now;
     const newEnd =
       req.billingCycle === 'DIRECT_SALE'
         ? new Date('2099-12-31T23:59:59.000Z')
