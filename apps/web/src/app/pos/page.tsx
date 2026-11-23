@@ -1101,9 +1101,9 @@ export default function PosPage() {
                                 addToCart(p, false);
                               }
                             }}
-                            className="flex w-full items-center justify-between gap-2.5 text-left"
+                            className="flex w-full min-w-0 items-center justify-between gap-2.5 text-left"
                           >
-                            <div className="flex min-w-0 items-center gap-2.5">
+                            <div className="flex min-w-0 flex-1 items-center gap-2.5">
                               {thumb ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
@@ -1116,7 +1116,7 @@ export default function PosPage() {
                                   <Package className="h-5 w-5" />
                                 </span>
                               )}
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
                                   <p className="truncate text-sm font-bold text-slate-900">{p.name}</p>
                                   {inCartQty > 0 ? (
@@ -1125,7 +1125,7 @@ export default function PosPage() {
                                     </span>
                                   ) : null}
                                 </div>
-                                <p className="mt-0.5 text-xs text-slate-500">
+                                <p className="mt-0.5 truncate text-xs text-slate-500">
                                   {p.sku} ·{' '}
                                   <span
                                     className={
