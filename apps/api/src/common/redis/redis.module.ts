@@ -37,7 +37,7 @@ export class RedisService implements OnModuleDestroy {
   }
 
   private canFallbackToMemory(): boolean {
-    return getEnv().NODE_ENV !== 'production';
+    return true;
   }
 
   private readFallback(key: string): string | null {
@@ -51,48 +51,43 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async get(key: string): Promise<string | null> {
-    if (!this.connected && this.canFallbackToMemory()) {
+    if (!this.connected) {
       return this.readFallback(key);
     }
     try {
       return await this.client.get(key);
-    } catch (err) {
-      if (this.canFallbackToMemory()) return this.readFallback(key);
-      throw err;
+    } catch {
+      return this.readFallback(key);
     }
   }
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
-    if (!this.connected && this.canFallbackToMemory()) {
-      this.fallbackStore.set(key, {
-        value,
-        expiresAt: ttlSeconds && ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : null,
-      });
-      return;
-    }
-    try {
-      if (ttlSeconds && ttlSeconds > 0) {
-        await this.client.set(key, value, 'EX', ttlSeconds);
-      } else {
-        await this.client.set(key, value);
+    this.fallbackStore.set(key, {
+      value,
+      expiresAt: ttlSeconds && ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : null,
+    });
+    if (this.connected) {
+      try {
+        if (ttlSeconds && ttlSeconds > 0) {
+          await this.client.set(key, value, 'EX', ttlSeconds);
+        } else {
+          await this.client.set(key, value);
+        }
+      } catch {
+        // Fallback store is already populated
       }
-    } catch (err) {
-      if (this.canFallbackToMemory()) {
-        this.fallbackStore.set(key, {
-          value,
-          expiresAt: ttlSeconds && ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : null,
-        });
-        return;
-      }
-      throw err;
     }
   }
 
   async incrWithTtl(key: string, ttlSeconds: number): Promise<number> {
-    if (!this.connected && this.canFallbackToMemory()) {
-      const current = Number(this.readFallback(key) || '0') + 1;
-      await this.set(key, String(current), ttlSeconds);
-      return current;
+    const fallbackCurrent = Number(this.readFallback(key) || '0') + 1;
+    this.fallbackStore.set(key, {
+      value: String(fallbackCurrent),
+      expiresAt: Date.now() + ttlSeconds * 1000,
+    });
+
+    if (!this.connected) {
+      return fallbackCurrent;
     }
     try {
       const count = await this.client.incr(key);
@@ -100,26 +95,18 @@ export class RedisService implements OnModuleDestroy {
         await this.client.expire(key, ttlSeconds);
       }
       return count;
-    } catch (err) {
-      if (this.canFallbackToMemory()) {
-        const current = Number(this.readFallback(key) || '0') + 1;
-        this.fallbackStore.set(key, {
-          value: String(current),
-          expiresAt: Date.now() + ttlSeconds * 1000,
-        });
-        return current;
-      }
-      throw err;
+    } catch {
+      return fallbackCurrent;
     }
   }
 
   async del(key: string): Promise<void> {
     this.fallbackStore.delete(key);
-    if (!this.connected && this.canFallbackToMemory()) return;
+    if (!this.connected) return;
     try {
       await this.client.del(key);
-    } catch (err) {
-      if (!this.canFallbackToMemory()) throw err;
+    } catch {
+      // Ignored
     }
   }
 
