@@ -27,16 +27,19 @@ const SAFE_FILENAME_RE = /^[a-z]+_[a-f0-9-]+\.(jpg|png|webp)$/;
 
 function resolveUploadsDir(): string {
   const candidates = [
-    path.resolve(process.cwd(), '../../uploads'),
     path.resolve(process.cwd(), 'uploads'),
+    path.resolve(process.cwd(), '../../uploads'),
+    path.resolve('/app/apps/api/uploads'),
+    path.resolve('/app/uploads'),
   ];
-  const target = fs.existsSync(path.resolve(process.cwd(), '../../package.json'))
-    ? candidates[0]
-    : candidates[1];
-  if (!fs.existsSync(target)) {
-    fs.mkdirSync(target, { recursive: true });
+  for (const dir of candidates) {
+    if (fs.existsSync(dir)) {
+      return dir;
+    }
   }
-  return target;
+  const fallback = candidates[0];
+  fs.mkdirSync(fallback, { recursive: true });
+  return fallback;
 }
 
 function detectImageTypeFromMagicBytes(buf: Buffer): { mime: string; ext: 'jpg' | 'png' | 'webp' } | null {
@@ -133,9 +136,14 @@ export class UploadsController {
     if (!SAFE_FILENAME_RE.test(filename)) {
       throw new NotFoundException({ code: 'MEDIA_NOT_FOUND', message: 'Image introuvable.' });
     }
-    const dir = resolveUploadsDir();
-    const fullPath = path.join(dir, filename);
-    if (!fs.existsSync(fullPath)) {
+    const candidates = [
+      path.resolve(process.cwd(), 'uploads', filename),
+      path.resolve(process.cwd(), '../../uploads', filename),
+      path.resolve('/app/apps/api/uploads', filename),
+      path.resolve('/app/uploads', filename),
+    ];
+    const fullPath = candidates.find((p) => fs.existsSync(p));
+    if (!fullPath) {
       throw new NotFoundException({ code: 'MEDIA_NOT_FOUND', message: 'Image introuvable.' });
     }
 
