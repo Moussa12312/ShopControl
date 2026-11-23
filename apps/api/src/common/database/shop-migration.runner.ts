@@ -38,11 +38,26 @@ export async function runShopMigrations(shopDatabaseUrl: string): Promise<ShopMi
     .map((d) => d.name)
     .sort();
 
-  const isRemoteSsl =
-    shopDatabaseUrl.includes('sslmode=require') ||
-    (!shopDatabaseUrl.includes('@localhost') &&
-      !shopDatabaseUrl.includes('@127.0.0.1') &&
-      !shopDatabaseUrl.includes('@postgres:'));
+  const hasExplicitSsl = shopDatabaseUrl.includes('sslmode=require');
+  let isRemoteSsl = false;
+  if (hasExplicitSsl) {
+    isRemoteSsl = true;
+  } else {
+    try {
+      const atIndex = shopDatabaseUrl.indexOf('@');
+      if (atIndex !== -1) {
+        const slashAfterAt = shopDatabaseUrl.indexOf('/', atIndex);
+        const hostPort = shopDatabaseUrl.substring(atIndex + 1, slashAfterAt === -1 ? undefined : slashAfterAt);
+        const host = hostPort.split(':')[0];
+        // Ne requiert SSL que s'il s'agit d'un vrai FQDN cloud distant (ex: Neon avec point dans le nom d'hôte), hors IP/Docker
+        if (host.includes('.') && host !== '127.0.0.1' && !host.endsWith('.local')) {
+          isRemoteSsl = true;
+        }
+      }
+    } catch {
+      isRemoteSsl = false;
+    }
+  }
   const client = new Client({
     connectionString: shopDatabaseUrl,
     ...(isRemoteSsl ? { ssl: { rejectUnauthorized: false } } : {}),

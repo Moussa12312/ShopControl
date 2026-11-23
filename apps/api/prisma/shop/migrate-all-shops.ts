@@ -21,7 +21,9 @@ async function main(): Promise<void> {
     const isLocalHost =
       env.POSTGRES_HOST === 'localhost' ||
       env.POSTGRES_HOST === '127.0.0.1' ||
-      env.POSTGRES_HOST === 'postgres';
+      env.POSTGRES_HOST === 'postgres' ||
+      env.POSTGRES_HOST === 'shopcontrol_postgres' ||
+      !env.POSTGRES_HOST.includes('.');
     const sslParam =
       env.DATABASE_URL.includes('sslmode=require') || (!isLocalHost && env.POSTGRES_HOST.includes('.'))
         ? '&sslmode=require'
