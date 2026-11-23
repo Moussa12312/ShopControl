@@ -81,6 +81,23 @@ interface DailyReportRow {
   createdAt: string;
 }
 
+interface TodayLiveSummary {
+  shopId: string;
+  shopName: string;
+  salesCount: number;
+  itemsSoldQty: number;
+  grossSalesXof: number;
+  refundsXof: number;
+  netSalesXof: number;
+  cogsXof: number;
+  grossMarginXof: number;
+  expensesXof: number;
+  estimatedNetProfitXof: number;
+  paymentsBreakdown: Record<string, number>;
+  openCashSessionsCount: number;
+  cashDiscrepancyTotalXof: number;
+}
+
 export default function OwnerReportsPage() {
   const { shops, selectedShopId } = useAuth();
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -91,6 +108,8 @@ export default function OwnerReportsPage() {
   const [report, setReport] = useState<ConsolidatedPayload | null>(null);
   const [dailyShopId, setDailyShopId] = useState('');
   const [dailyReports, setDailyReports] = useState<DailyReportRow[]>([]);
+  const [todayLive, setTodayLive] = useState<TodayLiveSummary | null>(null);
+  const [todayLiveLoading, setTodayLiveLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -122,15 +141,25 @@ export default function OwnerReportsPage() {
 
   const loadDaily = useCallback(async () => {
     if (!dailyShopId) return;
+    setTodayLiveLoading(true);
     try {
-      const list = await apiFetch<DailyReportRow[]>(`/shops/${dailyShopId}/reports/daily`, {
-        shopId: dailyShopId,
-      });
+      const [list, live] = await Promise.all([
+        apiFetch<DailyReportRow[]>(`/shops/${dailyShopId}/reports/daily`, {
+          shopId: dailyShopId,
+        }),
+        apiFetch<TodayLiveSummary>(`/shops/${dailyShopId}/reports/summary?from=${todayStr}&to=${todayStr}`, {
+          shopId: dailyShopId,
+        }),
+      ]);
       setDailyReports(Array.isArray(list) ? list : []);
+      setTodayLive(live);
     } catch {
       setDailyReports([]);
+      setTodayLive(null);
+    } finally {
+      setTodayLiveLoading(false);
     }
-  }, [dailyShopId]);
+  }, [dailyShopId, todayStr]);
 
   useEffect(() => {
     void load();
@@ -139,6 +168,32 @@ export default function OwnerReportsPage() {
   useEffect(() => {
     void loadDaily();
   }, [loadDaily]);
+
+  const handleDownload = async (format: 'csv' | 'pdf') => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/merchant/reports/export.${format}?from=${from}&to=${to}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        throw new Error(`Erreur ${res.status}: Impossible d'exporter le bilan.`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bilan-shopcontrol-${from}-${to}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Téléchargement impossible.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleGenerateDaily = async () => {
     if (!dailyShopId) return;
@@ -175,24 +230,24 @@ export default function OwnerReportsPage() {
       subtitle="Somme exacte multi-boutiques · Dépenses entreprise distinctes · Stock en transit compté une seule fois."
       headerActions={
         <div className="flex flex-wrap items-center gap-2">
-          <a
-            href={`${API_BASE_URL}/merchant/reports/export.csv?from=${from}&to=${to}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void handleDownload('csv')}
             className="sc-hero-btn-ghost text-xs sm:text-sm"
           >
             <FileSpreadsheet className="h-3.5 w-3.5 text-limeglow-400" />
             <span className="hidden sm:inline">Export</span> CSV
-          </a>
-          <a
-            href={`${API_BASE_URL}/merchant/reports/export.pdf?from=${from}&to=${to}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void handleDownload('pdf')}
             className="sc-hero-btn-primary text-xs sm:text-sm"
           >
             <Download className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Exporter</span> PDF
-          </a>
+          </button>
         </div>
       }
     >
@@ -479,6 +534,146 @@ export default function OwnerReportsPage() {
                   </tbody>
                 </table>
               </div>
+            </section>
+
+            {/* Bilan du jour en direct (Temps réel) */}
+            <section className="sc-card space-y-4 p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-3 w-3 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                  <div>
+                    <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                      Bilan du jour en direct ({todayStr})
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Calculé en temps réel depuis les ventes et encaissements enregistrés aujourd&apos;hui.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {shops.length > 1 ? (
+                    <select
+                      value={dailyShopId}
+                      onChange={(e) => setDailyShopId(e.target.value)}
+                      className="sc-input py-1.5 text-xs font-semibold"
+                    >
+                      {shops.map((s) => (
+                        <option key={s.shopId} value={s.shopId}>
+                          {s.shopName}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={busy || todayLiveLoading || !dailyShopId}
+                    onClick={() => void loadDaily()}
+                    className="sc-btn-ghost text-xs py-1.5"
+                    title="Rafraîchir les chiffres en direct"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${todayLiveLoading ? 'animate-spin' : ''}`} />
+                    Actualiser
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || !dailyShopId}
+                    onClick={handleGenerateDaily}
+                    className="sc-btn-primary text-xs py-1.5"
+                  >
+                    <Archive className="h-3.5 w-3.5" />
+                    Figer & Archiver
+                  </button>
+                </div>
+              </div>
+
+              {todayLive ? (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-700">État de la caisse :</span>
+                      {todayLive.openCashSessionsCount > 0 ? (
+                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 font-bold text-amber-800">
+                          🟡 Session ouverte en cours ({todayLive.openCashSessionsCount} caisse(s))
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 font-bold text-emerald-800">
+                          🟢 Caisses clôturées (Bilan prêt à être archivé)
+                        </span>
+                      )}
+                    </div>
+                    {todayLive.cashDiscrepancyTotalXof !== 0 && (
+                      <span className="font-bold text-rose-600">
+                        Écart caisse : {formatXof(todayLive.cashDiscrepancyTotalXof)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="text-[11px] font-semibold text-slate-500">CA Net du jour</p>
+                      <p className="mt-1 text-base font-black text-slate-900 tabular">
+                        {formatXof(todayLive.netSalesXof)}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-500">
+                        {todayLive.salesCount} vente{todayLive.salesCount > 1 ? 's' : ''} ({todayLive.itemsSoldQty} article{todayLive.itemsSoldQty > 1 ? 's' : ''})
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="text-[11px] font-semibold text-slate-500">Marge Brute</p>
+                      <p className="mt-1 text-base font-black text-brand-700 tabular">
+                        {formatXof(todayLive.grossMarginXof)}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-500">
+                        Coût march. : {formatXof(todayLive.cogsXof)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="text-[11px] font-semibold text-slate-500">Dépenses du jour</p>
+                      <p className="mt-1 text-base font-black text-rose-600 tabular">
+                        {formatXof(todayLive.expensesXof)}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-500">
+                        Enregistrées aujourd&apos;hui
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="text-[11px] font-semibold text-slate-500">Bénéfice Net Estimé</p>
+                      <p className={`mt-1 text-base font-black tabular ${todayLive.estimatedNetProfitXof >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                        {formatXof(todayLive.estimatedNetProfitXof)}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-500">
+                        Marge − Dépenses
+                      </p>
+                    </div>
+                  </div>
+
+                  {Object.keys(todayLive.paymentsBreakdown || {}).length > 0 && (
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs">
+                      <p className="font-bold text-slate-700 mb-2">Encaissements du jour :</p>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(todayLive.paymentsBreakdown).map(([code, amt]) => (
+                          <span
+                            key={code}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-xs border border-slate-200"
+                          >
+                            <span>{code.replace('_', ' ')}:</span>
+                            <strong className="text-brand-800">{formatXof(amt)}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : todayLiveLoading ? (
+                <LoadingSkeleton />
+              ) : null}
             </section>
 
             {/* Archive des Bilans Journaliers Versionnés */}
