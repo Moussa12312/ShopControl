@@ -1101,9 +1101,9 @@ export default function PosPage() {
                                 addToCart(p, false);
                               }
                             }}
-                            className="flex w-full min-w-0 items-center justify-between gap-2.5 text-left"
+                            className="flex w-full flex-col gap-2.5 text-left"
                           >
-                            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                            <div className="flex w-full items-start justify-between gap-2">
                               {thumb ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
@@ -1116,32 +1116,35 @@ export default function PosPage() {
                                   <Package className="h-5 w-5" />
                                 </span>
                               )}
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5">
-                                  <p className="truncate text-sm font-bold text-slate-900">{p.name}</p>
-                                  {inCartQty > 0 ? (
-                                    <span className="shrink-0 rounded-full bg-forest-900 px-1.5 py-0.5 text-[10px] font-bold text-limeglow-400">
-                                      ×{inCartQty}
-                                    </span>
-                                  ) : null}
-                                </div>
-                                <p className="mt-0.5 truncate text-xs text-slate-500">
-                                  {p.sku} ·{' '}
-                                  <span
-                                    className={
-                                      (p.stockAvailableDecimal ?? p.stockAvailable) <= 0
-                                        ? 'font-bold text-rose-600'
-                                        : 'font-semibold text-emerald-700'
-                                    }
-                                  >
-                                    {p.stockAvailableDecimal ?? p.stockAvailable} {p.unit}
+                              <div className="flex flex-col items-end gap-1">
+                                <span className="shrink-0 rounded-xl bg-brand-50 px-2.5 py-1 text-xs font-black text-brand-800 tabular sm:text-sm">
+                                  {formatXof(p.salePriceXof)}
+                                </span>
+                                {inCartQty > 0 ? (
+                                  <span className="shrink-0 rounded-full bg-forest-900 px-2 py-0.5 text-[10px] font-bold text-limeglow-400">
+                                    ×{inCartQty} au panier
                                   </span>
-                                </p>
+                                ) : null}
                               </div>
                             </div>
-                            <span className="shrink-0 rounded-xl bg-brand-50 px-2.5 py-1 text-xs font-extrabold text-brand-800 tabular sm:text-sm">
-                              {formatXof(p.salePriceXof)}
-                            </span>
+
+                            <div className="w-full min-w-0">
+                              <p className="line-clamp-2 text-sm font-bold text-slate-900" title={p.name}>
+                                {p.name}
+                              </p>
+                              <p className="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500">
+                                <span className="truncate">{p.sku}</span>
+                                <span
+                                  className={
+                                    (p.stockAvailableDecimal ?? p.stockAvailable) <= 0
+                                      ? 'shrink-0 font-bold text-rose-600'
+                                      : 'shrink-0 font-semibold text-emerald-700'
+                                  }
+                                >
+                                  {p.stockAvailableDecimal ?? p.stockAvailable} {p.unit}
+                                </span>
+                              </p>
+                            </div>
                           </button>
 
                           {(hasBulk || p.allowFractionalSale || p.warrantyMonths || (p.variants && p.variants.length > 0) || isWeightUnit(p.unit)) && (

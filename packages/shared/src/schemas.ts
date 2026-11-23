@@ -38,17 +38,226 @@ export const paymentMethodConfigSchema = z.object({
   code: z.string().trim().min(2).max(32),
   label: z.string().trim().min(2).max(60),
   enabled: z.boolean(),
-  requireReference: z.boolean(),
-  affectsCashDrawer: z.boolean(),
+  requireReference: z.boolean().default(false),
+  affectsCashDrawer: z.boolean().default(false),
 });
 
 export type PaymentMethodConfig = z.infer<typeof paymentMethodConfigSchema>;
 
-export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
-  { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
-  { code: 'ORANGE_MONEY', label: 'Orange Money', enabled: true, requireReference: true, affectsCashDrawer: false },
-  { code: 'WAVE', label: 'Wave', enabled: true, requireReference: true, affectsCashDrawer: false },
-];
+export interface CountryOption {
+  code: string;
+  name: string;
+  flag: string;
+  currency: string;
+  timezone: string;
+  methods: PaymentMethodConfig[];
+}
+
+export const COUNTRY_PRESETS: Record<string, CountryOption> = {
+  ML: {
+    code: 'ML',
+    name: 'Mali',
+    flag: '🇲🇱',
+    currency: 'XOF',
+    timezone: 'Africa/Bamako',
+    methods: [
+      { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+      { code: 'ORANGE_MONEY', label: 'Orange Money (Mali)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'WAVE', label: 'Wave (Mali)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'MOOV_MONEY', label: 'Moov Money (Mali)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'BANK_TRANSFER', label: 'Virement bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+      { code: 'CARD', label: 'Carte bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+    ],
+  },
+  CI: {
+    code: 'CI',
+    name: "Côte d'Ivoire",
+    flag: '🇨🇮',
+    currency: 'XOF',
+    timezone: 'Africa/Abidjan',
+    methods: [
+      { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+      { code: 'WAVE', label: 'Wave (CI)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'ORANGE_MONEY', label: 'Orange Money (CI)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'MTN_MOMO', label: 'MTN MoMo (CI)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'MOOV_MONEY', label: 'Moov Money (CI)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'BANK_TRANSFER', label: 'Virement bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+      { code: 'CARD', label: 'Carte bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+    ],
+  },
+  SN: {
+    code: 'SN',
+    name: 'Sénégal',
+    flag: '🇸🇳',
+    currency: 'XOF',
+    timezone: 'Africa/Dakar',
+    methods: [
+      { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+      { code: 'WAVE', label: 'Wave (Sénégal)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'ORANGE_MONEY', label: 'Orange Money (Sénégal)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'FREE_MONEY', label: 'Free Money', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'BANK_TRANSFER', label: 'Virement bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+      { code: 'CARD', label: 'Carte bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+    ],
+  },
+  BF: {
+    code: 'BF',
+    name: 'Burkina Faso',
+    flag: '🇧🇫',
+    currency: 'XOF',
+    timezone: 'Africa/Ouagadougou',
+    methods: [
+      { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+      { code: 'ORANGE_MONEY', label: 'Orange Money (BF)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'MOOV_MONEY', label: 'Moov Money (BF)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'BANK_TRANSFER', label: 'Virement bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+      { code: 'CARD', label: 'Carte bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+    ],
+  },
+  GN: {
+    code: 'GN',
+    name: 'Guinée',
+    flag: '🇬🇳',
+    currency: 'GNF',
+    timezone: 'Africa/Conakry',
+    methods: [
+      { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+      { code: 'ORANGE_MONEY', label: 'Orange Money (Guinée)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'MTN_MOMO', label: 'MTN MoMo (Guinée)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'BANK_TRANSFER', label: 'Virement bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+      { code: 'CARD', label: 'Carte bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+    ],
+  },
+  TG: {
+    code: 'TG',
+    name: 'Togo',
+    flag: '🇹🇬',
+    currency: 'XOF',
+    timezone: 'Africa/Lome',
+    methods: [
+      { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+      { code: 'TMONEY', label: 'T-Money (Togocom)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'MOOV_MONEY', label: 'Moov Money (Flooz)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'BANK_TRANSFER', label: 'Virement bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+      { code: 'CARD', label: 'Carte bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+    ],
+  },
+  BJ: {
+    code: 'BJ',
+    name: 'Bénin',
+    flag: '🇧🇯',
+    currency: 'XOF',
+    timezone: 'Africa/Porto-Novo',
+    methods: [
+      { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+      { code: 'MTN_MOMO', label: 'MTN MoMo (Bénin)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'MOOV_MONEY', label: 'Moov Money (Flooz)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'CELTIIS_CASH', label: 'Celtiis Cash', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'BANK_TRANSFER', label: 'Virement bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+      { code: 'CARD', label: 'Carte bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+    ],
+  },
+  NE: {
+    code: 'NE',
+    name: 'Niger',
+    flag: '🇳🇪',
+    currency: 'XOF',
+    timezone: 'Africa/Niamey',
+    methods: [
+      { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+      { code: 'AIRTEL_MONEY', label: 'Airtel Money (Niger)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'MOOV_MONEY', label: 'Moov Money (Niger)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'ORANGE_MONEY', label: 'Orange Money (Niger)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'BANK_TRANSFER', label: 'Virement bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+      { code: 'CARD', label: 'Carte bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+    ],
+  },
+  CM: {
+    code: 'CM',
+    name: 'Cameroun',
+    flag: '🇨🇲',
+    currency: 'XAF',
+    timezone: 'Africa/Douala',
+    methods: [
+      { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+      { code: 'ORANGE_MONEY', label: 'Orange Money (CM)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'MTN_MOMO', label: 'MTN MoMo (CM)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'BANK_TRANSFER', label: 'Virement bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+      { code: 'CARD', label: 'Carte bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+    ],
+  },
+  GA: {
+    code: 'GA',
+    name: 'Gabon',
+    flag: '🇬🇦',
+    currency: 'XAF',
+    timezone: 'Africa/Libreville',
+    methods: [
+      { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+      { code: 'AIRTEL_MONEY', label: 'Airtel Money (Gabon)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'MOOV_MONEY', label: 'Moov Money (Gabon)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'BANK_TRANSFER', label: 'Virement bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+      { code: 'CARD', label: 'Carte bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+    ],
+  },
+  CD: {
+    code: 'CD',
+    name: 'RDC',
+    flag: '🇨🇩',
+    currency: 'USD',
+    timezone: 'Africa/Kinshasa',
+    methods: [
+      { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+      { code: 'MPESA', label: 'M-Pesa (Vodacom)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'ORANGE_MONEY', label: 'Orange Money (RDC)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'AIRTEL_MONEY', label: 'Airtel Money (RDC)', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'BANK_TRANSFER', label: 'Virement bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+      { code: 'CARD', label: 'Carte bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+    ],
+  },
+  OTHER: {
+    code: 'OTHER',
+    name: 'Autre / International',
+    flag: '🌍',
+    currency: 'XOF',
+    timezone: 'Africa/Bamako',
+    methods: [
+      { code: 'CASH', label: 'Espèces', enabled: true, requireReference: false, affectsCashDrawer: true },
+      { code: 'ORANGE_MONEY', label: 'Orange Money', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'WAVE', label: 'Wave', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'MOOV_MONEY', label: 'Moov Money', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'MTN_MOMO', label: 'MTN MoMo', enabled: false, requireReference: false, affectsCashDrawer: false },
+      { code: 'CARD', label: 'Carte bancaire', enabled: true, requireReference: false, affectsCashDrawer: false },
+      { code: 'BANK_TRANSFER', label: 'Virement bancaire', enabled: false, requireReference: false, affectsCashDrawer: false },
+    ],
+  },
+};
+
+export const COUNTRY_OPTIONS = Object.values(COUNTRY_PRESETS);
+
+export function detectCountryFromTimezone(timezone?: string): string {
+  if (!timezone) return 'ML';
+  const tz = timezone.toLowerCase();
+  if (tz.includes('bamako')) return 'ML';
+  if (tz.includes('dakar')) return 'SN';
+  if (tz.includes('abidjan')) return 'CI';
+  if (tz.includes('ouagadougou')) return 'BF';
+  if (tz.includes('conakry')) return 'GN';
+  if (tz.includes('lome')) return 'TG';
+  if (tz.includes('porto-novo') || tz.includes('cotonou')) return 'BJ';
+  if (tz.includes('niamey')) return 'NE';
+  if (tz.includes('douala')) return 'CM';
+  if (tz.includes('libreville')) return 'GA';
+  if (tz.includes('kinshasa') || tz.includes('lubumbashi')) return 'CD';
+  return 'OTHER';
+}
+
+export function getPaymentMethodsForTimezone(timezone?: string): PaymentMethodConfig[] {
+  const code = detectCountryFromTimezone(timezone);
+  return COUNTRY_PRESETS[code]?.methods || COUNTRY_PRESETS.ML.methods;
+}
+
+export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = COUNTRY_PRESETS.ML.methods;
 
 export const dayHoursSchema = z.object({
   open: timeHHmmSchema,

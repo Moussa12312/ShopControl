@@ -15,9 +15,12 @@ import {
 } from 'lucide-react';
 import {
   BusinessProfileConfig,
+  COUNTRY_OPTIONS,
+  COUNTRY_PRESETS,
   DEFAULT_CURRENCY,
   DEFAULT_DAILY_REPORT_TIME,
   DEFAULT_TIMEZONE,
+  detectCountryFromTimezone,
   normalizeBusinessProfile,
   normalizeShopType,
   SHOP_TYPE_DESCRIPTIONS,
@@ -85,6 +88,7 @@ export default function OwnerShopsPage() {
     logoUrl: null as string | null,
     phone: '',
     address: '',
+    countryCode: 'ML',
     currency: DEFAULT_CURRENCY,
     timezone: DEFAULT_TIMEZONE,
     dailyReportTime: DEFAULT_DAILY_REPORT_TIME,
@@ -92,6 +96,16 @@ export default function OwnerShopsPage() {
     defaultTaxRateBps: 0,
     requireOperatorPin: false,
   });
+
+  const handleCountryChange = (cCode: string) => {
+    const preset = COUNTRY_PRESETS[cCode] || COUNTRY_PRESETS.ML;
+    setForm((prev) => ({
+      ...prev,
+      countryCode: cCode,
+      currency: preset.currency,
+      timezone: preset.timezone,
+    }));
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -119,8 +133,9 @@ export default function OwnerShopsPage() {
       logoUrl: null,
       phone: '',
       address: '',
-      currency: DEFAULT_CURRENCY,
-      timezone: DEFAULT_TIMEZONE,
+      countryCode: 'ML',
+      currency: COUNTRY_PRESETS.ML.currency,
+      timezone: COUNTRY_PRESETS.ML.timezone,
       dailyReportTime: DEFAULT_DAILY_REPORT_TIME,
       taxMode: 'NONE',
       defaultTaxRateBps: 0,
@@ -132,12 +147,14 @@ export default function OwnerShopsPage() {
   const openEdit = (shop: ShopRow) => {
     setEditingShop(shop);
     setFormError(null);
+    const country = detectCountryFromTimezone(shop.timezone);
     setForm({
       name: shop.name,
       slug: shop.slug,
       logoUrl: shop.logoUrl || null,
       phone: shop.phone || '',
       address: shop.address || '',
+      countryCode: country,
       currency: shop.currency,
       timezone: shop.timezone,
       dailyReportTime: shop.dailyReportTime,
@@ -201,6 +218,9 @@ export default function OwnerShopsPage() {
         taxMode: form.taxMode,
         defaultTaxRateBps: Number(form.defaultTaxRateBps) || 0,
         requireOperatorPin: form.requireOperatorPin,
+        ...(!editingShop
+          ? { paymentMethods: (COUNTRY_PRESETS[form.countryCode] || COUNTRY_PRESETS.ML).methods }
+          : {}),
       };
 
       if (editingShop) {
@@ -332,7 +352,9 @@ export default function OwnerShopsPage() {
                       </code>
                     </div>
                     <p className="leading-relaxed">
-                      Devise : <strong>{shop.currency}</strong> · Fuseau :{' '}
+                      {COUNTRY_PRESETS[detectCountryFromTimezone(shop.timezone)]?.flag || '🌍'}{' '}
+                      <strong>{COUNTRY_PRESETS[detectCountryFromTimezone(shop.timezone)]?.name || 'Boutique'}</strong> · Devise :{' '}
+                      <strong>{shop.currency}</strong> · Fuseau :{' '}
                       <strong className="break-words">{shop.timezone}</strong> · Bilan auto :{' '}
                       <strong>{shop.dailyReportTime}</strong>
                     </p>
@@ -467,6 +489,32 @@ export default function OwnerShopsPage() {
                       className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                     />
                   </div>
+                </div>
+
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 space-y-2">
+                  <label className="block text-xs font-bold text-slate-900">
+                    🌍 Pays d'implantation de la boutique
+                  </label>
+                  <select
+                    value={form.countryCode}
+                    onChange={(e) => handleCountryChange(e.target.value)}
+                    className="sc-input font-semibold bg-white"
+                  >
+                    {COUNTRY_OPTIONS.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.name} ({c.currency})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-emerald-900 leading-relaxed">
+                    💡 <strong>Mobile Money & devises préconfigurés pour ce pays :</strong>{' '}
+                    <span className="font-semibold">
+                      {(COUNTRY_PRESETS[form.countryCode] || COUNTRY_PRESETS.ML).methods
+                        .filter((m) => m.enabled)
+                        .map((m) => m.label)
+                        .join(' · ')}
+                    </span>
+                  </p>
                 </div>
 
                 <div>

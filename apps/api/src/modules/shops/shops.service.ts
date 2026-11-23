@@ -15,6 +15,7 @@ import {
   DEFAULT_PAYMENT_METHODS,
   DEFAULT_RECEIPT_SETTINGS,
   DEFAULT_TIMEZONE,
+  getPaymentMethodsForTimezone,
   normalizeBusinessProfile,
   normalizeShopType,
   SHOP_TYPE_LABELS,
@@ -134,7 +135,7 @@ export class ShopsService {
     const timezone = input.timezone || merchant.defaultTimezone || DEFAULT_TIMEZONE;
     const dailyReportTime = input.dailyReportTime || DEFAULT_DAILY_REPORT_TIME;
     const openingHours = input.openingHours ?? DEFAULT_OPENING_HOURS;
-    const paymentMethods = input.paymentMethods ?? DEFAULT_PAYMENT_METHODS;
+    const paymentMethods = input.paymentMethods ?? getPaymentMethodsForTimezone(timezone);
     const rawDeliveryCfg = {
       ...DEFAULT_DELIVERY_CONFIG,
       ...((input.deliveryConfig as object) || {}),

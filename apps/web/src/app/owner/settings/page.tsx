@@ -22,18 +22,23 @@ import {
   Plus,
   Trash2,
   Clock,
+  CreditCard,
 } from 'lucide-react';
 import {
   BusinessProfileConfig,
   canShopDeliver,
+  COUNTRY_OPTIONS,
+  COUNTRY_PRESETS,
   DEFAULT_DELIVERY_CONFIG,
   DEFAULT_OPENING_HOURS,
   DEFAULT_RECEIPT_SETTINGS,
   formatDateTimeInTimezone,
   formatXof,
+  getPaymentMethodsForTimezone,
   normalizeBusinessProfile,
   normalizeShopType,
   OpeningHoursConfig,
+  PaymentMethodConfig,
   PLATFORM_MODULE_LABELS,
   PlatformModuleKey,
   SHOP_TYPE_SHORT_LABELS,
@@ -92,6 +97,7 @@ interface ShopDetail {
   receiptSettings?: Record<string, any> | null;
   deliveryConfig?: Record<string, any> | null;
   openingHours?: Partial<OpeningHoursConfig> | null;
+  paymentMethods?: PaymentMethodConfig[] | null;
 }
 
 const WEEK_DAYS: Array<{ key: keyof OpeningHoursConfig; label: string; short: string }> = [
@@ -204,6 +210,7 @@ export default function OwnerSettingsPage() {
     maxOrderQty: 100,
     maxOrderAmountXof: 5_000_000,
     openingHours: DEFAULT_OPENING_HOURS as OpeningHoursConfig,
+    paymentMethods: [] as PaymentMethodConfig[],
   });
 
   const [newZoneName, setNewZoneName] = useState('');
@@ -305,6 +312,9 @@ export default function OwnerSettingsPage() {
       maxOrderQty: Number(d.maxOrderQty ?? 100),
       maxOrderAmountXof: Number(d.maxOrderAmountXof ?? 5_000_000),
       openingHours: mergedHours,
+      paymentMethods: Array.isArray(s.paymentMethods) && s.paymentMethods.length > 0
+        ? s.paymentMethods
+        : getPaymentMethodsForTimezone(s.timezone),
     });
   }, []);
 
@@ -378,6 +388,7 @@ export default function OwnerSettingsPage() {
           taxMode: shopForm.taxMode,
           defaultTaxRateBps: Math.round((Number(shopForm.taxRatePercent) || 0) * 100),
           openingHours: shopForm.openingHours,
+          paymentMethods: shopForm.paymentMethods,
           receiptSettings: {
             slogan: shopForm.slogan.trim(),
             headerText: shopForm.headerText.trim(),
@@ -716,6 +727,78 @@ export default function OwnerSettingsPage() {
                         onChange={(e) => setShopForm({ ...shopForm, legalNotice: e.target.value })}
                         className="sc-input mt-1"
                       />
+                    </div>
+                  </section>
+
+                  {/* Moyens de paiement & Mobile Money acceptés */}
+                  <section className="sc-card space-y-4 p-4 sm:p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-5 w-5 text-brand-700" />
+                        <div>
+                          <h2 className="text-base font-extrabold text-slate-900">
+                            Moyens de paiement & Mobile Money
+                          </h2>
+                          <p className="text-xs text-slate-500">
+                            Cochez les modes de règlement acceptés à la caisse de cette boutique.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <select
+                          aria-label="Changer de pays pour les moyens de paiement"
+                          onChange={(e) => {
+                            const c = e.target.value;
+                            if (c && COUNTRY_PRESETS[c]) {
+                              setShopForm((f) => ({ ...f, paymentMethods: COUNTRY_PRESETS[c].methods }));
+                            }
+                          }}
+                          className="sc-input py-1 text-xs font-semibold"
+                          defaultValue=""
+                        >
+                          <option value="" disabled>
+                            Presets pays…
+                          </option>
+                          {COUNTRY_OPTIONS.map((c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.flag} {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-950">
+                      ℹ️ <strong>Version 1 directe :</strong> Aucun paramétrage d’API ni compte marchand complexe requis. Vos caissiers sélectionnent simplement le mode de règlement (Espèces, Wave, Orange Money, etc.) lors de la vente.
+                    </div>
+
+                    <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+                      {shopForm.paymentMethods.map((m, idx) => (
+                        <div key={m.code} className="flex items-center justify-between p-3 text-xs">
+                          <label className="flex items-center gap-2.5 font-bold text-slate-900 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={m.enabled}
+                              onChange={(e) => {
+                                const next = [...shopForm.paymentMethods];
+                                next[idx] = { ...m, enabled: e.target.checked };
+                                setShopForm({ ...shopForm, paymentMethods: next });
+                              }}
+                              className="h-4 w-4 accent-brand-700 rounded"
+                            />
+                            <span>{m.label}</span>
+                          </label>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                              m.enabled
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-slate-100 text-slate-400'
+                            }`}
+                          >
+                            {m.enabled ? 'Actif en caisse' : 'Désactivé'}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </section>
                 </div>
