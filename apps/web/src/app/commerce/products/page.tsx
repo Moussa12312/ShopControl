@@ -1340,16 +1340,16 @@ export default function ProductsPage() {
 
             {/* Tableau desktop (>= md) */}
             <div className="sc-card hidden overflow-x-auto md:block">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <table className="w-full min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-porcelain-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-4 py-3.5 whitespace-nowrap">Produit & Catégorie</th>
-                    <th className="px-4 py-3.5">Caractéristiques</th>
-                    <th className="px-4 py-3.5 whitespace-nowrap">Prix vente</th>
-                    {canReadCost ? <th className="px-4 py-3.5 whitespace-nowrap">Coût (CMP)</th> : null}
-                    <th className="px-4 py-3.5 whitespace-nowrap">Stock dispo</th>
-                    <th className="px-4 py-3.5 whitespace-nowrap">Vitrine</th>
-                    {canEdit || canDelete ? <th className="px-4 py-3.5 text-right whitespace-nowrap">Action</th> : null}
+                    <th className="px-4 py-3.5 whitespace-nowrap min-w-[220px]">Produit & Catégorie</th>
+                    <th className="px-4 py-3.5 whitespace-nowrap min-w-[150px]">Caractéristiques</th>
+                    <th className="px-4 py-3.5 whitespace-nowrap min-w-[110px]">Prix vente</th>
+                    {canReadCost ? <th className="px-4 py-3.5 whitespace-nowrap min-w-[110px]">Coût (CMP)</th> : null}
+                    <th className="px-4 py-3.5 whitespace-nowrap min-w-[110px]">Stock dispo</th>
+                    <th className="px-4 py-3.5 whitespace-nowrap min-w-[90px]">Vitrine</th>
+                    {canEdit || canDelete ? <th className="px-4 py-3.5 text-right whitespace-nowrap min-w-[220px]">Action</th> : null}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1407,7 +1407,7 @@ export default function ProductsPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           {p.variants && p.variants.length > 0 ? (
                             <div className="flex flex-col items-start gap-1">
                               <span className="inline-flex items-center gap-1.5 rounded-full bg-forest-900/10 border border-forest-900/15 px-2.5 py-0.5 text-xs font-bold text-forest-900 whitespace-nowrap">
@@ -1421,7 +1421,7 @@ export default function ProductsPage() {
                               ) : null}
                             </div>
                           ) : (
-                            <span className="text-xs text-slate-400">
+                            <span className="text-xs text-slate-400 whitespace-nowrap">
                               Article unique ({p.unit})
                             </span>
                           )}
