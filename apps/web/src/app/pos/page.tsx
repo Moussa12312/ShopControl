@@ -593,6 +593,56 @@ export default function PosPage() {
     }
   };
 
+  // Détecteur global pour douchette code-barres USB ou sans fil (HID keyboard)
+  // Fonctionne partout sur l'écran sans obliger l'agent à cliquer dans le champ de recherche
+  useEffect(() => {
+    let scanBuffer = '';
+    let lastKeyTime = 0;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      const now = Date.now();
+      const timeDiff = now - lastKeyTime;
+      lastKeyTime = now;
+
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable);
+
+      if (e.key === 'Enter') {
+        const candidate = scanBuffer.trim();
+        scanBuffer = '';
+        if (candidate.length >= 2) {
+          const match = handleBarcodeCode(candidate);
+          if (match) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (isInput && target instanceof HTMLInputElement) {
+              target.value = '';
+            }
+          }
+        }
+        return;
+      }
+
+      // Si le délai entre deux frappes est supérieur à 85ms, ce n'est pas un scan automatique de douchette
+      if (timeDiff > 85) {
+        scanBuffer = '';
+      }
+
+      if (e.key.length === 1) {
+        scanBuffer += e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
+  }, [handleBarcodeCode]);
+
   // Scanner caméra code-barres (BarcodeDetector natif si supporté + saisie rapide)
   useEffect(() => {
     if (!scannerOpen) return;

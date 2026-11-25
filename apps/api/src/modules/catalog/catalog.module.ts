@@ -213,7 +213,13 @@ export class CatalogService {
 
     const where: Record<string, unknown> = {};
     if (params.categoryId) where.categoryId = params.categoryId;
-    if (params.status) where.status = params.status;
+    if (params.status) {
+      if (params.status !== 'ALL') {
+        where.status = params.status;
+      }
+    } else {
+      where.status = { not: 'ARCHIVED' };
+    }
     if (params.search?.trim()) {
       const q = params.search.trim();
       where.OR = [
@@ -772,9 +778,16 @@ export class CatalogService {
       throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND', message: 'Produit introuvable.' });
     }
 
-    const hasSales = product.saleLines.length > 0;
+    const [hasSales, hasPurchaseLines, hasOnlineLines, hasInventory] = await Promise.all([
+      client.saleLine.count({ where: { productId } }),
+      client.purchaseOrderItem.count({ where: { productId } }),
+      client.onlineOrderLine.count({ where: { productId } }),
+      client.stockInventorySessionItem.count({ where: { productId } }),
+    ]);
 
-    if (hasSales) {
+    const hasHistory = hasSales > 0 || hasPurchaseLines > 0 || hasOnlineLines > 0 || hasInventory > 0;
+
+    if (hasHistory) {
       // Soft-delete / Archivage pour préserver la comptabilité et les tickets de vente
       await client.$transaction(async (tx) => {
         await tx.product.update({
@@ -796,7 +809,7 @@ export class CatalogService {
         action: 'PRODUCT_ARCHIVED',
         entityType: 'Product',
         entityId: productId,
-        reason: 'Archivé suite à demande de suppression (historique de ventes existant)',
+        reason: 'Archivé suite à demande de suppression (historique commercial ou mouvements existants)',
         ipAddress: meta.ipAddress,
         userAgent: meta.userAgent,
         correlationId: meta.correlationId,
@@ -805,40 +818,59 @@ export class CatalogService {
       return {
         success: true,
         action: 'ARCHIVED',
-        message: `Le produit « ${product.name} » a un historique de ventes. Il a été archivé pour protéger la comptabilité et ne sera plus visible en caisse.`,
+        message: `Le produit « ${product.name} » a un historique de mouvements. Il a été retiré du catalogue et archivé avec succès.`,
       };
     }
 
-    // Pas de ventes enregistrées : suppression définitive propre
-    await client.$transaction(async (tx) => {
-      await tx.stockMovement.deleteMany({ where: { productId } });
-      await tx.stockBalance.deleteMany({ where: { productId } });
-      await tx.productCostHistory.deleteMany({ where: { productId } });
-      await tx.productBatch.deleteMany({ where: { productId } });
-      await tx.productVariant.deleteMany({ where: { productId } });
-      await tx.product.delete({ where: { id: productId } });
-    });
+    // Pas de ventes ni commandes enregistrées : tentative de suppression définitive propre
+    try {
+      await client.$transaction(async (tx) => {
+        await tx.stockMovement.deleteMany({ where: { productId } });
+        await tx.stockBalance.deleteMany({ where: { productId } });
+        await tx.productCostHistory.deleteMany({ where: { productId } });
+        await tx.productBatch.deleteMany({ where: { productId } });
+        await tx.productVariant.deleteMany({ where: { productId } });
+        await tx.product.delete({ where: { id: productId } });
+      });
 
-    await this.auditService.recordShop({
-      shopId,
-      actorUserId: user.userId,
-      actorRole: user.role,
-      declaredOperatorId: operator?.id ?? null,
-      declaredOperatorName: operator?.firstName ?? null,
-      action: 'PRODUCT_DELETED',
-      entityType: 'Product',
-      entityId: productId,
-      beforeData: { name: product.name, sku: product.sku },
-      ipAddress: meta.ipAddress,
-      userAgent: meta.userAgent,
-      correlationId: meta.correlationId,
-    });
+      await this.auditService.recordShop({
+        shopId,
+        actorUserId: user.userId,
+        actorRole: user.role,
+        declaredOperatorId: operator?.id ?? null,
+        declaredOperatorName: operator?.firstName ?? null,
+        action: 'PRODUCT_DELETED',
+        entityType: 'Product',
+        entityId: productId,
+        beforeData: { name: product.name, sku: product.sku },
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        correlationId: meta.correlationId,
+      });
 
-    return {
-      success: true,
-      action: 'DELETED',
-      message: `Le produit « ${product.name} » a été supprimé définitivement.`,
-    };
+      return {
+        success: true,
+        action: 'DELETED',
+        message: `Le produit « ${product.name} » a été supprimé définitivement.`,
+      };
+    } catch {
+      // Fallback gracieux en cas de contrainte imprévue
+      await client.$transaction(async (tx) => {
+        await tx.product.update({
+          where: { id: productId },
+          data: { status: 'ARCHIVED' },
+        });
+        await tx.productVariant.updateMany({
+          where: { productId },
+          data: { isActive: false },
+        });
+      });
+      return {
+        success: true,
+        action: 'ARCHIVED',
+        message: `Le produit « ${product.name} » a été retiré du catalogue et archivé avec succès.`,
+      };
+    }
   }
 
   async ventilateStock(

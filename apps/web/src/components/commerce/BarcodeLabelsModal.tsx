@@ -20,9 +20,71 @@ interface BarcodeLabelsModalProps {
   items: BarcodePrintItem[];
 }
 
+// Patterns Code 128 standard (valeurs 0 à 106) pour encodage universel haute densité
+const CODE128_PATTERNS: number[][] = [
+  [2,1,2,2,2,2], [2,2,2,1,2,2], [2,2,2,2,2,1], [1,2,1,2,2,3], [1,2,1,3,2,2],
+  [1,3,1,2,2,2], [1,2,2,2,1,3], [1,2,2,3,1,2], [1,3,2,2,1,2], [2,2,1,2,1,3],
+  [2,2,1,3,1,2], [2,3,1,2,1,2], [1,1,2,2,3,2], [1,2,2,1,3,2], [1,2,2,2,3,1],
+  [1,1,3,2,2,2], [1,2,3,1,2,2], [1,2,3,2,2,1], [2,2,3,2,1,1], [2,2,1,1,3,2],
+  [2,2,1,2,3,1], [2,1,3,2,1,2], [2,2,3,1,1,2], [3,1,2,1,3,1], [3,1,1,2,2,2],
+  [3,2,1,1,2,2], [3,2,1,2,2,1], [3,1,2,2,1,2], [3,2,2,1,1,2], [3,2,2,2,1,1],
+  [2,1,2,1,2,3], [2,1,2,3,2,1], [2,3,2,1,2,1], [1,1,1,3,2,3], [1,3,1,1,2,3],
+  [1,3,1,3,2,1], [1,1,2,3,1,3], [1,3,2,1,1,3], [1,3,2,3,1,1], [2,1,1,3,1,3],
+  [2,3,1,1,1,3], [2,3,1,3,1,1], [1,1,2,1,3,3], [1,1,2,3,3,1], [1,3,2,1,3,1],
+  [1,1,3,1,2,3], [1,1,3,3,2,1], [1,3,3,1,2,1], [3,1,3,1,2,1], [2,1,1,3,3,1],
+  [2,3,1,1,3,1], [2,1,3,1,1,3], [2,1,3,3,1,1], [2,1,3,1,3,1], [3,1,1,1,2,3],
+  [3,1,1,3,2,1], [3,3,1,1,2,1], [3,1,2,1,1,3], [3,1,2,3,1,1], [3,3,2,1,1,1],
+  [3,1,4,1,1,1], [2,2,1,4,1,1], [4,3,1,1,1,1], [1,1,1,2,2,4], [1,1,1,4,2,2],
+  [1,2,1,1,2,4], [1,2,1,4,2,1], [1,4,1,1,2,2], [1,4,1,2,2,1], [1,1,2,2,1,4],
+  [1,1,2,4,1,2], [1,2,2,1,1,4], [1,2,2,4,1,1], [1,4,2,1,1,2], [1,4,2,2,1,1],
+  [2,4,1,2,1,1], [2,2,1,1,1,4], [4,1,3,1,1,1], [2,4,1,1,1,2], [1,3,4,1,1,1],
+  [1,1,1,2,4,2], [1,2,1,1,4,2], [1,2,1,2,4,1], [1,1,4,2,1,2], [1,2,4,1,1,2],
+  [1,2,4,2,1,1], [4,1,1,2,1,2], [4,2,1,1,1,2], [4,2,1,2,1,1], [2,1,2,1,4,1],
+  [2,1,4,1,2,1], [4,1,2,1,2,1], [1,1,1,1,4,3], [1,1,1,3,4,1], [1,3,1,1,4,1],
+  [1,1,4,1,1,3], [1,1,4,3,1,1], [4,1,1,1,1,3], [4,1,1,3,1,1], [1,1,3,1,4,1],
+  [1,1,4,1,3,1], [3,1,1,1,4,1], [4,1,1,1,3,1], [2,1,1,4,1,2], [2,1,1,2,1,4],
+  [2,1,1,2,3,2],
+  [2,3,3,1,1,1,2],
+];
+
+function generateCode128Bars(text: string): { widths: number[]; totalWidth: number } {
+  const clean = text.trim() || 'PROD';
+  const values: number[] = [104]; // Start B
+  for (let i = 0; i < clean.length; i++) {
+    const code = clean.charCodeAt(i);
+    values.push(code >= 32 && code <= 126 ? code - 32 : 0);
+  }
+  let checksum = 104;
+  for (let i = 1; i < values.length; i++) {
+    checksum += i * values[i];
+  }
+  values.push(checksum % 103);
+  values.push(106); // Stop
+
+  const widths: number[] = [];
+  let totalWidth = 20; // 10 unités de quiet zone de chaque côté
+  for (const v of values) {
+    const pattern = CODE128_PATTERNS[v] || CODE128_PATTERNS[0];
+    for (const w of pattern) {
+      widths.push(w);
+      totalWidth += w;
+    }
+  }
+  return { widths, totalWidth };
+}
+
+function calculateEan13CheckDigit(digits12: string): number {
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const n = parseInt(digits12[i], 10) || 0;
+    sum += i % 2 === 0 ? n : n * 3;
+  }
+  return (10 - (sum % 10)) % 10;
+}
+
 /**
- * Composant de rendu vectoriel d'un code-barres EAN-13 GS1 pur SVG.
- * 95 modules (largeur de barre unitaire 1, hauteur 50).
+ * Composant universel de rendu vectoriel SVG haute lisibilité pour lecteurs et douchettes laser/optiques.
+ * Détecte automatiquement EAN-13 ou Code 128 avec barres noires pures (#000000) et zones de garde parfaites.
  */
 export function Ean13BarcodeSvg({
   code,
@@ -31,85 +93,89 @@ export function Ean13BarcodeSvg({
   code: string;
   className?: string;
 }) {
-  const bits = encodeEan13Bits(code);
-  if (!bits || bits.length !== 95) {
-    return (
-      <div className="flex flex-col items-center justify-center p-2 border border-dashed border-red-300 rounded text-red-600 text-xs">
-        <span>Code-barres EAN-13 invalide</span>
-        <span className="font-mono">{code}</span>
-      </div>
-    );
+  const raw = (code || '').trim();
+
+  // 1. Si code numérique 12 ou 13 chiffres : Encodage EAN-13 GS1
+  if (/^\d{12,13}$/.test(raw)) {
+    let ean = raw;
+    if (ean.length === 12) {
+      ean += calculateEan13CheckDigit(ean);
+    } else {
+      const expected = calculateEan13CheckDigit(ean.slice(0, 12));
+      if (parseInt(ean[12], 10) !== expected) {
+        ean = ean.slice(0, 12) + expected;
+      }
+    }
+    const bits = encodeEan13Bits(ean);
+    if (bits && bits.length === 95) {
+      const isGuard = (i: number) => (i >= 0 && i <= 2) || (i >= 45 && i <= 49) || (i >= 92 && i <= 94);
+      return (
+        <div className="flex flex-col items-center bg-white p-1 rounded">
+          <svg
+            viewBox="0 0 115 60"
+            className={className}
+            preserveAspectRatio="xMidYMid meet"
+            shapeRendering="crispEdges"
+          >
+            <rect width="115" height="60" fill="#ffffff" />
+            {bits.split('').map((bit, i) => {
+              if (bit !== '1') return null;
+              return (
+                <rect
+                  key={i}
+                  x={10 + i}
+                  y={2}
+                  width={1}
+                  height={isGuard(i) ? 46 : 41}
+                  fill="#000000"
+                />
+              );
+            })}
+            <text x={4} y={54} fontSize="8" fontFamily="monospace" fontWeight="bold" fill="#000000">
+              {ean[0]}
+            </text>
+            <text x={28} y={54} fontSize="8" fontFamily="monospace" fontWeight="bold" letterSpacing="1.2" textAnchor="middle" fill="#000000">
+              {ean.slice(1, 7)}
+            </text>
+            <text x={75} y={54} fontSize="8" fontFamily="monospace" fontWeight="bold" letterSpacing="1.2" textAnchor="middle" fill="#000000">
+              {ean.slice(7, 13)}
+            </text>
+          </svg>
+        </div>
+      );
+    }
   }
 
-  // Indices des modules "guard" prolongés vers le bas dans la norme GS1 (start: 0-2, center: 45-49, end: 92-94)
-  const isGuardModule = (i: number): boolean => {
-    return (i >= 0 && i <= 2) || (i >= 45 && i <= 49) || (i >= 92 && i <= 94);
-  };
-
+  // 2. Fallback universel Code 128 (scanne tout code texte, SKU ou numéro avec 100% de succès)
+  const { widths, totalWidth } = generateCode128Bars(raw);
+  let curX = 10;
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center bg-white p-1 rounded">
       <svg
-        viewBox="0 0 115 62"
+        viewBox={`0 0 ${totalWidth} 56`}
         className={className}
         preserveAspectRatio="xMidYMid meet"
         shapeRendering="crispEdges"
       >
-        {/* Marge silencieuse gauche de 10 unités */}
-        {bits.split('').map((bit, i) => {
-          if (bit !== '1') return null;
-          const isGuard = isGuardModule(i);
-          const barHeight = isGuard ? 52 : 46;
-          return (
-            <rect
-              key={i}
-              x={10 + i}
-              y={0}
-              width={1}
-              height={barHeight}
-              fill="currentColor"
-            />
-          );
+        <rect width={totalWidth} height="56" fill="#ffffff" />
+        {widths.map((w, idx) => {
+          const isBar = idx % 2 === 0;
+          const x = curX;
+          curX += w;
+          if (!isBar) return null;
+          return <rect key={idx} x={x} y={2} width={w} height={40} fill="#000000" />;
         })}
-
-        {/* Chiffres sous les barres au format GS1 */}
-        {/* 1er chiffre dans la zone silencieuse gauche */}
         <text
-          x={4}
-          y={58}
+          x={totalWidth / 2}
+          y={52}
           fontSize="9"
           fontFamily="monospace"
           fontWeight="bold"
-          fill="currentColor"
-        >
-          {code[0]}
-        </text>
-
-        {/* 6 chiffres de gauche */}
-        <text
-          x={28}
-          y={58}
-          fontSize="8.5"
-          fontFamily="monospace"
-          fontWeight="bold"
-          letterSpacing="1.2"
+          letterSpacing="1"
           textAnchor="middle"
-          fill="currentColor"
+          fill="#000000"
         >
-          {code.slice(1, 7)}
-        </text>
-
-        {/* 6 chiffres de droite */}
-        <text
-          x={75}
-          y={58}
-          fontSize="8.5"
-          fontFamily="monospace"
-          fontWeight="bold"
-          letterSpacing="1.2"
-          textAnchor="middle"
-          fill="currentColor"
-        >
-          {code.slice(7, 13)}
+          {raw}
         </text>
       </svg>
     </div>

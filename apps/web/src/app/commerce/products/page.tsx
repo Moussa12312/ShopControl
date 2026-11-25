@@ -680,6 +680,7 @@ export default function ProductsPage() {
           shopId,
         },
       );
+      setProducts((prev) => prev.filter((p) => p.id !== product.id));
       setDeleteTarget(null);
       if (previewProduct?.id === product.id) setPreviewProduct(null);
       if (editing?.id === product.id) setModalOpen(false);
@@ -1514,8 +1515,8 @@ export default function ProductsPage() {
 
         {/* MODAL PRODUIT EN 2 ÉTAPES : 1) CHOIX CATÉGORIE -> 2) FORMULAIRE ADAPTATIF ZÉRO MÉLANGE */}
         {modalOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/65 p-3 backdrop-blur-xs sm:p-4">
-            <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/65 p-2 sm:p-4 backdrop-blur-xs">
+            <div className="max-h-[95vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:p-6 lg:p-7">
               {/* En-tête du modal */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
@@ -2037,38 +2038,38 @@ export default function ProductsPage() {
                     {/* Cas 1 : Variantes créées (Ventilation du stock) */}
                     {form.variants.length > 0 ? (
                       <div className="space-y-3">
-                        {/* Vue Mobile : Fiches variantes empilées */}
-                        <div className="space-y-2.5 sm:hidden">
+                        {/* Vue Mobile : Fiches variantes empilées 100% responsive */}
+                        <div className="space-y-3 sm:hidden">
                           {form.variants.map((v, vIdx) => (
                             <div
                               key={`vm-${vIdx}`}
-                              className="rounded-xl border border-slate-200 bg-white p-3 space-y-2 shadow-2xs"
+                              className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 space-y-2.5 shadow-2xs"
                             >
-                              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-1.5">
-                                <span className="text-xs font-bold text-slate-800">
+                              <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 pb-2">
+                                <span className="inline-flex items-center gap-1.5 rounded-lg bg-forest-900 px-2.5 py-0.5 text-xs font-bold text-limeglow-400">
                                   Variante #{vIdx + 1}
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => removeVariant(vIdx)}
-                                  className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                  className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100"
                                   title="Supprimer la variante"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </button>
                               </div>
                               <div>
-                                <label className="text-[11px] font-semibold text-slate-600">Nom variante</label>
+                                <label className="text-[11px] font-bold text-slate-700">Nom / Déclinaison *</label>
                                 <input
                                   value={v.name}
                                   onChange={(e) => updateVariant(vIdx, { name: e.target.value })}
-                                  placeholder="Ex: Pointure 42 / Noir"
-                                  className="sc-input mt-0.5 bg-slate-50 py-1.5 text-xs"
+                                  placeholder="Ex: Taille 42 / Noir"
+                                  className="sc-input mt-1 bg-white text-xs font-semibold"
                                 />
                               </div>
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                  <label className="text-[11px] font-semibold text-slate-600">
+                                  <label className="text-[11px] font-bold text-slate-700">
                                     {editing ? 'Stock physique' : 'Stock initial'}
                                   </label>
                                   <input
@@ -2087,11 +2088,11 @@ export default function ProductsPage() {
                                         stockPhysical: val,
                                       });
                                     }}
-                                    className="sc-input mt-0.5 bg-slate-50 py-1.5 text-xs text-center tabular font-bold text-slate-900"
+                                    className="sc-input mt-1 bg-white text-center tabular font-extrabold text-emerald-800 text-sm"
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-[11px] font-semibold text-slate-600">Prix vente (XOF)</label>
+                                  <label className="text-[11px] font-bold text-slate-700">Prix vente (XOF)</label>
                                   <input
                                     type="number"
                                     min={0}
@@ -2101,24 +2102,24 @@ export default function ProductsPage() {
                                         salePriceXof: Number(e.target.value) || 0,
                                       })
                                     }
-                                    className="sc-input mt-0.5 bg-slate-50 py-1.5 text-xs tabular"
+                                    className="sc-input mt-1 bg-white text-xs font-semibold tabular"
                                   />
                                 </div>
                               </div>
-                              <div className="grid grid-cols-3 gap-2">
-                                <div className="col-span-2">
-                                  <label className="text-[11px] font-semibold text-slate-600">Code EAN-13</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[11px] font-bold text-slate-700">Code EAN-13 / SKU</label>
                                   <input
                                     value={v.barcode || ''}
                                     onChange={(e) =>
                                       updateVariant(vIdx, { barcode: e.target.value })
                                     }
-                                    placeholder="Auto EAN-13..."
-                                    className="sc-input mt-0.5 bg-slate-50 py-1.5 text-xs font-mono"
+                                    placeholder="Code-barres..."
+                                    className="sc-input mt-1 bg-white text-xs font-mono"
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-[11px] font-semibold text-slate-600">Seuil alerte</label>
+                                  <label className="text-[11px] font-bold text-slate-700">Seuil alerte</label>
                                   <input
                                     type="number"
                                     min={0}
@@ -2128,7 +2129,7 @@ export default function ProductsPage() {
                                         alertThreshold: Number(e.target.value) || 0,
                                       })
                                     }
-                                    className="sc-input mt-0.5 bg-slate-50 py-1.5 text-xs text-center tabular"
+                                    className="sc-input mt-1 bg-white text-center tabular text-xs font-semibold"
                                   />
                                 </div>
                               </div>
@@ -2907,14 +2908,14 @@ export default function ProductsPage() {
                   </div>
                   <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 text-xs">
                     {previewProduct.variants.map((v, i) => (
-                      <div key={v.id || i} className="flex items-center justify-between py-2">
-                        <div>
-                          <p className="font-bold text-slate-800">{v.name}</p>
-                          <p className="text-[11px] text-slate-400 font-mono">
+                      <div key={v.id || i} className="flex items-center justify-between gap-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-slate-800 truncate">{v.name}</p>
+                          <p className="text-[11px] text-slate-400 font-mono truncate">
                             {v.sku || 'SKU auto'} {v.barcode ? `· ${v.barcode}` : ''}
                           </p>
                         </div>
-                        <div className="text-right">
+                        <div className="shrink-0 text-right">
                           <p
                             className={`font-extrabold tabular ${
                               (v.stockPhysical || 0) <= (v.alertThreshold || 0)
