@@ -330,7 +330,6 @@ export default function PurchasesPage() {
       subtitle="Les commandes n’augmentent jamais le stock avant réception (partielle ou totale) avec recalcul automatique du CMP."
       headerActions={
         <>
-          <ShopPickerInline shopId={shopId} onChange={selectShop} />
           <div className="inline-flex rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-xs font-semibold">
             <button
               type="button"
@@ -458,12 +457,69 @@ export default function PurchasesPage() {
                 placeholder="Téléphone"
                 className="sc-input sm:col-span-3"
               />
-              <input
-                value={supProducts}
-                onChange={(e) => setSupProducts(e.target.value)}
-                placeholder="Ce qu’il fournit (ex. Riz, Sucre, Huile, Pommades…)"
-                className="sc-input sm:col-span-5"
-              />
+              <div className="sm:col-span-5 space-y-1.5">
+                <div className="flex gap-2">
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const prodName = e.target.value;
+                      if (!prodName) return;
+                      const current = supProducts
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean);
+                      if (!current.includes(prodName)) {
+                        const updated = [...current, prodName].join(', ');
+                        setSupProducts(updated);
+                      }
+                    }}
+                    className="sc-input flex-1 text-xs bg-porcelain-50"
+                  >
+                    <option value="">+ Choisir un produit du catalogue...</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.name}>
+                        {p.name} ({p.sku})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <input
+                  value={supProducts}
+                  onChange={(e) => setSupProducts(e.target.value)}
+                  placeholder="Articles fournis (ex. Chaussure, Sacoche...)"
+                  className="sc-input text-xs"
+                />
+                {supProducts.trim() ? (
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {supProducts
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                      .map((item, idx) => (
+                        <span
+                          key={`tag-${idx}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-[11px] font-bold text-brand-800"
+                        >
+                          {item}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const filtered = supProducts
+                                .split(',')
+                                .map((s) => s.trim())
+                                .filter(Boolean)
+                                .filter((x) => x !== item);
+                              setSupProducts(filtered.join(', '));
+                            }}
+                            className="text-brand-600 hover:text-rose-600 font-bold ml-0.5"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                  </div>
+                ) : null}
+              </div>
               <div className="sm:col-span-12 sm:flex sm:justify-end">
                 <button
                   type="submit"

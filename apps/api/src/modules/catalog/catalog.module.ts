@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
+  Delete,
   Get,
   Injectable,
   Module,
@@ -26,6 +28,7 @@ import {
   normalizeShopType,
   updateCategorySchema,
   updateProductSchema,
+  ventilateProductStockSchema,
 } from '@shopcontrol/shared';
 import {
   CurrentOperator,
@@ -635,6 +638,35 @@ export class CatalogService {
                 isActive: v.isActive ?? true,
               },
             });
+
+            if (v.targetStockQty !== undefined && v.targetStockQty !== null) {
+              const vBal = await tx.stockBalance.findUnique({
+                where: {
+                  productId_variantKey: {
+                    productId,
+                    variantKey: v.id,
+                  },
+                },
+              });
+              const currentQty = vBal?.physicalQty ?? 0;
+              const targetQty = Number(v.targetStockQty);
+              const diff = targetQty - currentQty;
+              if (diff !== 0) {
+                await this.inventoryService.applyMovementInTx(tx, {
+                  productId,
+                  variantId: v.id,
+                  movementType: 'INVENTORY_ADJUSTMENT',
+                  quantityDelta: diff,
+                  unitCostXof: v.costPriceXof ?? prod.costPriceXof,
+                  referenceType: 'MANUAL_VARIANT_ADJUST',
+                  referenceId: v.id,
+                  reason: `Mise à jour stock variante « ${vName} » (${currentQty} -> ${targetQty})`,
+                  actorUserId: user.userId,
+                  declaredOperatorId: operator?.id ?? null,
+                  declaredOperatorName: operator?.firstName ?? null,
+                });
+              }
+            }
           } else {
             const vSku =
               v.sku?.trim() ||
@@ -661,12 +693,13 @@ export class CatalogService {
             });
             keptIds.push(createdVar.id);
 
-            if (v.initialStockQty && v.initialStockQty > 0) {
+            const initialQty = v.targetStockQty ?? v.initialStockQty ?? 0;
+            if (initialQty > 0) {
               await this.inventoryService.applyMovementInTx(tx, {
                 productId,
                 variantId: createdVar.id,
                 movementType: 'INITIAL_IMPORT',
-                quantityDelta: v.initialStockQty,
+                quantityDelta: initialQty,
                 unitCostXof: createdVar.costPriceXof ?? prod.costPriceXof,
                 referenceType: 'PRODUCT_ADD_VARIANT',
                 referenceId: createdVar.id,
@@ -719,6 +752,187 @@ export class CatalogService {
     });
 
     return updated;
+  }
+
+  async deleteProduct(
+    shopId: string,
+    productId: string,
+    user: AuthenticatedUser,
+    operator: DeclaredOperatorContext | undefined,
+    meta: RequestMeta,
+  ) {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+    const product = await client.product.findUnique({
+      where: { id: productId },
+      include: {
+        saleLines: { select: { id: true }, take: 1 },
+      },
+    });
+    if (!product) {
+      throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND', message: 'Produit introuvable.' });
+    }
+
+    const hasSales = product.saleLines.length > 0;
+
+    if (hasSales) {
+      // Soft-delete / Archivage pour préserver la comptabilité et les tickets de vente
+      await client.$transaction(async (tx) => {
+        await tx.product.update({
+          where: { id: productId },
+          data: { status: 'ARCHIVED' },
+        });
+        await tx.productVariant.updateMany({
+          where: { productId },
+          data: { isActive: false },
+        });
+      });
+
+      await this.auditService.recordShop({
+        shopId,
+        actorUserId: user.userId,
+        actorRole: user.role,
+        declaredOperatorId: operator?.id ?? null,
+        declaredOperatorName: operator?.firstName ?? null,
+        action: 'PRODUCT_ARCHIVED',
+        entityType: 'Product',
+        entityId: productId,
+        reason: 'Archivé suite à demande de suppression (historique de ventes existant)',
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        correlationId: meta.correlationId,
+      });
+
+      return {
+        success: true,
+        action: 'ARCHIVED',
+        message: `Le produit « ${product.name} » a un historique de ventes. Il a été archivé pour protéger la comptabilité et ne sera plus visible en caisse.`,
+      };
+    }
+
+    // Pas de ventes enregistrées : suppression définitive propre
+    await client.$transaction(async (tx) => {
+      await tx.stockMovement.deleteMany({ where: { productId } });
+      await tx.stockBalance.deleteMany({ where: { productId } });
+      await tx.productCostHistory.deleteMany({ where: { productId } });
+      await tx.productBatch.deleteMany({ where: { productId } });
+      await tx.productVariant.deleteMany({ where: { productId } });
+      await tx.product.delete({ where: { id: productId } });
+    });
+
+    await this.auditService.recordShop({
+      shopId,
+      actorUserId: user.userId,
+      actorRole: user.role,
+      declaredOperatorId: operator?.id ?? null,
+      declaredOperatorName: operator?.firstName ?? null,
+      action: 'PRODUCT_DELETED',
+      entityType: 'Product',
+      entityId: productId,
+      beforeData: { name: product.name, sku: product.sku },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+
+    return {
+      success: true,
+      action: 'DELETED',
+      message: `Le produit « ${product.name} » a été supprimé définitivement.`,
+    };
+  }
+
+  async ventilateStock(
+    shopId: string,
+    productId: string,
+    distributions: Array<{ variantId: string; quantity: number }>,
+    user: AuthenticatedUser,
+    operator: DeclaredOperatorContext | undefined,
+    meta: RequestMeta,
+  ) {
+    const client = await this.shopDbManager.getClientForShop(shopId);
+    const product = await client.product.findUnique({
+      where: { id: productId },
+      include: { variants: true, stockBalances: true },
+    });
+    if (!product) {
+      throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND', message: 'Produit introuvable.' });
+    }
+
+    const baseBal = product.stockBalances.find((b) => b.variantKey === 'BASE');
+    const baseQty = baseBal?.physicalQty ?? 0;
+    const totalToVentilate = distributions.reduce((sum, d) => sum + d.quantity, 0);
+
+    if (totalToVentilate <= 0) {
+      throw new BadRequestException({
+        code: 'INVALID_QUANTITY',
+        message: 'La quantité totale à ventiler doit être supérieure à zéro.',
+      });
+    }
+    if (totalToVentilate > baseQty) {
+      throw new BadRequestException({
+        code: 'INSUFFICIENT_BASE_STOCK',
+        message: `Stock principal insuffisant (${baseQty} ${product.unit} disponibles, ${totalToVentilate} demandés).`,
+      });
+    }
+
+    await client.$transaction(async (tx) => {
+      for (const dist of distributions) {
+        if (dist.quantity <= 0) continue;
+        const targetVariant = product.variants.find((v) => v.id === dist.variantId);
+        if (!targetVariant) continue;
+
+        // Déduire du BASE
+        await this.inventoryService.applyMovementInTx(tx, {
+          productId,
+          variantId: undefined,
+          movementType: 'INVENTORY_ADJUSTMENT',
+          quantityDelta: -dist.quantity,
+          unitCostXof: product.costPriceXof,
+          referenceType: 'STOCK_VENTILATION',
+          referenceId: targetVariant.id,
+          reason: `Ventilation vers variante « ${targetVariant.name} » (-${dist.quantity})`,
+          actorUserId: user.userId,
+          declaredOperatorId: operator?.id ?? null,
+          declaredOperatorName: operator?.firstName ?? null,
+        });
+
+        // Ajouter à la variante
+        await this.inventoryService.applyMovementInTx(tx, {
+          productId,
+          variantId: targetVariant.id,
+          movementType: 'INVENTORY_ADJUSTMENT',
+          quantityDelta: dist.quantity,
+          unitCostXof: targetVariant.costPriceXof ?? product.costPriceXof,
+          referenceType: 'STOCK_VENTILATION',
+          referenceId: targetVariant.id,
+          reason: `Ventilation reçue du stock principal (+${dist.quantity})`,
+          actorUserId: user.userId,
+          declaredOperatorId: operator?.id ?? null,
+          declaredOperatorName: operator?.firstName ?? null,
+        });
+      }
+    });
+
+    await this.auditService.recordShop({
+      shopId,
+      actorUserId: user.userId,
+      actorRole: user.role,
+      declaredOperatorId: operator?.id ?? null,
+      declaredOperatorName: operator?.firstName ?? null,
+      action: 'STOCK_VENTILATED',
+      entityType: 'Product',
+      entityId: productId,
+      afterData: { totalVentilated: totalToVentilate, distributions },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      correlationId: meta.correlationId,
+    });
+
+    return {
+      success: true,
+      totalVentilated: totalToVentilate,
+      message: `${totalToVentilate} unités ventilées avec succès sur les variantes.`,
+    };
   }
 }
 
@@ -821,6 +1035,43 @@ export class CatalogController {
     @Req() req: RequestWithAuth,
   ) {
     return this.catalogService.updateProduct(shopId, productId, body, user, operator, {
+      ipAddress: req.ip || null,
+      userAgent: req.header('user-agent') || null,
+      correlationId: req.correlationId || null,
+    });
+  }
+
+  @Delete('products/:productId')
+  @Roles('OWNER', 'AGENT')
+  @RequirePermissions('products:update')
+  @ApiOperation({ summary: 'Supprimer ou archiver un produit selon présence d’historique de vente' })
+  deleteProduct(
+    @Param('shopId') shopId: string,
+    @Param('productId') productId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOperator() operator: DeclaredOperatorContext | undefined,
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.catalogService.deleteProduct(shopId, productId, user, operator, {
+      ipAddress: req.ip || null,
+      userAgent: req.header('user-agent') || null,
+      correlationId: req.correlationId || null,
+    });
+  }
+
+  @Post('products/:productId/ventilate-stock')
+  @Roles('OWNER', 'AGENT')
+  @RequirePermissions('products:update')
+  @ApiOperation({ summary: 'Ventiler le stock principal BASE vers les variantes du produit' })
+  ventilateStock(
+    @Param('shopId') shopId: string,
+    @Param('productId') productId: string,
+    @Body(new ZodValidationPipe(ventilateProductStockSchema)) body: any,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOperator() operator: DeclaredOperatorContext | undefined,
+    @Req() req: RequestWithAuth,
+  ) {
+    return this.catalogService.ventilateStock(shopId, productId, body.distributions, user, operator, {
       ipAddress: req.ip || null,
       userAgent: req.header('user-agent') || null,
       correlationId: req.correlationId || null,

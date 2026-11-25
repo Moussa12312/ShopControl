@@ -199,7 +199,6 @@ export default function CashPage() {
       allowedRoles={['OWNER', 'AGENT']}
       title="Caisse & Clôtures"
       subtitle="Session rattachée à la boutique · Solde théorique temps réel · Clôture immuable avec alerte d’écart."
-      headerActions={<ShopPickerInline shopId={shopId} onChange={selectShop} />}
     >
       <div className="space-y-5">
 

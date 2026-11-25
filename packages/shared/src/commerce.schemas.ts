@@ -23,7 +23,7 @@ export const updateCategorySchema = createCategorySchema.partial().extend({
 });
 
 export const productVariantInputSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().uuid().optional().or(z.literal('')),
   name: z.string().trim().min(1, 'Nom de variante requis.').max(80),
   sku: z.string().trim().max(64).optional().or(z.literal('')),
   barcode: z.string().trim().max(64).optional().or(z.literal('')),
@@ -31,6 +31,7 @@ export const productVariantInputSchema = z.object({
   costPriceXof: xofInt.nullable().optional(),
   alertThreshold: z.number().int().min(0).default(5),
   initialStockQty: z.number().int().min(0).optional(),
+  targetStockQty: z.number().int().min(0).optional(),
   isActive: z.boolean().default(true),
 });
 
@@ -68,6 +69,15 @@ export const createProductSchema = z.object({
 export const updateProductSchema = createProductSchema
   .omit({ initialStockQty: true, batchNumber: true })
   .partial();
+
+export const ventilateProductStockSchema = z.object({
+  distributions: z.array(
+    z.object({
+      variantId: z.string().uuid('Variante requise.'),
+      quantity: positiveInt,
+    }),
+  ).min(1, 'Au moins une variante requise.'),
+});
 
 export const createProductBatchSchema = z.object({
   productId: z.string().uuid('Produit requis.'),

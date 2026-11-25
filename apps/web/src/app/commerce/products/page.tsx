@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
+  AlertTriangle,
   ArrowLeft,
   Boxes,
   CalendarClock,
@@ -10,6 +11,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Eye,
   Layers,
   Package,
   Palette,
@@ -115,6 +117,7 @@ export interface ProductVariantItem {
   costPriceXof?: number | null;
   alertThreshold: number;
   initialStockQty?: number;
+  targetStockQty?: number;
   stockPhysical?: number;
   stockAvailable?: number;
   isActive?: boolean;
@@ -203,6 +206,8 @@ export default function ProductsPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [codeSeed, setCodeSeed] = useState(() => Math.floor(1000 + Math.random() * 9000));
   const [barcodeTarget, setBarcodeTarget] = useState<ProductRow | null>(null);
+  const [previewProduct, setPreviewProduct] = useState<ProductRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProductRow | null>(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -469,6 +474,7 @@ export default function ProductsPage() {
             costPriceXof: v.costPriceXof,
             alertThreshold: v.alertThreshold,
             initialStockQty: 0,
+            targetStockQty: v.stockPhysical ?? 0,
             stockPhysical: v.stockPhysical,
             stockAvailable: v.stockAvailable,
           }))
@@ -664,6 +670,67 @@ export default function ProductsPage() {
     }));
   };
 
+  const handleDeleteProduct = async (product: ProductRow) => {
+    if (!shopId) return;
+    setBusy(true);
+    try {
+      const res = await apiFetch<{ success: boolean; action: string; message: string }>(
+        `/shops/${shopId}/products/${product.id}`,
+        {
+          method: 'DELETE',
+          shopId,
+        },
+      );
+      setDeleteTarget(null);
+      if (previewProduct?.id === product.id) setPreviewProduct(null);
+      if (editing?.id === product.id) setModalOpen(false);
+      setInfoMsg(res.message);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur lors de la suppression du produit.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAutoVentilate = async (product: ProductRow) => {
+    if (!shopId || !product.variants?.length) return;
+    setBusy(true);
+    try {
+      const totalVarStock = product.variants.reduce((sum, v) => sum + (v.stockPhysical || 0), 0);
+      const baseStock = Math.max(0, product.stockPhysical - totalVarStock);
+      if (baseStock <= 0) {
+        setError('Aucun stock principal non-ventilé disponible.');
+        return;
+      }
+      const count = product.variants.length;
+      const perVariant = Math.floor(baseStock / count);
+      let remainder = baseStock % count;
+
+      const distributions = product.variants.map((v) => {
+        const qty = perVariant + (remainder > 0 ? 1 : 0);
+        if (remainder > 0) remainder--;
+        return { variantId: v.id, quantity: qty };
+      });
+
+      const res = await apiFetch<{ success: boolean; totalVentilated: number; message: string }>(
+        `/shops/${shopId}/products/${product.id}/ventilate-stock`,
+        {
+          method: 'POST',
+          shopId,
+          body: { distributions },
+        },
+      );
+      setInfoMsg(res.message);
+      if (previewProduct?.id === product.id) setPreviewProduct(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur lors de la ventilation du stock.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!shopId) return;
@@ -729,7 +796,7 @@ export default function ProductsPage() {
         variants:
           form.variants.length > 0
             ? form.variants.map((v) => ({
-                id: v.id,
+                id: v.id && v.id.length > 10 ? v.id : undefined,
                 name: v.name.trim(),
                 sku: v.sku?.trim() || undefined,
                 barcode: v.barcode?.trim() || undefined,
@@ -738,8 +805,23 @@ export default function ProductsPage() {
                   v.costPriceXof !== undefined && v.costPriceXof !== null && String(v.costPriceXof).trim() !== ''
                     ? Math.round(Number(v.costPriceXof))
                     : null,
-                alertThreshold: Math.round(Number(v.alertThreshold) || form.alertThreshold || 0),
-                initialStockQty: Math.max(0, Math.round(Number(v.initialStockQty) || 0)),
+                alertThreshold: Math.round(Number(v.alertThreshold) || 2),
+                initialStockQty: !editing ? Math.max(0, Math.round(Number(v.initialStockQty) || 0)) : undefined,
+                targetStockQty:
+                  editing
+                    ? Math.max(
+                        0,
+                        Math.round(
+                          Number(
+                            v.targetStockQty !== undefined
+                              ? v.targetStockQty
+                              : v.stockPhysical !== undefined
+                                ? v.stockPhysical
+                                : 0,
+                          ),
+                        ),
+                      )
+                    : undefined,
               }))
             : undefined,
       };
@@ -781,15 +863,12 @@ export default function ProductsPage() {
       title="Produits & Catégories"
       subtitle="Gérez votre catalogue, vos catégories et vos prix."
       headerActions={
-        <>
-          <ShopPickerInline shopId={shopId} onChange={selectShop} />
-          {canWrite && shopId ? (
-            <button type="button" onClick={openCreate} className="sc-hero-btn-primary">
-              <Plus className="h-3.5 w-3.5" />
-              Nouveau produit
-            </button>
-          ) : null}
-        </>
+        canWrite && shopId ? (
+          <button type="button" onClick={openCreate} className="sc-hero-btn-primary">
+            <Plus className="h-3.5 w-3.5" />
+            Nouveau produit
+          </button>
+        ) : null
       }
     >
       <div className="space-y-3.5 sm:space-y-4">
@@ -1212,25 +1291,43 @@ export default function ProductsPage() {
                       </div>
                     </div>
 
-                    <div className="mt-3 flex items-center gap-2">
+                    <div className="mt-3 flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewProduct(p)}
+                        className="sc-btn-ghost flex-1 py-1.5 text-xs font-semibold"
+                        title="Voir la fiche détaillée du produit"
+                      >
+                        <Eye className="h-3.5 w-3.5 text-brand-700" />
+                        Aperçu
+                      </button>
                       <button
                         type="button"
                         onClick={() => setBarcodeTarget(p)}
-                        className="sc-btn-ghost flex-1 py-2 text-xs"
+                        className="sc-btn-ghost px-2.5 py-1.5 text-xs"
                         title="Imprimer ou prévisualiser les étiquettes code-barres"
                       >
                         <Printer className="h-3.5 w-3.5" />
-                        Étiquettes
                       </button>
                       {canWrite ? (
-                        <button
-                          type="button"
-                          onClick={() => openEdit(p)}
-                          className="sc-btn-ghost flex-1 py-2 text-xs"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Modifier
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openEdit(p)}
+                            className="sc-btn-ghost px-2.5 py-1.5 text-xs"
+                            title="Modifier ce produit"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(p)}
+                            className="sc-btn-ghost px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
+                            title="Supprimer ou archiver ce produit"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
                       ) : null}
                     </div>
                   </div>
@@ -1259,7 +1356,11 @@ export default function ProductsPage() {
                     const colors = p.availableColors || [];
                     return (
                       <tr key={p.id} className="transition hover:bg-porcelain-50/70">
-                        <td className="px-4 py-3">
+                        <td
+                          className="px-4 py-3 cursor-pointer group"
+                          onClick={() => setPreviewProduct(p)}
+                          title="Cliquer pour voir l'aperçu complet de la fiche produit"
+                        >
                           <div className="flex items-center gap-3">
                             {thumb ? (
                               <div className="relative h-11 w-11 shrink-0">
@@ -1267,7 +1368,7 @@ export default function ProductsPage() {
                                 <img
                                   src={thumb}
                                   alt={p.name}
-                                  className="h-11 w-11 rounded-xl border border-slate-200 bg-white object-cover"
+                                  className="h-11 w-11 rounded-xl border border-slate-200 bg-white object-cover group-hover:border-brand-400 transition"
                                 />
                                 {(p.imageUrls?.length || 0) > 1 ? (
                                   <span className="absolute -bottom-1 -right-1 rounded-md bg-forest-900 px-1 py-0.5 text-[9px] font-bold text-limeglow-400 shadow-xs">
@@ -1276,13 +1377,15 @@ export default function ProductsPage() {
                                 ) : null}
                               </div>
                             ) : (
-                              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 group-hover:bg-brand-100 transition">
                                 <Package className="h-5 w-5" />
                               </span>
                             )}
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-1.5">
-                                <p className="font-bold text-slate-900">{p.name}</p>
+                                <p className="font-bold text-slate-900 group-hover:text-brand-800 transition">
+                                  {p.name}
+                                </p>
                                 {p.brand ? (
                                   <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-semibold text-slate-700">
                                     {p.brand}
@@ -1358,40 +1461,49 @@ export default function ProductsPage() {
                             {PRODUCT_STATUS_LABELS[p.status]}
                           </span>
                         </td>
-                        {canWrite ? (
-                          <td className="px-4 py-3 text-right whitespace-nowrap">
-                            <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                              <button
-                                type="button"
-                                onClick={() => setBarcodeTarget(p)}
-                                className="sc-btn-ghost px-2.5 py-1.5 text-xs"
-                                title="Imprimer les étiquettes code-barres"
-                              >
-                                <Printer className="h-3.5 w-3.5" />
-                                Étiquettes
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openEdit(p)}
-                                className="sc-btn-ghost px-3 py-1.5 text-xs"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                                Modifier
-                              </button>
-                            </div>
-                          </td>
-                        ) : (
-                          <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewProduct(p)}
+                              className="sc-btn-ghost px-2.5 py-1.5 text-xs font-semibold"
+                              title="Aperçu rapide"
+                            >
+                              <Eye className="h-3.5 w-3.5 text-brand-700" />
+                              Aperçu
+                            </button>
                             <button
                               type="button"
                               onClick={() => setBarcodeTarget(p)}
                               className="sc-btn-ghost px-2.5 py-1.5 text-xs"
+                              title="Imprimer les étiquettes code-barres"
                             >
                               <Printer className="h-3.5 w-3.5" />
                               Étiquettes
                             </button>
-                          </td>
-                        )}
+                            {canWrite ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => openEdit(p)}
+                                  className="sc-btn-ghost px-2.5 py-1.5 text-xs"
+                                  title="Modifier le produit"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  Modifier
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteTarget(p)}
+                                  className="sc-btn-ghost px-2 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
+                                  title="Supprimer ou archiver ce produit"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
@@ -1878,6 +1990,51 @@ export default function ProductsPage() {
                       </div>
                     )}
 
+                    {/* Alerte si le produit dispose de stock principal non encore ventilé sur les variantes */}
+                    {editing && form.variants.length > 0 && (() => {
+                      const totalVarStock = form.variants.reduce((sum, v) => sum + (v.stockPhysical || 0), 0);
+                      const baseStock = Math.max(0, (editing.stockPhysical || 0) - totalVarStock);
+                      if (baseStock <= 0) return null;
+                      return (
+                        <div className="rounded-2xl border border-amber-300 bg-amber-50/90 p-3.5 space-y-2">
+                          <div className="flex items-center gap-2 text-amber-950 font-extrabold text-xs">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                            <span>Stock principal général à ventiler ({baseStock} {form.unit})</span>
+                          </div>
+                          <p className="text-[11px] text-amber-900 leading-relaxed">
+                            Ce produit dispose de <strong>{baseStock} {form.unit}</strong> enregistrées sur le stock de base global, alors que les <strong>{form.variants.length} variantes</strong> ci-dessous doivent être approvisionnées.
+                          </p>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => {
+                              const count = form.variants.length;
+                              const perVar = Math.floor(baseStock / count);
+                              let rem = baseStock % count;
+                              const nextVars = form.variants.map((v) => {
+                                const add = perVar + (rem > 0 ? 1 : 0);
+                                if (rem > 0) rem--;
+                                const current = v.stockPhysical ?? 0;
+                                return {
+                                  ...v,
+                                  targetStockQty: current + add,
+                                  stockPhysical: current + add,
+                                };
+                              });
+                              setForm((f) => ({ ...f, variants: nextVars }));
+                              setInfoMsg(
+                                `Répartition équitable calculée (+${perVar} par variante = ${baseStock} total). Cliquez sur "Enregistrer les modifications" ci-dessous pour appliquer.`,
+                              );
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shadow-xs"
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            ⚡ Répartir automatiquement les {baseStock} {form.unit} sur les {form.variants.length} variantes
+                          </button>
+                        </div>
+                      );
+                    })()}
+
                     {/* Cas 1 : Variantes créées (Ventilation du stock) */}
                     {form.variants.length > 0 ? (
                       <div className="space-y-3">
@@ -1911,23 +2068,30 @@ export default function ProductsPage() {
                                 />
                               </div>
                               <div className="grid grid-cols-2 gap-2">
-                                {!editing ? (
-                                  <div>
-                                    <label className="text-[11px] font-semibold text-slate-600">Stock initial</label>
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      value={v.initialStockQty ?? 0}
-                                      onChange={(e) =>
-                                        updateVariant(vIdx, {
-                                          initialStockQty: Number(e.target.value) || 0,
-                                        })
-                                      }
-                                      className="sc-input mt-0.5 bg-slate-50 py-1.5 text-xs text-center tabular"
-                                    />
-                                  </div>
-                                ) : null}
-                                <div className={editing ? 'col-span-2' : ''}>
+                                <div>
+                                  <label className="text-[11px] font-semibold text-slate-600">
+                                    {editing ? 'Stock physique' : 'Stock initial'}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={
+                                      editing
+                                        ? (v.targetStockQty !== undefined ? v.targetStockQty : (v.stockPhysical ?? 0))
+                                        : (v.initialStockQty ?? 0)
+                                    }
+                                    onChange={(e) => {
+                                      const val = Number(e.target.value) || 0;
+                                      updateVariant(vIdx, {
+                                        initialStockQty: val,
+                                        targetStockQty: val,
+                                        stockPhysical: val,
+                                      });
+                                    }}
+                                    className="sc-input mt-0.5 bg-slate-50 py-1.5 text-xs text-center tabular font-bold text-slate-900"
+                                  />
+                                </div>
+                                <div>
                                   <label className="text-[11px] font-semibold text-slate-600">Prix vente (XOF)</label>
                                   <input
                                     type="number"
@@ -1979,7 +2143,9 @@ export default function ProductsPage() {
                             <thead>
                               <tr className="text-left font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                                 <th className="py-2 pr-2">Nom variante</th>
-                                {!editing ? <th className="py-2 px-2 text-center w-24">Stock init.</th> : null}
+                                <th className="py-2 px-2 text-center w-24">
+                                  {editing ? 'Stock phys.' : 'Stock init.'}
+                                </th>
                                 <th className="py-2 px-2 w-28">Prix vente (XOF)</th>
                                 <th className="py-2 px-2">Code-barres EAN-13</th>
                                 <th className="py-2 px-2 text-center w-20">Seuil</th>
@@ -1997,21 +2163,26 @@ export default function ProductsPage() {
                                       className="sc-input bg-white py-1 text-xs"
                                     />
                                   </td>
-                                  {!editing ? (
-                                    <td className="py-2 px-2 w-24">
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        value={v.initialStockQty ?? 0}
-                                        onChange={(e) =>
-                                          updateVariant(vIdx, {
-                                            initialStockQty: Number(e.target.value) || 0,
-                                          })
-                                        }
-                                        className="sc-input bg-white py-1 text-center text-xs tabular"
-                                      />
-                                    </td>
-                                  ) : null}
+                                  <td className="py-2 px-2 w-24">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={
+                                        editing
+                                          ? (v.targetStockQty !== undefined ? v.targetStockQty : (v.stockPhysical ?? 0))
+                                          : (v.initialStockQty ?? 0)
+                                      }
+                                      onChange={(e) => {
+                                        const val = Number(e.target.value) || 0;
+                                        updateVariant(vIdx, {
+                                          initialStockQty: val,
+                                          targetStockQty: val,
+                                          stockPhysical: val,
+                                        });
+                                      }}
+                                      className="sc-input bg-white py-1 text-center text-xs tabular font-bold text-slate-900"
+                                    />
+                                  </td>
                                   <td className="py-2 px-2 w-28">
                                     <input
                                       type="number"
@@ -2469,21 +2640,36 @@ export default function ProductsPage() {
                     )}
                   </div>
 
-                  <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
-                    <button
-                      type="button"
-                      onClick={() => setModalOpen(false)}
-                      className="sc-btn-ghost"
-                    >
-                      Annuler
-                    </button>
-                    <button type="submit" disabled={busy} className="sc-btn-primary">
-                      {busy
-                        ? 'Enregistrement…'
-                        : editing
-                          ? 'Mettre à jour'
-                          : 'Créer le produit'}
-                    </button>
+                  <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                    {editing && canWrite ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setDeleteTarget(editing);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Supprimer ce produit
+                      </button>
+                    ) : <div />}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setModalOpen(false)}
+                        className="sc-btn-ghost"
+                      >
+                        Annuler
+                      </button>
+                      <button type="submit" disabled={busy} className="sc-btn-primary">
+                        {busy
+                          ? 'Enregistrement…'
+                          : editing
+                            ? 'Enregistrer les modifications'
+                            : 'Créer le produit'}
+                      </button>
+                    </div>
                   </div>
                 </form>
               )}
@@ -2614,6 +2800,288 @@ export default function ProductsPage() {
                 })),
             ]}
           />
+        ) : null}
+
+        {/* Modal d'aperçu rapide fiche produit (Point 8) */}
+        {previewProduct ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/65 p-3 backdrop-blur-xs sm:p-4">
+            <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6 space-y-4">
+              <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-3">
+                  {previewProduct.imageUrls?.[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={previewProduct.imageUrls[0]}
+                      alt={previewProduct.name}
+                      className="h-14 w-14 rounded-2xl border border-slate-200 object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
+                      <Package className="h-7 w-7" />
+                    </div>
+                  )}
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-base font-extrabold text-slate-900 sm:text-lg">
+                        {previewProduct.name}
+                      </h2>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                          previewProduct.status === 'PUBLISHED'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : previewProduct.status === 'DRAFT'
+                              ? 'bg-slate-100 text-slate-600'
+                              : 'bg-rose-50 text-rose-700'
+                        }`}
+                      >
+                        {PRODUCT_STATUS_LABELS[previewProduct.status]}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      <code className="font-mono text-slate-700">{previewProduct.sku}</code>
+                      {previewProduct.categoryName ? ` · Rayon : ${previewProduct.categoryName}` : ''}
+                      {previewProduct.barcode ? ` · Code : ${previewProduct.barcode}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewProduct(null)}
+                  className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Cartes métriques */}
+              <div className={`grid gap-2.5 ${canReadCost ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                <div className="rounded-2xl border border-slate-200 bg-porcelain-50 p-3 text-center">
+                  <p className="text-[11px] font-semibold text-slate-500">Prix de vente</p>
+                  <p className="text-base font-extrabold text-slate-900 tabular">
+                    {formatXof(previewProduct.salePriceXof)}
+                  </p>
+                </div>
+                {canReadCost ? (
+                  <div className="rounded-2xl border border-slate-200 bg-porcelain-50 p-3 text-center">
+                    <p className="text-[11px] font-semibold text-slate-500">Coût d'achat (CMP)</p>
+                    <p className="text-base font-semibold text-slate-700 tabular">
+                      {previewProduct.costPriceXof !== null ? formatXof(previewProduct.costPriceXof) : 'Estimé'}
+                    </p>
+                  </div>
+                ) : null}
+                <div className="rounded-2xl border border-slate-200 bg-porcelain-50 p-3 text-center">
+                  <p className="text-[11px] font-semibold text-slate-500">Stock disponible</p>
+                  <p
+                    className={`text-base font-extrabold tabular ${
+                      previewProduct.stockAvailable <= 0
+                        ? 'text-rose-600'
+                        : previewProduct.stockAvailable <= previewProduct.alertThreshold
+                          ? 'text-amber-700'
+                          : 'text-emerald-700'
+                    }`}
+                  >
+                    {previewProduct.stockAvailableDecimal ?? previewProduct.stockAvailable} {previewProduct.unit}
+                  </p>
+                </div>
+              </div>
+
+              {/* Variantes détaillées */}
+              {previewProduct.variants && previewProduct.variants.length > 0 ? (
+                <div className="rounded-2xl border border-slate-200 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-slate-900">
+                      Déclinaisons & Variantes ({previewProduct.variants.length})
+                    </span>
+                    {canWrite &&
+                    previewProduct.stockPhysical > 0 &&
+                    previewProduct.variants.every((v) => (v.stockPhysical || 0) === 0) ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleAutoVentilate(previewProduct)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1 text-[11px] font-bold text-white hover:bg-amber-600 shadow-2xs"
+                      >
+                        <Sparkles className="h-3 w-3" />
+                        Ventiler {previewProduct.stockPhysical} {previewProduct.unit}
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 text-xs">
+                    {previewProduct.variants.map((v, i) => (
+                      <div key={v.id || i} className="flex items-center justify-between py-2">
+                        <div>
+                          <p className="font-bold text-slate-800">{v.name}</p>
+                          <p className="text-[11px] text-slate-400 font-mono">
+                            {v.sku || 'SKU auto'} {v.barcode ? `· ${v.barcode}` : ''}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p
+                            className={`font-extrabold tabular ${
+                              (v.stockPhysical || 0) <= (v.alertThreshold || 0)
+                                ? 'text-amber-700'
+                                : 'text-emerald-700'
+                            }`}
+                          >
+                            {v.stockPhysical ?? 0} en stock
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            Seuil alerte : {v.alertThreshold ?? 5}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Caractéristiques sectorielles */}
+              <div className="grid grid-cols-2 gap-2 text-xs rounded-2xl bg-slate-50 p-3">
+                {previewProduct.brand ? (
+                  <div>
+                    <span className="text-slate-400">Marque :</span>{' '}
+                    <strong className="text-slate-800">{previewProduct.brand}</strong>
+                  </div>
+                ) : null}
+                {previewProduct.modelName ? (
+                  <div>
+                    <span className="text-slate-400">Modèle :</span>{' '}
+                    <strong className="text-slate-800">{previewProduct.modelName}</strong>
+                  </div>
+                ) : null}
+                {previewProduct.volumeLabel ? (
+                  <div>
+                    <span className="text-slate-400">Contenance :</span>{' '}
+                    <strong className="text-slate-800">{previewProduct.volumeLabel}</strong>
+                  </div>
+                ) : null}
+                {previewProduct.bulkUnitLabel ? (
+                  <div>
+                    <span className="text-slate-400">Conditionnement :</span>{' '}
+                    <strong className="text-slate-800">
+                      {previewProduct.bulkUnitLabel} ×{previewProduct.unitsPerBulk}
+                    </strong>
+                  </div>
+                ) : null}
+                {previewProduct.expiryDate ? (
+                  <div>
+                    <span className="text-slate-400">DLC :</span>{' '}
+                    <strong className="text-amber-800">
+                      {new Date(previewProduct.expiryDate).toLocaleDateString('fr-FR')}
+                    </strong>
+                  </div>
+                ) : null}
+                {previewProduct.warrantyMonths ? (
+                  <div>
+                    <span className="text-slate-400">Garantie :</span>{' '}
+                    <strong className="text-indigo-800">{previewProduct.warrantyMonths} mois</strong>
+                  </div>
+                ) : null}
+                {previewProduct.description ? (
+                  <div className="col-span-2 pt-1 text-slate-600 border-t border-slate-200 mt-1">
+                    {previewProduct.description}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                {canWrite ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const p = previewProduct;
+                      setPreviewProduct(null);
+                      setDeleteTarget(p);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Supprimer
+                  </button>
+                ) : (
+                  <div />
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const p = previewProduct;
+                      setPreviewProduct(null);
+                      setBarcodeTarget(p);
+                    }}
+                    className="sc-btn-ghost py-2 text-xs"
+                  >
+                    <Printer className="h-4 w-4" />
+                    Étiquettes
+                  </button>
+                  {canWrite ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const p = previewProduct;
+                        setPreviewProduct(null);
+                        openEdit(p);
+                      }}
+                      className="sc-btn-primary py-2 text-xs"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Modifier
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Modal de confirmation de suppression / archivage */}
+        {deleteTarget ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/65 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
+                  <Trash2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">Supprimer le produit</h3>
+                  <p className="text-xs text-slate-500">Action sécurisée avec conservation comptable</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Êtes-vous sûr de vouloir supprimer le produit{' '}
+                <strong className="text-slate-900 font-bold">« {deleteTarget.name} »</strong> ({deleteTarget.sku}) ?
+              </p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600 space-y-1">
+                <p className="font-semibold text-slate-800">Règle de gestion :</p>
+                <p>
+                  • Si ce produit n’a jamais été vendu : il sera <strong>définitivement supprimé</strong> de votre base.
+                </p>
+                <p>
+                  • S’il a déjà des ventes enregistrées : il sera <strong>archivé</strong> (masqué de la caisse tout en préservant l’intégrité de vos rapports financiers).
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setDeleteTarget(null)}
+                  className="sc-btn-ghost"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => handleDeleteProduct(deleteTarget)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 shadow-xs disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {busy ? 'Suppression…' : 'Confirmer la suppression'}
+                </button>
+              </div>
+            </div>
+          </div>
         ) : null}
       </div>
     </AppShell>
