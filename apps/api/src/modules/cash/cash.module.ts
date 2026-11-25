@@ -171,7 +171,14 @@ export class CashService {
     return client.cashRegister.create({ data: { name } });
   }
 
-  async getCurrentSession(shopId: string) {
+  private canReadTheoreticalCash(user?: AuthenticatedUser, shopId?: string): boolean {
+    if (!user) return true;
+    if (user.role === 'OWNER' || user.role === 'SUPER_ADMIN') return true;
+    const access = user.shopAccesses.find((s) => s.shopId === shopId);
+    return Boolean(access?.permissions['finance:read_margins']);
+  }
+
+  async getCurrentSession(shopId: string, user?: AuthenticatedUser) {
     const client = await this.shopDbManager.getClientForShop(shopId);
     const session = await client.cashSession.findFirst({
       where: { status: 'OPEN' },
@@ -183,9 +190,11 @@ export class CashService {
     });
     if (!session) return null;
 
+    const canSeeTheoretical = this.canReadTheoreticalCash(user, shopId);
     const hoursOpen = (Date.now() - session.openedAt.getTime()) / 3_600_000;
     return {
       ...session,
+      theoreticalAmountXof: canSeeTheoretical ? session.theoreticalAmountXof : null,
       openedAt: session.openedAt.toISOString(),
       closedAt: null,
       overdueAlert24h: hoursOpen > 24,
@@ -196,7 +205,7 @@ export class CashService {
     };
   }
 
-  async listSessions(shopId: string) {
+  async listSessions(shopId: string, user?: AuthenticatedUser) {
     const client = await this.shopDbManager.getClientForShop(shopId);
     const sessions = await client.cashSession.findMany({
       orderBy: { openedAt: 'desc' },
@@ -206,15 +215,16 @@ export class CashService {
         _count: { select: { movements: true, sales: true } },
       },
     });
+    const canSeeTheoretical = this.canReadTheoreticalCash(user, shopId);
     return sessions.map((s) => ({
       id: s.id,
       registerId: s.registerId,
       registerName: s.register.name,
       status: s.status,
       openingAmountXof: s.openingAmountXof,
-      theoreticalAmountXof: s.theoreticalAmountXof,
+      theoreticalAmountXof: canSeeTheoretical ? s.theoreticalAmountXof : null,
       countedAmountXof: s.countedAmountXof,
-      discrepancyXof: s.discrepancyXof,
+      discrepancyXof: canSeeTheoretical ? s.discrepancyXof : null,
       openedByOperatorName: s.openedByOperatorName,
       closedByOperatorName: s.closedByOperatorName,
       movementsCount: s._count.movements,
@@ -456,7 +466,12 @@ export class CashService {
       });
     }
 
-    return closed;
+    const canSeeTheoretical = this.canReadTheoreticalCash(actor, shopId);
+    return {
+      ...closed,
+      theoreticalAmountXof: canSeeTheoretical ? closed.theoreticalAmountXof : null,
+      discrepancyXof: canSeeTheoretical ? closed.discrepancyXof : null,
+    };
   }
 
   /**
@@ -544,17 +559,17 @@ export class CashController {
   @Get('sessions/current')
   @Roles('OWNER', 'AGENT')
   @RequirePermissions('cash:read')
-  @ApiOperation({ summary: 'Consulter la session de caisse actuellement ouverte et son solde théorique' })
-  current(@Param('shopId') shopId: string) {
-    return this.cashService.getCurrentSession(shopId);
+  @ApiOperation({ summary: 'Consulter la session de caisse actuellement ouverte' })
+  current(@Param('shopId') shopId: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.cashService.getCurrentSession(shopId, user);
   }
 
   @Get('sessions')
   @Roles('OWNER', 'AGENT')
   @RequirePermissions('cash:read')
   @ApiOperation({ summary: 'Lister l’historique des sessions et clôtures de caisse' })
-  listSessions(@Param('shopId') shopId: string) {
-    return this.cashService.listSessions(shopId);
+  listSessions(@Param('shopId') shopId: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.cashService.listSessions(shopId, user);
   }
 
   @Post('sessions/open')
@@ -637,7 +652,7 @@ export class CashController {
   }
 
   @Post('sessions/:sessionId/regularize')
-  @Roles('OWNER', 'AGENT')
+  @Roles('OWNER')
   @RequirePermissions('cash:close')
   @RequireOperator(true)
   @ApiOperation({ summary: 'Régulariser une erreur sur une session clôturée par mouvement motivé' })

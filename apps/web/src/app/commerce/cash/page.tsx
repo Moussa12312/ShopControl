@@ -15,7 +15,7 @@ interface CurrentCashSession {
   id: string;
   register: { id: string; name: string };
   openingAmountXof: number;
-  theoreticalAmountXof: number;
+  theoreticalAmountXof: number | null;
   openedByOperatorName: string | null;
   openedAt: string;
   overdueAlert24h: boolean;
@@ -35,7 +35,7 @@ interface SessionHistoryRow {
   registerName: string;
   status: 'OPEN' | 'CLOSED';
   openingAmountXof: number;
-  theoreticalAmountXof: number;
+  theoreticalAmountXof: number | null;
   countedAmountXof: number | null;
   discrepancyXof: number | null;
   openedByOperatorName: string | null;
@@ -46,7 +46,7 @@ interface SessionHistoryRow {
 
 export default function CashPage() {
   const { activeOperator } = useAuth();
-  const { shopId, selectShop } = useActiveOperationalShop();
+  const { shopId, selectShop, isOwner } = useActiveOperationalShop();
 
   const [current, setCurrent] = useState<CurrentCashSession | null>(null);
   const [history, setHistory] = useState<SessionHistoryRow[]>([]);
@@ -143,7 +143,7 @@ export default function CashPage() {
     setBusy(true);
     setError(null);
     try {
-      const closed = await apiFetch<{ discrepancyXof: number }>(
+      const closed = await apiFetch<{ discrepancyXof: number | null }>(
         `/shops/${shopId}/cash/sessions/${current.id}/close`,
         {
           method: 'POST',
@@ -157,11 +157,15 @@ export default function CashPage() {
       );
       setCountedClose('');
       setCloseNotes('');
-      setMsg(
-        `Session clôturée définitivement. Écart constaté : ${formatXof(closed.discrepancyXof ?? 0)}${
-          closed.discrepancyXof !== 0 ? ' (propriétaire notifié)' : ''
-        }.`,
-      );
+      if (isOwner && closed.discrepancyXof !== null && closed.discrepancyXof !== undefined) {
+        setMsg(
+          `Session clôturée définitivement. Écart constaté : ${formatXof(closed.discrepancyXof)}${
+            closed.discrepancyXof !== 0 ? ' (écart enregistré dans le rapport)' : ''
+          }.`,
+        );
+      } else {
+        setMsg('Session clôturée avec succès. Le récapitulatif a été transmis au propriétaire.');
+      }
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Clôture refusée.');
@@ -279,9 +283,15 @@ export default function CashPage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">Solde théorique actuel</p>
-                      <p className="text-lg font-bold text-brand-800">
-                        {formatXof(current.theoreticalAmountXof)}
-                      </p>
+                      {isOwner && current.theoreticalAmountXof !== null ? (
+                        <p className="text-lg font-bold text-brand-800">
+                          {formatXof(current.theoreticalAmountXof)}
+                        </p>
+                      ) : (
+                        <p className="text-xs font-semibold text-slate-500 italic mt-1" title="Comptage à l'aveugle : seul le montant physique compté doit être saisi">
+                          🔒 Comptage à l’aveugle
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -417,7 +427,7 @@ export default function CashPage() {
                         <div className="min-w-0">
                           <p className="text-[10px] text-slate-400">Théorique</p>
                           <p className="truncate font-mono text-[11px] font-bold text-slate-900">
-                            {formatXof(s.theoreticalAmountXof)}
+                            {isOwner && s.theoreticalAmountXof !== null ? formatXof(s.theoreticalAmountXof) : '🔒 Masqué'}
                           </p>
                         </div>
                         <div className="min-w-0">
@@ -430,18 +440,18 @@ export default function CashPage() {
                           <p className="text-[10px] text-slate-400">Écart</p>
                           <p
                             className={`truncate font-mono text-[11px] font-bold ${
-                              s.discrepancyXof === null
+                              !isOwner || s.discrepancyXof === null
                                 ? 'text-slate-400'
                                 : s.discrepancyXof === 0
                                   ? 'text-emerald-700'
                                   : 'text-red-600'
                             }`}
                           >
-                            {s.discrepancyXof !== null ? formatXof(s.discrepancyXof) : '—'}
+                            {isOwner && s.discrepancyXof !== null ? formatXof(s.discrepancyXof) : '🔒 Masqué'}
                           </p>
                         </div>
                       </div>
-                      {s.status === 'CLOSED' ? (
+                      {s.status === 'CLOSED' && isOwner ? (
                         <button
                           type="button"
                           onClick={() => setRegTarget(s)}
@@ -464,7 +474,7 @@ export default function CashPage() {
                       <th className="px-4 py-3">Théorique</th>
                       <th className="px-4 py-3">Compté</th>
                       <th className="px-4 py-3">Écart</th>
-                      <th className="px-4 py-3 text-right">Action</th>
+                      {isOwner ? <th className="px-4 py-3 text-right">Action</th> : null}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -477,30 +487,34 @@ export default function CashPage() {
                             {s.closedAt ? ` → ${formatDateTimeInTimezone(s.closedAt)}` : ' (En cours)'}
                           </p>
                         </td>
-                        <td className="px-4 py-2.5 font-mono text-xs">{formatXof(s.theoreticalAmountXof)}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs">
+                          {isOwner && s.theoreticalAmountXof !== null ? formatXof(s.theoreticalAmountXof) : '🔒 Masqué'}
+                        </td>
                         <td className="px-4 py-2.5 font-mono text-xs">
                           {s.countedAmountXof !== null ? formatXof(s.countedAmountXof) : '—'}
                         </td>
                         <td className="px-4 py-2.5 font-mono text-xs font-bold">
-                          {s.discrepancyXof !== null ? (
+                          {isOwner && s.discrepancyXof !== null ? (
                             <span className={s.discrepancyXof === 0 ? 'text-emerald-700' : 'text-red-600'}>
                               {formatXof(s.discrepancyXof)}
                             </span>
                           ) : (
-                            '—'
+                            <span className="text-slate-400">🔒 Masqué</span>
                           )}
                         </td>
-                        <td className="px-4 py-2.5 text-right">
-                          {s.status === 'CLOSED' ? (
-                            <button
-                              type="button"
-                              onClick={() => setRegTarget(s)}
-                              className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                            >
-                              Régulariser
-                            </button>
-                          ) : null}
-                        </td>
+                        {isOwner ? (
+                          <td className="px-4 py-2.5 text-right">
+                            {s.status === 'CLOSED' ? (
+                              <button
+                                type="button"
+                                onClick={() => setRegTarget(s)}
+                                className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                              >
+                                Régulariser
+                              </button>
+                            ) : null}
+                          </td>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>

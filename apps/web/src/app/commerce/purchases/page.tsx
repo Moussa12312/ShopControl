@@ -285,8 +285,8 @@ export default function PurchasesPage() {
           receivedInBulk: Boolean(receiveInBulkMap[i.id]),
           ...(receiveExpiryMap[i.id]?.trim()
             ? {
-                expiryDate: new Date(`${receiveExpiryMap[i.id].trim()}T23:59:59.000Z`).toISOString(),
-              }
+              expiryDate: new Date(`${receiveExpiryMap[i.id].trim()}T23:59:59.000Z`).toISOString(),
+            }
             : {}),
           ...(receiveBatchMap[i.id]?.trim() ? { batchNumber: receiveBatchMap[i.id].trim() } : {}),
         };
@@ -339,7 +339,7 @@ export default function PurchasesPage() {
 
   return (
     <AppShell
-      allowedRoles={['OWNER', 'AGENT']}
+      allowedRoles={['OWNER']}
       title="Achats & Fournisseurs"
       subtitle="Les commandes n’augmentent jamais le stock avant réception (partielle ou totale) avec recalcul automatique du CMP."
       headerActions={
@@ -348,18 +348,16 @@ export default function PurchasesPage() {
             <button
               type="button"
               onClick={() => setTab('orders')}
-              className={`rounded-full px-3 py-1 transition ${
-                tab === 'orders' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
-              }`}
+              className={`rounded-full px-3 py-1 transition ${tab === 'orders' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+                }`}
             >
               Commandes ({orders.length})
             </button>
             <button
               type="button"
               onClick={() => setTab('suppliers')}
-              className={`rounded-full px-3 py-1 transition ${
-                tab === 'suppliers' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
-              }`}
+              className={`rounded-full px-3 py-1 transition ${tab === 'suppliers' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+                }`}
             >
               Fournisseurs ({suppliers.length})
             </button>

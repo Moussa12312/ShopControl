@@ -156,7 +156,6 @@ const AGENT_NAV: NavItem[] = [
   { href: '/commerce/products', label: 'Produits', group: 'Gestion', icon: Package, requiredPerm: 'products:read' },
   { href: '/commerce/stock', label: 'Stocks', group: 'Gestion', icon: Boxes, requiredPerm: 'stock:read' },
   { href: '/commerce/clients', label: 'Clients & Dettes', shortLabel: 'Clients', group: 'Gestion', icon: Receipt, requiredPerm: 'clients:read' },
-  { href: '/commerce/purchases', label: 'Achats', group: 'Gestion', icon: Truck, requiredPerm: 'purchases:read' },
   { href: '/commerce/expenses', label: 'Dépenses', group: 'Gestion', icon: Wallet, requiredPerm: 'expenses:create' },
   { href: '/commerce/transfers', label: 'Transferts', group: 'Gestion', icon: ArrowLeftRight, requiredPerm: 'stock:read' },
   { href: '/messaging', label: 'Messagerie', group: 'Communication', icon: MessageSquare },

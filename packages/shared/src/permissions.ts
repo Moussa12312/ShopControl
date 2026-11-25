@@ -79,9 +79,9 @@ export const PERMISSION_CATALOG: PermissionMeta[] = [
   { key: 'stock:inventory', domain: 'Stocks', label: 'Réaliser un inventaire', defaultForAgent: false },
   { key: 'stock:adjust', domain: 'Stocks', label: 'Corriger le stock (avec motif)', sensitive: true, defaultForAgent: false },
 
-  { key: 'purchases:read', domain: 'Achats', label: 'Consulter les achats', defaultForAgent: false },
-  { key: 'purchases:create', domain: 'Achats', label: 'Préparer une commande fournisseur', defaultForAgent: false },
-  { key: 'purchases:receive', domain: 'Achats', label: 'Enregistrer une réception fournisseur', defaultForAgent: true },
+  { key: 'purchases:read', domain: 'Achats', label: 'Consulter les achats', sensitive: true, defaultForAgent: false },
+  { key: 'purchases:create', domain: 'Achats', label: 'Préparer une commande fournisseur', sensitive: true, defaultForAgent: false },
+  { key: 'purchases:receive', domain: 'Achats', label: 'Enregistrer une réception fournisseur', sensitive: true, defaultForAgent: false },
 
   { key: 'orders:read', domain: 'Commandes', label: 'Consulter les commandes vitrine', defaultForAgent: true },
   { key: 'orders:contact', domain: 'Commandes', label: 'Contacter le client', defaultForAgent: true },

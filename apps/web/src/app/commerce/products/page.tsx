@@ -160,7 +160,10 @@ interface ProductRow {
 
 export default function ProductsPage() {
   const { shopId, activeShop, selectShop, isOwner } = useActiveOperationalShop();
-  const canWrite = isOwner || Boolean(activeShop?.permissions['products:create']);
+  const canCreate = isOwner || Boolean(activeShop?.permissions['products:create']);
+  const canEdit = isOwner || Boolean(activeShop?.permissions['products:update']);
+  const canDelete = isOwner || Boolean(activeShop?.permissions['products:archive']);
+  const canWrite = canCreate;
   const canReadCost = isOwner || Boolean(activeShop?.permissions['finance:read_margins']);
   const shopType = normalizeShopType(activeShop?.shopType);
   const profile = normalizeBusinessProfile(shopType, activeShop?.businessProfile);
@@ -1309,25 +1312,25 @@ export default function ProductsPage() {
                       >
                         <Printer className="h-3.5 w-3.5" />
                       </button>
-                      {canWrite ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => openEdit(p)}
-                            className="sc-btn-ghost px-2.5 py-1.5 text-xs"
-                            title="Modifier ce produit"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteTarget(p)}
-                            className="sc-btn-ghost px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
-                            title="Supprimer ou archiver ce produit"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          onClick={() => openEdit(p)}
+                          className="sc-btn-ghost px-2.5 py-1.5 text-xs"
+                          title="Modifier ce produit"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
+                      {canDelete ? (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(p)}
+                          className="sc-btn-ghost px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
+                          title="Supprimer ou archiver ce produit"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       ) : null}
                     </div>
                   </div>
@@ -1346,7 +1349,7 @@ export default function ProductsPage() {
                     {canReadCost ? <th className="px-4 py-3.5 whitespace-nowrap">Coût (CMP)</th> : null}
                     <th className="px-4 py-3.5 whitespace-nowrap">Stock dispo</th>
                     <th className="px-4 py-3.5 whitespace-nowrap">Vitrine</th>
-                    {canWrite ? <th className="px-4 py-3.5 text-right whitespace-nowrap">Action</th> : null}
+                    {canEdit || canDelete ? <th className="px-4 py-3.5 text-right whitespace-nowrap">Action</th> : null}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1481,26 +1484,26 @@ export default function ProductsPage() {
                               <Printer className="h-3.5 w-3.5" />
                               Étiquettes
                             </button>
-                            {canWrite ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => openEdit(p)}
-                                  className="sc-btn-ghost px-2.5 py-1.5 text-xs"
-                                  title="Modifier le produit"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                  Modifier
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDeleteTarget(p)}
-                                  className="sc-btn-ghost px-2 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
-                                  title="Supprimer ou archiver ce produit"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </>
+                            {canEdit ? (
+                              <button
+                                type="button"
+                                onClick={() => openEdit(p)}
+                                className="sc-btn-ghost px-2.5 py-1.5 text-xs"
+                                title="Modifier le produit"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Modifier
+                              </button>
+                            ) : null}
+                            {canDelete ? (
+                              <button
+                                type="button"
+                                onClick={() => setDeleteTarget(p)}
+                                className="sc-btn-ghost px-2 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
+                                title="Supprimer ou archiver ce produit"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
                             ) : null}
                           </div>
                         </td>
@@ -2313,21 +2316,23 @@ export default function ProductsPage() {
 
                     {showAdvanced && (
                       <div className="p-4 border-t border-slate-100 space-y-4">
-                        {/* Coût d'achat & Code-barres & SKU */}
-                        <div className="grid gap-3 sm:grid-cols-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700">
-                              Coût d’achat (XOF)
-                            </label>
-                            <input
-                              type="number"
-                              min={0}
-                              value={form.costPriceXof}
-                              onChange={(e) => setForm({ ...form, costPriceXof: e.target.value })}
-                              placeholder="Optionnel (pour marge brute)"
-                              className="sc-input mt-1 tabular"
-                            />
-                          </div>
+                        {/* Coût d'achat (propriétaire/finance uniquement) & Code-barres & SKU */}
+                        <div className={`grid gap-3 ${canReadCost ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+                          {canReadCost ? (
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-700">
+                                Coût d’achat (XOF)
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                value={form.costPriceXof}
+                                onChange={(e) => setForm({ ...form, costPriceXof: e.target.value })}
+                                placeholder="Optionnel (pour marge brute)"
+                                className="sc-input mt-1 tabular"
+                              />
+                            </div>
+                          ) : null}
 
                           <div>
                             <div className="flex items-center justify-between gap-1">
@@ -2641,7 +2646,7 @@ export default function ProductsPage() {
                   </div>
 
                   <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                    {editing && canWrite ? (
+                    {editing && canDelete ? (
                       <button
                         type="button"
                         disabled={busy}
@@ -2986,7 +2991,7 @@ export default function ProductsPage() {
 
               {/* Footer Actions */}
               <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                {canWrite ? (
+                {canDelete ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -3015,7 +3020,7 @@ export default function ProductsPage() {
                     <Printer className="h-4 w-4" />
                     Étiquettes
                   </button>
-                  {canWrite ? (
+                  {canEdit ? (
                     <button
                       type="button"
                       onClick={() => {

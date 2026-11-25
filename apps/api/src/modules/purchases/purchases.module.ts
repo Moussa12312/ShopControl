@@ -562,7 +562,7 @@ export class PurchasesController {
   constructor(private readonly purchasesService: PurchasesService) {}
 
   @Get('suppliers')
-  @Roles('OWNER', 'AGENT')
+  @Roles('OWNER')
   @RequirePermissions('purchases:read')
   @ApiOperation({ summary: 'Lister les fournisseurs avec solde de dettes en cours' })
   listSuppliers(@Param('shopId') shopId: string) {
@@ -570,7 +570,7 @@ export class PurchasesController {
   }
 
   @Post('suppliers')
-  @Roles('OWNER', 'AGENT')
+  @Roles('OWNER')
   @RequirePermissions('purchases:create')
   @ApiOperation({ summary: 'Créer un fournisseur' })
   createSupplier(
@@ -581,7 +581,7 @@ export class PurchasesController {
   }
 
   @Patch('suppliers/:supplierId')
-  @Roles('OWNER', 'AGENT')
+  @Roles('OWNER')
   @RequirePermissions('purchases:create')
   @ApiOperation({ summary: 'Modifier un fournisseur' })
   updateSupplier(
@@ -593,7 +593,7 @@ export class PurchasesController {
   }
 
   @Get('purchases')
-  @Roles('OWNER', 'AGENT')
+  @Roles('OWNER')
   @RequirePermissions('purchases:read')
   @ApiOperation({ summary: 'Lister les commandes fournisseurs' })
   listOrders(@Param('shopId') shopId: string, @Query('status') status?: string) {
@@ -601,7 +601,7 @@ export class PurchasesController {
   }
 
   @Post('purchases')
-  @Roles('OWNER', 'AGENT')
+  @Roles('OWNER')
   @RequirePermissions('purchases:create')
   @ApiOperation({ summary: 'Créer une commande fournisseur (sans modifier le stock avant réception)' })
   createOrder(
@@ -619,7 +619,7 @@ export class PurchasesController {
   }
 
   @Post('purchases/:poId/receive')
-  @Roles('OWNER', 'AGENT')
+  @Roles('OWNER')
   @RequirePermissions('purchases:receive')
   @RequireOperator()
   @ApiOperation({ summary: 'Réceptionner (partiellement ou totalement) une commande et recalculer le CMP' })

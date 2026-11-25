@@ -1074,8 +1074,8 @@ export class CatalogController {
   }
 
   @Delete('products/:productId')
-  @Roles('OWNER', 'AGENT')
-  @RequirePermissions('products:update')
+  @Roles('OWNER')
+  @RequirePermissions('products:archive')
   @ApiOperation({ summary: 'Supprimer ou archiver un produit selon présence d’historique de vente' })
   deleteProduct(
     @Param('shopId') shopId: string,
