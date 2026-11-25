@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, Inbox, Lock, RefreshCw } from 'lucide-react';
+import { AlertCircle, Inbox, Lock, RefreshCw } from 'lucide-react';
 import { TenantStatus, TENANT_STATUS_LABELS } from '@shopcontrol/shared';
 
 export function LoadingSkeleton({ rows = 4 }: { rows?: number }) {
@@ -45,18 +45,23 @@ export function ErrorState({
   return (
     <div
       role="alert"
-      className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 px-6 py-10 text-center"
+      className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/90 bg-white px-6 py-8 text-center shadow-xs"
     >
-      <AlertTriangle className="mb-2 h-8 w-8 text-red-600" aria-hidden="true" />
-      <p className="text-sm font-medium text-red-900">{message}</p>
+      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 ring-1 ring-amber-200/60">
+        <AlertCircle className="h-5 w-5" aria-hidden="true" />
+      </div>
+      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+        Information ou action requise
+      </h4>
+      <p className="mt-1.5 max-w-md text-xs text-slate-600 leading-relaxed">{message}</p>
       {onRetry ? (
         <button
           type="button"
           onClick={onRetry}
-          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-forest-900 px-4 py-2 text-xs font-bold text-white hover:bg-forest-800 transition active:scale-95"
         >
-          <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          Réessayer
+          <RefreshCw className="h-3.5 w-3.5 text-limeglow-400" aria-hidden="true" />
+          Actualiser / Réessayer
         </button>
       ) : null}
     </div>

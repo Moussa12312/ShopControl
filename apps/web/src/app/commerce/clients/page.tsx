@@ -92,6 +92,11 @@ export default function ClientsReceivablesPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Erreurs d'actions locales (pour ne jamais faire disparaître la liste avec un grand écran d'erreur)
+  const [clientErr, setClientErr] = useState<string | null>(null);
+  const [debtErr, setDebtErr] = useState<string | null>(null);
+  const [payErr, setPayErr] = useState<string | null>(null);
+
   // Formulaire nouveau client
   const [showNewClient, setShowNewClient] = useState(false);
   const [form, setForm] = useState({ fullName: '', phone: '', address: '', creditLimitXof: 0 });
@@ -127,11 +132,11 @@ export default function ClientsReceivablesPage() {
       if (clientFilterId) qs.set('clientId', clientFilterId);
 
       const [shopDetail, cl, rec] = await Promise.all([
-        apiFetch<ShopDetailResponse>(`/shops/${shopId}`, { shopId }).catch(() => null),
-        apiFetch<ClientRow[]>(`/shops/${shopId}/clients`, { shopId }),
+        apiFetch<ShopDetailResponse>(`/shops/${shopId}`, { shopId, operatorId: activeOperator?.id }).catch(() => null),
+        apiFetch<ClientRow[]>(`/shops/${shopId}/clients`, { shopId, operatorId: activeOperator?.id }),
         apiFetch<ReceivableRow[]>(
           `/shops/${shopId}/receivables${qs.toString() ? `?${qs.toString()}` : ''}`,
-          { shopId },
+          { shopId, operatorId: activeOperator?.id },
         ).catch(() => []),
       ]);
 
@@ -150,7 +155,7 @@ export default function ClientsReceivablesPage() {
     } finally {
       setLoading(false);
     }
-  }, [shopId, debtFilter, clientFilterId]);
+  }, [shopId, debtFilter, clientFilterId, activeOperator?.id]);
 
   useEffect(() => {
     void load();
@@ -198,12 +203,13 @@ export default function ClientsReceivablesPage() {
     e.preventDefault();
     if (!shopId) return;
     setBusy(true);
-    setError(null);
+    setClientErr(null);
     setMsg(null);
     try {
       await apiFetch(`/shops/${shopId}/clients`, {
         method: 'POST',
         shopId,
+        operatorId: activeOperator?.id,
         body: {
           fullName: form.fullName,
           phone: form.phone,
@@ -216,13 +222,14 @@ export default function ClientsReceivablesPage() {
       setMsg('Fiche client enregistrée.');
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Création impossible.');
+      setClientErr(err instanceof ApiError ? err.message : 'Création impossible.');
     } finally {
       setBusy(false);
     }
   };
 
   const openNewDebtModal = (presetClientId?: string) => {
+    setDebtErr(null);
     setDebtForm({
       clientId: presetClientId || clients[0]?.id || '',
       amountXof: 0,
@@ -237,7 +244,7 @@ export default function ClientsReceivablesPage() {
     e.preventDefault();
     if (!shopId || !debtForm.clientId) return;
     setBusy(true);
-    setError(null);
+    setDebtErr(null);
     setMsg(null);
     try {
       await apiFetch(`/shops/${shopId}/receivables`, {
@@ -258,7 +265,7 @@ export default function ClientsReceivablesPage() {
       setDebtFilter('OPEN');
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Enregistrement de la dette refusé.');
+      setDebtErr(err instanceof ApiError ? err.message : 'Enregistrement de la dette refusé.');
     } finally {
       setBusy(false);
     }
@@ -268,7 +275,7 @@ export default function ClientsReceivablesPage() {
     e.preventDefault();
     if (!shopId || !payTarget || !payMethod) return;
     setBusy(true);
-    setError(null);
+    setPayErr(null);
     setMsg(null);
     try {
       await apiFetch(`/shops/${shopId}/receivables/${payTarget.id}/payments`, {
@@ -288,7 +295,7 @@ export default function ClientsReceivablesPage() {
       setMsg('Règlement de dette encaissé et journalisé.');
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Encaissement refusé.');
+      setPayErr(err instanceof ApiError ? err.message : 'Encaissement refusé.');
     } finally {
       setBusy(false);
     }
@@ -374,12 +381,20 @@ export default function ClientsReceivablesPage() {
               <h2 className="text-sm font-bold text-slate-900">Nouvelle fiche client</h2>
               <button
                 type="button"
-                onClick={() => setShowNewClient(false)}
+                onClick={() => {
+                  setShowNewClient(false);
+                  setClientErr(null);
+                }}
                 className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
+            {clientErr ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs font-semibold text-amber-900">
+                {clientErr}
+              </div>
+            ) : null}
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
               <input
                 required
@@ -815,12 +830,27 @@ export default function ClientsReceivablesPage() {
                 <h3 className="text-base font-bold text-slate-900">Enregistrer une dette client</h3>
                 <button
                   type="button"
-                  onClick={() => setShowNewDebt(false)}
+                  onClick={() => {
+                    setShowNewDebt(false);
+                    setDebtErr(null);
+                  }}
                   className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
+
+              {debtErr ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs font-semibold text-amber-900">
+                  {debtErr}
+                </div>
+              ) : null}
+
+              {user?.role === 'AGENT' && !activeOperator ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900">
+                  ⚠️ <strong>Opérateur requis :</strong> veuillez sélectionner votre prénom d’opérateur au comptoir (en haut à droite) avant d’enregistrer la dette.
+                </div>
+              ) : null}
 
               <div>
                 <label className="mb-1 block text-xs font-semibold text-slate-700">Client *</label>
@@ -925,12 +955,27 @@ export default function ClientsReceivablesPage() {
                 </h3>
                 <button
                   type="button"
-                  onClick={() => setPayTarget(null)}
+                  onClick={() => {
+                    setPayTarget(null);
+                    setPayErr(null);
+                  }}
                   className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
+
+              {payErr ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs font-semibold text-amber-900">
+                  {payErr}
+                </div>
+              ) : null}
+
+              {user?.role === 'AGENT' && !activeOperator ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900">
+                  ⚠️ <strong>Opérateur requis :</strong> sélectionnez votre prénom d’opérateur au comptoir (en haut à droite) avant d’encaisser le paiement.
+                </div>
+              ) : null}
 
               <p className="rounded-xl bg-amber-50 p-2.5 text-xs text-amber-950">
                 Reste dû : <strong className="tabular">{formatXof(payTarget.remainingAmountXof)}</strong>

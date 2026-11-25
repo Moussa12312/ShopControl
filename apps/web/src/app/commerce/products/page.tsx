@@ -1340,7 +1340,7 @@ export default function ProductsPage() {
 
             {/* Tableau desktop (>= md) */}
             <div className="sc-card hidden overflow-x-auto md:block">
-              <table className="w-full min-w-full divide-y divide-slate-200 text-sm">
+              <table className="w-full min-w-[960px] table-auto divide-y divide-slate-200 text-sm">
                 <thead className="bg-porcelain-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-4 py-3.5 whitespace-nowrap min-w-[220px]">Produit & Catégorie</th>
@@ -1518,8 +1518,8 @@ export default function ProductsPage() {
 
         {/* MODAL PRODUIT EN 2 ÉTAPES : 1) CHOIX CATÉGORIE -> 2) FORMULAIRE ADAPTATIF ZÉRO MÉLANGE */}
         {modalOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/65 p-2 sm:p-4 backdrop-blur-xs">
-            <div className="max-h-[95vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:p-6 lg:p-7">
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden bg-forest-950/70 p-2 sm:p-4 backdrop-blur-xs">
+            <div className="max-h-[94vh] w-full max-w-[calc(100vw-1rem)] sm:max-w-5xl overflow-y-auto overflow-x-hidden rounded-3xl border border-slate-200 bg-white p-3.5 shadow-2xl sm:p-6 lg:p-7">
               {/* En-tête du modal */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
@@ -1672,9 +1672,9 @@ export default function ProductsPage() {
                 /* ÉTAPE 2 : FORMULAIRE PRODUIT ÉPURÉ ET FLUIDE */
                 <form onSubmit={handleSave} className="mt-4 space-y-4">
                   {/* Sélecteur de catégorie rapide en haut du formulaire */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200/50 bg-forest-950 p-3.5 text-white shadow-xs">
-                    <div className="flex flex-1 min-w-[200px] items-center gap-2.5">
-                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-300 whitespace-nowrap">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 rounded-2xl border border-emerald-200/50 bg-forest-950 p-3 sm:p-3.5 text-white shadow-xs">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-300 shrink-0">
                         Catégorie :
                       </span>
                       <select
@@ -1690,7 +1690,7 @@ export default function ProductsPage() {
                             unit: f.unit || spec.defaultUnit,
                           }));
                         }}
-                        className="flex-1 rounded-xl border border-white/20 bg-forest-900/90 px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-limeglow-400"
+                        className="min-w-0 flex-1 rounded-xl border border-white/20 bg-forest-900/90 px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-limeglow-400"
                       >
                         {categories.map((c) => (
                           <option key={c.id} value={c.id} className="bg-forest-950 text-white">
@@ -1702,7 +1702,7 @@ export default function ProductsPage() {
                     <button
                       type="button"
                       onClick={() => setModalStep('PICK_CATEGORY')}
-                      className="inline-flex items-center gap-1 rounded-xl bg-white/10 px-2.5 py-1.5 text-xs font-bold text-limeglow-400 hover:bg-white/20 whitespace-nowrap"
+                      className="inline-flex self-start sm:self-auto items-center gap-1 rounded-xl bg-white/10 px-2.5 py-1.5 text-xs font-bold text-limeglow-400 hover:bg-white/20 shrink-0"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Autre catégorie

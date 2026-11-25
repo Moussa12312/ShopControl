@@ -815,9 +815,11 @@ export default function StockPage() {
                 <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
                 <span>{alerts.length} alerte(s) de stock (rupture ou seuil bas atteint)</span>
               </div>
-              <span className="text-xs text-white/60 hidden sm:inline">
-                Cliquez sur « Commander » pour réapprovisionner en 1 clic
-              </span>
+              {isOwner ? (
+                <span className="text-xs text-white/60 hidden sm:inline">
+                  Cliquez sur « Commander » pour réapprovisionner en 1 clic
+                </span>
+              ) : null}
             </div>
             <div className="mt-2.5 flex flex-wrap gap-2">
               {alerts.slice(0, 10).map((a, i) => (
@@ -837,22 +839,24 @@ export default function StockPage() {
                       : {a.availableQty} {a.unit} (seuil {a.alertThreshold})
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      openQuickRestock({
-                        productId: a.productId,
-                        variantId: a.variantId,
-                        name: a.name,
-                        sku: a.sku,
-                        suggestedQty: Math.max(10, a.alertThreshold * 2 - a.availableQty),
-                        unitCost: a.costPriceXof,
-                      })
-                    }
-                    className="ml-1 px-2 py-0.5 rounded-lg bg-[#a3e635] text-[#051413] hover:bg-[#bef264] text-[10px] font-black uppercase tracking-wider transition-colors"
-                  >
-                    Commander
-                  </button>
+                  {isOwner ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openQuickRestock({
+                          productId: a.productId,
+                          variantId: a.variantId,
+                          name: a.name,
+                          sku: a.sku,
+                          suggestedQty: Math.max(10, a.alertThreshold * 2 - a.availableQty),
+                          unitCost: a.costPriceXof,
+                        })
+                      }
+                      className="ml-1 px-2 py-0.5 rounded-lg bg-[#a3e635] text-[#051413] hover:bg-[#bef264] text-[10px] font-black uppercase tracking-wider transition-colors"
+                    >
+                      Commander
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -1180,22 +1184,24 @@ export default function StockPage() {
                             </button>
                           )}
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openQuickRestock({
-                                productId: item.productId,
-                                name: item.name,
-                                sku: item.sku,
-                                suggestedQty: Math.max(10, item.alertThreshold * 2 - item.stockAvailable),
-                                unitCost: item.costPriceXof,
-                              })
-                            }
-                            className="px-2.5 py-1 rounded-lg bg-[#a3e635] text-[#051413] hover:bg-[#bef264] text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1"
-                          >
-                            <ShoppingCart className="w-3 h-3" />
-                            <span>Commander</span>
-                          </button>
+                          {isOwner ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openQuickRestock({
+                                  productId: item.productId,
+                                  name: item.name,
+                                  sku: item.sku,
+                                  suggestedQty: Math.max(10, item.alertThreshold * 2 - item.stockAvailable),
+                                  unitCost: item.costPriceXof,
+                                })
+                              }
+                              className="px-2.5 py-1 rounded-lg bg-[#a3e635] text-[#051413] hover:bg-[#bef264] text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1"
+                            >
+                              <ShoppingCart className="w-3 h-3" />
+                              <span>Commander</span>
+                            </button>
+                          ) : null}
                         </div>
 
                         {/* Variantes dépliées sur mobile */}
@@ -1216,23 +1222,25 @@ export default function StockPage() {
                                   <span className="font-mono text-[#a3e635] font-bold">
                                     {formatXof(v.salePriceXof)}
                                   </span>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      openQuickRestock({
-                                        productId: item.productId,
-                                        variantId: v.id,
-                                        name: `${item.name} (${v.name})`,
-                                        sku: v.sku || item.sku,
-                                        suggestedQty: Math.max(5, v.alertThreshold * 2 - v.stockAvailable),
-                                        unitCost: v.costPriceXof ?? item.costPriceXof,
-                                      })
-                                    }
-                                    className="p-1 rounded bg-white/10 hover:bg-[#a3e635] hover:text-[#051413] transition-colors"
-                                    title="Commander cette variante"
-                                  >
-                                    <ShoppingCart className="w-3.5 h-3.5" />
-                                  </button>
+                                  {isOwner ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        openQuickRestock({
+                                          productId: item.productId,
+                                          variantId: v.id,
+                                          name: `${item.name} (${v.name})`,
+                                          sku: v.sku || item.sku,
+                                          suggestedQty: Math.max(5, v.alertThreshold * 2 - v.stockAvailable),
+                                          unitCost: v.costPriceXof ?? item.costPriceXof,
+                                        })
+                                      }
+                                      className="p-1 rounded bg-white/10 hover:bg-[#a3e635] hover:text-[#051413] transition-colors"
+                                      title="Commander cette variante"
+                                    >
+                                      <ShoppingCart className="w-3.5 h-3.5" />
+                                    </button>
+                                  ) : null}
                                 </div>
                               </div>
                             ))}
@@ -1356,23 +1364,25 @@ export default function StockPage() {
                                   >
                                     <Tag className="w-3.5 h-3.5 text-[#a3e635]" />
                                   </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      openQuickRestock({
-                                        productId: item.productId,
-                                        name: item.name,
-                                        sku: item.sku,
-                                        suggestedQty: Math.max(10, item.alertThreshold * 2 - item.stockAvailable),
-                                        unitCost: item.costPriceXof,
-                                      })
-                                    }
-                                    title="Commander au fournisseur"
-                                    className="px-2 py-1 rounded-lg bg-[#a3e635] text-[#051413] hover:bg-[#bef264] text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1"
-                                  >
-                                    <ShoppingCart className="w-3 h-3" />
-                                    <span>Commander</span>
-                                  </button>
+                                  {isOwner ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        openQuickRestock({
+                                          productId: item.productId,
+                                          name: item.name,
+                                          sku: item.sku,
+                                          suggestedQty: Math.max(10, item.alertThreshold * 2 - item.stockAvailable),
+                                          unitCost: item.costPriceXof,
+                                        })
+                                      }
+                                      title="Commander au fournisseur"
+                                      className="px-2 py-1 rounded-lg bg-[#a3e635] text-[#051413] hover:bg-[#bef264] text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1"
+                                    >
+                                      <ShoppingCart className="w-3 h-3" />
+                                      <span>Commander</span>
+                                    </button>
+                                  ) : null}
                                 </div>
                               </td>
                             </tr>
@@ -1439,22 +1449,24 @@ export default function StockPage() {
                                       >
                                         <Tag className="w-3 h-3 text-[#a3e635]" />
                                       </button>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          openQuickRestock({
-                                            productId: item.productId,
-                                            variantId: v.id,
-                                            name: `${item.name} (${v.name})`,
-                                            sku: v.sku || item.sku,
-                                            suggestedQty: Math.max(5, v.alertThreshold * 2 - v.stockAvailable),
-                                            unitCost: v.costPriceXof ?? item.costPriceXof,
-                                          })
-                                        }
-                                        className="px-2 py-0.5 rounded bg-white/10 hover:bg-[#a3e635] hover:text-[#051413] text-[9px] font-bold transition-colors"
-                                      >
-                                        Commander
-                                      </button>
+                                      {isOwner ? (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            openQuickRestock({
+                                              productId: item.productId,
+                                              variantId: v.id,
+                                              name: `${item.name} (${v.name})`,
+                                              sku: v.sku || item.sku,
+                                              suggestedQty: Math.max(5, v.alertThreshold * 2 - v.stockAvailable),
+                                              unitCost: v.costPriceXof ?? item.costPriceXof,
+                                            })
+                                          }
+                                          className="px-2 py-0.5 rounded bg-white/10 hover:bg-[#a3e635] hover:text-[#051413] text-[9px] font-bold transition-colors"
+                                        >
+                                          Commander
+                                        </button>
+                                      ) : null}
                                     </div>
                                   </td>
                                 </tr>
