@@ -27,7 +27,6 @@ import { apiFetch, ApiError } from '@/lib/api-client';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { AppShell } from '@/components/layout/AppShell';
 import {
-  ShopPickerInline,
   useActiveOperationalShop,
 } from '@/components/commerce/ActiveShopHeader';
 import { ReceiptModal, SaleDocumentView } from '@/components/commerce/ReceiptModal';
@@ -261,7 +260,6 @@ export default function OrdersPage() {
       subtitle="Confirmez pour réserver le stock immédiatement · Convertissez en vente + ticket lors de la remise."
       headerActions={
         <>
-          <ShopPickerInline shopId={shopId} onChange={selectShop} />
           {activeShop ? (
             <button
               type="button"

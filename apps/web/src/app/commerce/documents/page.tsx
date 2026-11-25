@@ -11,7 +11,6 @@ import {
 import { apiFetch, API_BASE_URL, ApiError } from '@/lib/api-client';
 import { AppShell } from '@/components/layout/AppShell';
 import {
-  ShopPickerInline,
   useActiveOperationalShop,
 } from '@/components/commerce/ActiveShopHeader';
 import { ReceiptModal, SaleDocumentView } from '@/components/commerce/ReceiptModal';
@@ -63,7 +62,6 @@ export default function DocumentsPage() {
       allowedRoles={['OWNER', 'AGENT']}
       title="Tickets de caisse & Avoirs"
       subtitle="Numérotation séquentielle immuable · Réimpression marquée DUPLICATA · Format thermique 58/80 mm et PDF."
-      headerActions={<ShopPickerInline shopId={shopId} onChange={selectShop} />}
     >
       <div className="space-y-5">
 

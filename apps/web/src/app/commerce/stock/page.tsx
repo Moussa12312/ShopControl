@@ -41,7 +41,6 @@ import { apiFetch, ApiError } from '@/lib/api-client';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { AppShell } from '@/components/layout/AppShell';
 import {
-  ShopPickerInline,
   useActiveOperationalShop,
 } from '@/components/commerce/ActiveShopHeader';
 import {
@@ -718,7 +717,6 @@ export default function StockPage() {
       allowedRoles={['OWNER', 'AGENT']}
       title="Gestion des Stocks & Valorisation"
       subtitle="Valorisation financière CMP, stock par variante, scan code-barres et réapprovisionnement pro."
-      headerActions={<ShopPickerInline shopId={shopId} onChange={selectShop} />}
     >
       {/* Wrapper sombre : toute la page stock est conçue en dark theme */}
       <div className="min-h-[calc(100vh-5rem)] space-y-4 rounded-2xl bg-[#071615] p-3 sm:p-4 -mx-3 sm:-mx-5 lg:-mx-6 -mt-0">

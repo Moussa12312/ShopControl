@@ -53,7 +53,6 @@ import {
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { AppShell } from '@/components/layout/AppShell';
 import {
-  ShopPickerInline,
   useActiveOperationalShop,
 } from '@/components/commerce/ActiveShopHeader';
 import { BarcodeLabelsModal } from '@/components/commerce/BarcodeLabelsModal';

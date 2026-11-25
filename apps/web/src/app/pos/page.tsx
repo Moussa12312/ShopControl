@@ -47,7 +47,6 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { useNetworkStatus } from '@/components/providers/NetworkStatusProvider';
 import { AppShell } from '@/components/layout/AppShell';
 import {
-  ShopPickerInline,
   useActiveOperationalShop,
 } from '@/components/commerce/ActiveShopHeader';
 import { ReceiptModal, SaleDocumentView } from '@/components/commerce/ReceiptModal';
@@ -929,7 +928,6 @@ export default function PosPage() {
       subtitle="Validation atomique (stock + caisse + créances) · Montants entiers XOF · Mode hors-ligne."
       headerActions={
         <>
-          <ShopPickerInline shopId={shopId} onChange={selectShop} />
           <div className="inline-flex rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-xs font-semibold">
             <button
               type="button"

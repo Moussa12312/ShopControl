@@ -6,7 +6,6 @@ import { formatDateTimeInTimezone, ImportEntityType } from '@shopcontrol/shared'
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { AppShell } from '@/components/layout/AppShell';
 import {
-  ShopPickerInline,
   useActiveOperationalShop,
 } from '@/components/commerce/ActiveShopHeader';
 import { ErrorState } from '@/components/ui/StateViews';
@@ -133,7 +132,6 @@ export default function CsvImportPage() {
       allowedRoles={['OWNER']}
       title="Import de données CSV"
       subtitle="Reprise rapide de vos produits, stocks initiaux, fournisseurs et clients avec aperçu et annulation possible."
-      headerActions={<ShopPickerInline shopId={shopId} onChange={selectShop} />}
     >
       <div className="space-y-5">
 

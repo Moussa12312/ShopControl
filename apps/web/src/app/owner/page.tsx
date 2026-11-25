@@ -108,7 +108,7 @@ interface ConsolidatedOverview {
 
 export default function OwnerDashboardPage() {
   const { user, shops, selectedShopId, setSelectedShopId, supportGrantId } = useAuth();
-  const [period, setPeriod] = useState<Period>('monthly');
+  const [period, setPeriod] = useState<Period>('daily');
   const [chartMode, setChartMode] = useState<'sales' | 'count'>('sales');
   const [rightTab, setRightTab] = useState<'products' | 'shops'>('products');
   const [productSearch, setProductSearch] = useState('');
@@ -242,13 +242,20 @@ export default function OwnerDashboardPage() {
 
       {/* 4 cartes KPI Obsidian Glass + Lime Glow sur 1 rangée desktop */}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Carte 1 : Ventes du jour / période */}
         <div className="sc-dark-glass min-w-0 p-3.5">
           <div className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500/20 text-limeglow-400 ring-1 ring-brand-400/25">
               <ShoppingBag className="h-4 w-4" />
             </span>
             <div className="min-w-0">
-              <p className="text-[11px] font-medium text-[#98b3ae]">Chiffre d’affaires net</p>
+              <p className="text-[11px] font-medium text-[#98b3ae]">
+                {period === 'daily'
+                  ? 'Ventes du jour'
+                  : period === 'weekly'
+                    ? 'Ventes de la semaine'
+                    : 'Ventes du mois'}
+              </p>
               <p className="truncate text-base font-extrabold tracking-tight text-white tabular sm:text-lg">
                 {formatXof(kpis?.currentSalesXof ?? 0)}
               </p>
@@ -277,6 +284,7 @@ export default function OwnerDashboardPage() {
           </div>
         </div>
 
+        {/* Carte 2 : Bénéfice net réel */}
         <div className="sc-dark-glass min-w-0 p-3.5">
           <div className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-200">
@@ -284,7 +292,7 @@ export default function OwnerDashboardPage() {
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <p className="text-[11px] font-medium text-[#98b3ae]">Résultat net</p>
+                <p className="text-[11px] font-medium text-[#98b3ae]">Bénéfice net réel</p>
                 {kpis?.isEstimated ? (
                   <span className="rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-200">
                     Estimé
@@ -306,57 +314,72 @@ export default function OwnerDashboardPage() {
           </p>
         </div>
 
+        {/* Carte 3 : Alertes urgentes de stock */}
         <div className="sc-dark-glass min-w-0 p-3.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-200">
-                <Receipt className="h-4 w-4" />
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/25">
+                <AlertTriangle className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <p className="text-[11px] font-medium text-[#98b3ae]">Dettes clients</p>
+                <p className="text-[11px] font-medium text-[#98b3ae]">Alertes urgentes stock</p>
                 <p className="truncate text-base font-extrabold tracking-tight text-white tabular sm:text-lg">
-                  {formatXof(kpis?.openReceivablesAmountXof ?? 0)}
+                  {(kpis?.lowStockCount ?? 0) + (kpis?.outOfStockCount ?? 0)} article(s)
                 </p>
               </div>
             </div>
-            <HealthBarPill
-              level={receivableRiskLevel}
-              label={
-                receivableRiskLevel === 'OK'
-                  ? 'Sain'
-                  : receivableRiskLevel === 'LOW'
-                    ? 'Modéré'
-                    : 'Élevé'
-              }
-            />
+            <Link
+              href="/commerce/stock"
+              className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold text-amber-200 transition hover:bg-white/20"
+            >
+              <span>Gérer</span>
+              <ChevronRight className="h-3 w-3" />
+            </Link>
           </div>
           <p className="mt-2 truncate text-[11px] text-[#8aa8a2]">
-            <strong className="text-white">{kpis?.totalProductsCount ?? 0}</strong> produits ·{' '}
-            <span className={(kpis?.lowStockCount ?? 0) > 0 ? 'font-bold text-amber-300' : 'text-emerald-300'}>
+            {(kpis?.outOfStockCount ?? 0) > 0 ? (
+              <strong className="text-rose-300 font-bold">{kpis?.outOfStockCount ?? 0} rupture(s)</strong>
+            ) : (
+              <span className="text-emerald-300">0 rupture</span>
+            )}
+            {' · '}
+            <span className={(kpis?.lowStockCount ?? 0) > 0 ? 'font-bold text-amber-300' : 'text-slate-300'}>
               {kpis?.lowStockCount ?? 0} stock bas
             </span>
           </p>
         </div>
 
-        <div className="lime-glow-card flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-limeglow-400/30 p-3.5">
-          <div className="min-w-0">
-            <p className="text-base font-extrabold text-white tabular sm:text-lg">
-              {(kpis?.priorityActionsCount ?? 0) + (kpis?.pendingOrdersCount ?? 0)}{' '}
-              <span className="text-xs font-semibold text-emerald-100/80">Actions</span>
-            </p>
-            <p className="truncate text-xs font-semibold text-emerald-50">
-              {(kpis?.pendingOrdersCount ?? 0) > 0
-                ? `${kpis?.pendingOrdersCount} commande(s) QR`
-                : `${kpis?.openCashSessionsCount ?? 0} caisse(s) ouverte(s)`}
-            </p>
+        {/* Carte 4 : État des caisses */}
+        <div className="lime-glow-card flex min-w-0 flex-col justify-between rounded-2xl border border-limeglow-400/30 p-3.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-limeglow-400/20 text-limeglow-300 ring-1 ring-limeglow-400/30">
+                <Banknote className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-emerald-100/90">État des caisses</p>
+                <p className="truncate text-base font-extrabold tracking-tight text-white tabular sm:text-lg">
+                  {kpis?.openCashSessionsCount ?? 0} caisse(s) active(s)
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/commerce/cash"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-limeglow-400 px-2.5 py-1 text-[11px] font-extrabold text-forest-950 shadow-lime transition hover:bg-limeglow-300"
+            >
+              <span>Caisses</span>
+              <ChevronRight className="h-3 w-3 stroke-[2.5]" />
+            </Link>
           </div>
-          <Link
-            href={(kpis?.pendingOrdersCount ?? 0) > 0 ? '/commerce/orders' : '/owner/reports'}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-limeglow-400 px-3 py-1.5 text-xs font-extrabold text-forest-950 shadow-lime transition hover:bg-limeglow-300"
-          >
-            <span>{(kpis?.pendingOrdersCount ?? 0) > 0 ? 'Commandes' : 'Bilans'}</span>
-            <Sparkles className="h-3.5 w-3.5" />
-          </Link>
+          <p className="mt-2 truncate text-[11px] text-emerald-100/80">
+            {(kpis?.recentDiscrepancies ?? 0) > 0 ? (
+              <strong className="text-rose-300 font-bold">{kpis?.recentDiscrepancies} écart(s)</strong>
+            ) : (
+              <span className="text-limeglow-300">Aucun écart</span>
+            )}
+            {' · '}
+            <span>{kpis?.overdueCashSessions ?? 0} en retard</span>
+          </p>
         </div>
       </div>
     </div>

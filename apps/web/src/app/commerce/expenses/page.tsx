@@ -7,7 +7,6 @@ import { apiFetch, ApiError } from '@/lib/api-client';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { AppShell } from '@/components/layout/AppShell';
 import {
-  ShopPickerInline,
   useActiveOperationalShop,
 } from '@/components/commerce/ActiveShopHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateViews';
@@ -188,7 +187,6 @@ export default function ExpensesPage() {
       subtitle="Prises en compte dans le bénéfice net estimé ; décaissement automatique si payée depuis la caisse."
       headerActions={
         <>
-          <ShopPickerInline shopId={shopId} onChange={selectShop} />
           {isOwner ? (
             <div className="inline-flex rounded-full border border-white/10 bg-forest-800/80 p-0.5 text-xs font-semibold">
               <button

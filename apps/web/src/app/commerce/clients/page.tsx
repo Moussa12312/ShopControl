@@ -23,7 +23,6 @@ import { apiFetch, ApiError } from '@/lib/api-client';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { AppShell } from '@/components/layout/AppShell';
 import {
-  ShopPickerInline,
   useActiveOperationalShop,
 } from '@/components/commerce/ActiveShopHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateViews';
@@ -311,7 +310,6 @@ export default function ClientsReceivablesPage() {
       subtitle="Suivi des crédits clients, enregistrement de dettes directes, échéances et encaissements."
       headerActions={
         <>
-          <ShopPickerInline shopId={shopId} onChange={selectShop} />
           <button
             type="button"
             onClick={() => setShowNewClient((v) => !v)}
