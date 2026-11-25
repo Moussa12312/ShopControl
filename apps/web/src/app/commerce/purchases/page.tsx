@@ -1,7 +1,16 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, PackageCheck, Plus, Wallet } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  PackageCheck,
+  Plus,
+  ShoppingCart,
+  Sparkles,
+  Truck,
+  Wallet,
+} from 'lucide-react';
 import {
   formatDateTimeInTimezone,
   formatXof,
@@ -35,11 +44,17 @@ interface ProductOpt {
   costPriceXof: number | null;
   bulkUnitLabel?: string | null;
   unitsPerBulk?: number | null;
+  stockAvailable?: number;
+  stockPhysical?: number;
+  alertThreshold?: number;
   variants?: Array<{
     id: string;
     name: string;
     sku: string;
     costPriceXof: number | null;
+    stockAvailable?: number;
+    stockPhysical?: number;
+    alertThreshold?: number;
   }>;
 }
 
@@ -67,7 +82,7 @@ export default function PurchasesPage() {
   const { activeOperator } = useAuth();
   const { shopId, selectShop, isOwner } = useActiveOperationalShop();
 
-  const [tab, setTab] = useState<'orders' | 'suppliers'>('orders');
+  const [tab, setTab] = useState<'orders' | 'suppliers' | 'restock'>('orders');
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [orders, setOrders] = useState<PurchaseOrderRow[]>([]);
   const [products, setProducts] = useState<ProductOpt[]>([]);
@@ -102,6 +117,94 @@ export default function PurchasesPage() {
   const [payAmount, setPayAmount] = useState(0);
   const [payMethodCode, setPayMethodCode] = useState('');
   const [payFromCash, setPayFromCash] = useState(false);
+
+  // Carnet de réapprovisionnement automatique (Point 2)
+  const restockSuggestions = useMemo(() => {
+    const list: Array<{
+      productId: string;
+      variantId?: string;
+      productName: string;
+      variantName?: string;
+      sku: string;
+      unit: string;
+      currentStock: number;
+      alertThreshold: number;
+      suggestedQty: number;
+      unitCostXof: number;
+      supplierId?: string;
+      supplierName?: string;
+    }> = [];
+
+    for (const p of products) {
+      if (p.variants && p.variants.length > 0) {
+        for (const v of p.variants) {
+          const stock = v.stockAvailable ?? v.stockPhysical ?? 0;
+          const threshold = v.alertThreshold ?? 5;
+          if (stock <= threshold) {
+            const matchedSup = suppliers.find((s) =>
+              s.suppliedProducts?.toLowerCase().includes(p.name.toLowerCase()) ||
+              s.suppliedProducts?.toLowerCase().includes(v.name.toLowerCase()),
+            );
+            const suggested = Math.max(10, threshold * 2 - stock);
+            list.push({
+              productId: p.id,
+              variantId: v.id,
+              productName: p.name,
+              variantName: v.name,
+              sku: v.sku || p.sku,
+              unit: p.unit || 'unité',
+              currentStock: stock,
+              alertThreshold: threshold,
+              suggestedQty: suggested,
+              unitCostXof: v.costPriceXof ?? p.costPriceXof ?? 0,
+              supplierId: matchedSup?.id,
+              supplierName: matchedSup?.name,
+            });
+          }
+        }
+      } else {
+        const stock = p.stockAvailable ?? p.stockPhysical ?? 0;
+        const threshold = p.alertThreshold ?? 5;
+        if (stock <= threshold) {
+          const matchedSup = suppliers.find((s) =>
+            s.suppliedProducts?.toLowerCase().includes(p.name.toLowerCase()),
+          );
+          const suggested = Math.max(10, threshold * 2 - stock);
+          list.push({
+            productId: p.id,
+            productName: p.name,
+            sku: p.sku,
+            unit: p.unit || 'unité',
+            currentStock: stock,
+            alertThreshold: threshold,
+            suggestedQty: suggested,
+            unitCostXof: p.costPriceXof ?? 0,
+            supplierId: matchedSup?.id,
+            supplierName: matchedSup?.name,
+          });
+        }
+      }
+    }
+    return list;
+  }, [products, suppliers]);
+
+  const handleQuickRestock = (item: {
+    productId: string;
+    variantId?: string;
+    supplierId?: string;
+    suggestedQty: number;
+    unitCostXof: number;
+  }) => {
+    if (item.supplierId) {
+      setPoSupplierId(item.supplierId);
+    } else if (suppliers[0]) {
+      setPoSupplierId(suppliers[0].id);
+    }
+    setPoProductId(item.variantId ? `${item.productId}::${item.variantId}` : item.productId);
+    setPoQty(item.suggestedQty);
+    setPoUnitCost(item.unitCostXof || 1000);
+    setShowNewPo(true);
+  };
 
   const load = useCallback(async () => {
     if (!shopId) {
@@ -349,11 +452,41 @@ export default function PurchasesPage() {
             >
               Fournisseurs ({suppliers.length})
             </button>
+            <button
+              type="button"
+              onClick={() => setTab('restock')}
+              className={`rounded-full px-3 py-1 transition inline-flex items-center gap-1.5 ${
+                tab === 'restock' ? 'bg-white font-bold text-forest-950' : 'text-[#8aa8a2] hover:text-white'
+              }`}
+            >
+              <Sparkles className="h-3 w-3 text-limeglow-400" />
+              <span>Réappro. auto</span>
+              {restockSuggestions.length > 0 ? (
+                <span className="rounded-full bg-amber-400 text-slate-950 px-1.5 py-0.2 text-[10px] font-extrabold">
+                  {restockSuggestions.length}
+                </span>
+              ) : null}
+            </button>
           </div>
           {tab === 'orders' && suppliers.length > 0 && products.length > 0 ? (
             <button type="button" onClick={() => setShowNewPo(true)} className="sc-hero-btn-primary">
               <Plus className="h-3.5 w-3.5" />
               Nouvel achat
+            </button>
+          ) : tab === 'restock' && suppliers.length > 0 && products.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (restockSuggestions[0]) {
+                  handleQuickRestock(restockSuggestions[0]);
+                } else {
+                  setShowNewPo(true);
+                }
+              }}
+              className="sc-hero-btn-primary"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Créer commande
             </button>
           ) : null}
         </>
@@ -438,7 +571,7 @@ export default function PurchasesPage() {
               ))}
             </div>
           )
-        ) : (
+        ) : tab === 'suppliers' ? (
           <div className="space-y-4">
             <form
               onSubmit={handleCreateSupplier}
@@ -550,6 +683,147 @@ export default function PurchasesPage() {
                 </div>
               ))}
             </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Bannière explicative réapprovisionnement automatique (Point 2) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50/70 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-700 text-limeglow-400">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-brand-950">
+                    Carnet de réapprovisionnement automatique (Basé sur le stock & les seuils d’alerte)
+                  </h3>
+                  <p className="text-xs text-brand-800/80">
+                    Détecte instantanément vos articles en rupture ou sous le seuil d'alerte, les associe au grossiste attitré et calcule le volume d’achat nécessaire.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Métriques de synthèse */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="sc-card p-4">
+                <p className="text-xs font-semibold text-slate-500">Articles à recommander</p>
+                <p className="mt-1 text-2xl font-extrabold text-amber-600 tabular">
+                  {restockSuggestions.length}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">En rupture ou sous le seuil</p>
+              </div>
+              <div className="sc-card p-4">
+                <p className="text-xs font-semibold text-slate-500">Quantité totale conseillée</p>
+                <p className="mt-1 text-2xl font-extrabold text-slate-900 tabular">
+                  {restockSuggestions.reduce((sum, item) => sum + item.suggestedQty, 0)}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Pour reconstituer le stock optimal</p>
+              </div>
+              <div className="sc-card p-4">
+                <p className="text-xs font-semibold text-slate-500">Budget d’achat estimé</p>
+                <p className="mt-1 text-2xl font-extrabold text-brand-700 tabular">
+                  {formatXof(
+                    restockSuggestions.reduce(
+                      (sum, item) => sum + item.suggestedQty * item.unitCostXof,
+                      0,
+                    ),
+                  )}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Basé sur le coût d'achat CMP</p>
+              </div>
+            </div>
+
+            {/* Tableau des articles nécessitant un réapprovisionnement */}
+            {restockSuggestions.length === 0 ? (
+              <EmptyState
+                title="Tous vos stocks sont au niveau optimal !"
+                description="Aucun article n’est actuellement en rupture ou sous son seuil d’alerte. Vos approvisionnements sont à jour."
+              />
+            ) : (
+              <div className="sc-card overflow-hidden">
+                <div className="border-b border-slate-100 px-4 py-3 bg-porcelain-50">
+                  <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wide">
+                    Articles nécessitant un réapprovisionnement ({restockSuggestions.length})
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-xs">
+                    <thead className="bg-porcelain-50/60 text-left font-bold text-slate-500 uppercase tracking-wider">
+                      <tr>
+                        <th className="py-2.5 px-4">Article & Déclinaison</th>
+                        <th className="py-2.5 px-4">Grossiste attitré</th>
+                        <th className="py-2.5 px-4 text-center">Stock actuel</th>
+                        <th className="py-2.5 px-4 text-center">Seuil alerte</th>
+                        <th className="py-2.5 px-4 text-center">Qté conseillée</th>
+                        <th className="py-2.5 px-4 text-right">Coût estimé</th>
+                        <th className="py-2.5 px-4 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {restockSuggestions.map((item, idx) => (
+                        <tr key={`restock-${idx}`} className="hover:bg-slate-50/70 transition">
+                          <td className="py-2.5 px-4">
+                            <p className="font-bold text-slate-900">{item.productName}</p>
+                            {item.variantName ? (
+                              <p className="text-[11px] text-brand-800 font-semibold">
+                                {item.variantName}
+                              </p>
+                            ) : null}
+                            <code className="text-[10px] text-slate-400 font-mono">{item.sku}</code>
+                          </td>
+                          <td className="py-2.5 px-4">
+                            {item.supplierName ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-[11px] font-bold text-brand-800">
+                                <Truck className="h-3 w-3" />
+                                {item.supplierName}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">
+                                Non assigné
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-4 text-center">
+                            <span
+                              className={`font-extrabold tabular px-2 py-0.5 rounded-full ${
+                                item.currentStock <= 0
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {item.currentStock} {item.unit}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-4 text-center text-slate-500 tabular font-semibold">
+                            {item.alertThreshold}
+                          </td>
+                          <td className="py-2.5 px-4 text-center">
+                            <span className="font-extrabold text-emerald-700 tabular text-sm">
+                              +{item.suggestedQty}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-bold text-slate-800 tabular">
+                            {item.unitCostXof > 0
+                              ? formatXof(item.suggestedQty * item.unitCostXof)
+                              : 'À négocier'}
+                          </td>
+                          <td className="py-2.5 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleQuickRestock(item)}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-forest-900 px-3 py-1.5 text-xs font-bold text-limeglow-400 hover:bg-forest-800 shadow-2xs transition"
+                            >
+                              <ShoppingCart className="h-3.5 w-3.5" />
+                              Commander
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

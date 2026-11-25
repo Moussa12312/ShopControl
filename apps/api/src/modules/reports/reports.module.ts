@@ -40,6 +40,10 @@ export interface ShopFinancialSummary {
   missingCostProductsCount: number;
   receivablesCreatedXof: number;
   receivablesOutstandingXof: number;
+  purchasesOrderedXof: number;
+  purchasesReceivedXof: number;
+  supplierPaymentsXof: number;
+  supplierDebtOutstandingXof: number;
   paymentsBreakdown: Record<string, number>;
   openCashSessionsCount: number;
   cashDiscrepancyTotalXof: number;
@@ -95,6 +99,10 @@ export class ReportsService {
         missingCostProductsCount: 0,
         receivablesCreatedXof: 0,
         receivablesOutstandingXof: 0,
+        purchasesOrderedXof: 0,
+        purchasesReceivedXof: 0,
+        supplierPaymentsXof: 0,
+        supplierDebtOutstandingXof: 0,
         paymentsBreakdown: {},
         openCashSessionsCount: 0,
         cashDiscrepancyTotalXof: 0,
@@ -104,37 +112,62 @@ export class ReportsService {
     }
 
     const client = await this.shopDbManager.getClientForShop(shopId);
-    const [sales, refunds, expenses, openReceivables, cashSessions, products, pendingOrdersCount] =
-      await Promise.all([
-        client.sale.findMany({
-          where: { status: 'COMPLETED', createdAt: { gte: start, lte: end } },
-          include: { lines: true, payments: true },
-        }),
-        client.saleRefund.findMany({
-          where: { createdAt: { gte: start, lte: end }, sale: { status: { not: 'CANCELLED' } } },
-        }),
-        client.expense.aggregate({
-          where: { status: 'ACTIVE', expenseDate: { gte: start, lte: end } },
-          _sum: { amountXof: true },
-        }),
-        client.receivable.aggregate({
-          where: { status: { in: ['OPEN', 'PARTIALLY_PAID'] } },
-          _sum: { remainingAmountXof: true },
-        }),
-        client.cashSession.findMany({
-          where: {
-            OR: [{ status: 'OPEN' }, { closedAt: { gte: start, lte: end } }],
-          },
-          select: { status: true, discrepancyXof: true },
-        }),
-        client.product.findMany({
-          where: { status: { not: 'ARCHIVED' } },
-          select: { alertThreshold: true, stockBalances: { where: { variantKey: 'BASE' } } },
-        }),
-        client.onlineOrder.count({
-          where: { status: { in: ['NEW', 'CONFIRMED', 'PREPARING', 'READY', 'IN_DELIVERY'] } },
-        }),
-      ]);
+    const [
+      sales,
+      refunds,
+      expenses,
+      openReceivables,
+      cashSessions,
+      products,
+      pendingOrdersCount,
+      periodPurchases,
+      supplierPaymentsAgg,
+      allActivePOs,
+    ] = await Promise.all([
+      client.sale.findMany({
+        where: { status: 'COMPLETED', createdAt: { gte: start, lte: end } },
+        include: { lines: true, payments: true },
+      }),
+      client.saleRefund.findMany({
+        where: { createdAt: { gte: start, lte: end }, sale: { status: { not: 'CANCELLED' } } },
+      }),
+      client.expense.aggregate({
+        where: { status: 'ACTIVE', expenseDate: { gte: start, lte: end } },
+        _sum: { amountXof: true },
+      }),
+      client.receivable.aggregate({
+        where: { status: { in: ['OPEN', 'PARTIALLY_PAID'] } },
+        _sum: { remainingAmountXof: true },
+      }),
+      client.cashSession.findMany({
+        where: {
+          OR: [{ status: 'OPEN' }, { closedAt: { gte: start, lte: end } }],
+        },
+        select: { status: true, discrepancyXof: true },
+      }),
+      client.product.findMany({
+        where: { status: { not: 'ARCHIVED' } },
+        select: { alertThreshold: true, stockBalances: { where: { variantKey: 'BASE' } } },
+      }),
+      client.onlineOrder.count({
+        where: { status: { in: ['NEW', 'CONFIRMED', 'PREPARING', 'READY', 'IN_DELIVERY'] } },
+      }),
+      client.purchaseOrder.findMany({
+        where: {
+          status: { in: ['ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED'] },
+          createdAt: { gte: start, lte: end },
+        },
+        select: { totalOrderedXof: true, totalReceivedXof: true, totalPaidXof: true },
+      }),
+      client.supplierPayment.aggregate({
+        where: { createdAt: { gte: start, lte: end } },
+        _sum: { amountXof: true },
+      }),
+      client.purchaseOrder.findMany({
+        where: { status: { in: ['ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED'] } },
+        select: { totalReceivedXof: true, totalPaidXof: true },
+      }),
+    ]);
 
     let grossSalesXof = 0;
     let itemsSoldQty = 0;
@@ -180,6 +213,14 @@ export class ReportsService {
       return avail <= p.alertThreshold;
     }).length;
 
+    const purchasesOrderedXof = periodPurchases.reduce((sum, po) => sum + (po.totalOrderedXof || 0), 0);
+    const purchasesReceivedXof = periodPurchases.reduce((sum, po) => sum + (po.totalReceivedXof || 0), 0);
+    const supplierPaymentsXof = supplierPaymentsAgg._sum?.amountXof ?? 0;
+    const supplierDebtOutstandingXof = allActivePOs.reduce(
+      (sum, po) => sum + Math.max(0, (po.totalReceivedXof || 0) - (po.totalPaidXof || 0)),
+      0,
+    );
+
     return {
       shopId: shop.id,
       shopName: shop.name,
@@ -198,6 +239,10 @@ export class ReportsService {
       missingCostProductsCount: missingCostIds.size,
       receivablesCreatedXof,
       receivablesOutstandingXof: openReceivables._sum.remainingAmountXof ?? 0,
+      purchasesOrderedXof,
+      purchasesReceivedXof,
+      supplierPaymentsXof,
+      supplierDebtOutstandingXof,
       paymentsBreakdown,
       openCashSessionsCount,
       cashDiscrepancyTotalXof,
@@ -263,6 +308,10 @@ export class ReportsService {
     const totalExpensesXof = shopsExpensesXof + companyExpensesXof;
     const estimatedNetProfitXof = grossMarginXof - totalExpensesXof;
     const missingCostProductsCount = byShop.reduce((a, s) => a + s.missingCostProductsCount, 0);
+    const purchasesOrderedXof = byShop.reduce((a, s) => a + (s.purchasesOrderedXof || 0), 0);
+    const purchasesReceivedXof = byShop.reduce((a, s) => a + (s.purchasesReceivedXof || 0), 0);
+    const supplierPaymentsXof = byShop.reduce((a, s) => a + (s.supplierPaymentsXof || 0), 0);
+    const supplierDebtOutstandingXof = byShop.reduce((a, s) => a + (s.supplierDebtOutstandingXof || 0), 0);
 
     return {
       from: start.toISOString(),
@@ -283,6 +332,10 @@ export class ReportsService {
         missingCostProductsCount,
         receivablesOutstandingXof: byShop.reduce((a, s) => a + s.receivablesOutstandingXof, 0),
         cashDiscrepancyTotalXof: byShop.reduce((a, s) => a + s.cashDiscrepancyTotalXof, 0),
+        purchasesOrderedXof,
+        purchasesReceivedXof,
+        supplierPaymentsXof,
+        supplierDebtOutstandingXof,
         paymentsBreakdown,
         inTransitTransfersCount: inTransitTransfers.length,
         inTransitQty,
