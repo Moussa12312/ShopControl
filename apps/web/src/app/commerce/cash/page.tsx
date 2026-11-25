@@ -14,11 +14,12 @@ import { ErrorState, LoadingSkeleton } from '@/components/ui/StateViews';
 interface CurrentCashSession {
   id: string;
   register: { id: string; name: string };
-  openingAmountXof: number;
+  openingAmountXof: number | null;
   theoreticalAmountXof: number | null;
   openedByOperatorName: string | null;
   openedAt: string;
   overdueAlert24h: boolean;
+  movementsCount?: number;
   movements: Array<{
     id: string;
     type: string;
@@ -34,7 +35,7 @@ interface SessionHistoryRow {
   id: string;
   registerName: string;
   status: 'OPEN' | 'CLOSED';
-  openingAmountXof: number;
+  openingAmountXof: number | null;
   theoreticalAmountXof: number | null;
   countedAmountXof: number | null;
   discrepancyXof: number | null;
@@ -277,9 +278,15 @@ export default function CashPage() {
                   <div className="grid grid-cols-1 gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
                     <div>
                       <p className="text-xs text-slate-500">Fond initial</p>
-                      <p className="text-lg font-bold text-slate-900">
-                        {formatXof(current.openingAmountXof)}
-                      </p>
+                      {isOwner && current.openingAmountXof !== null ? (
+                        <p className="text-lg font-bold text-slate-900">
+                          {formatXof(current.openingAmountXof)}
+                        </p>
+                      ) : (
+                        <p className="text-xs font-semibold text-slate-600 italic mt-1">
+                          🔒 Enregistré à l’ouverture
+                        </p>
+                      )}
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">Solde théorique actuel</p>
@@ -288,7 +295,7 @@ export default function CashPage() {
                           {formatXof(current.theoreticalAmountXof)}
                         </p>
                       ) : (
-                        <p className="text-xs font-semibold text-slate-500 italic mt-1" title="Comptage à l'aveugle : seul le montant physique compté doit être saisi">
+                        <p className="text-xs font-semibold text-slate-600 italic mt-1" title="Comptage à l'aveugle : seul le montant physique compté doit être saisi">
                           🔒 Comptage à l’aveugle
                         </p>
                       )}
@@ -366,29 +373,70 @@ export default function CashPage() {
                   </form>
                 </div>
 
-                <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-                  <h3 className="mb-3 text-sm font-bold text-slate-900 sm:text-base">
-                    Mouvements de la session en cours ({current.movements.length})
-                  </h3>
-                  <div className="max-h-96 divide-y divide-slate-100 overflow-y-auto text-xs">
-                    {current.movements.map((m) => (
-                      <div key={m.id} className="flex items-center justify-between gap-2 py-2.5">
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-slate-800">{m.type}</p>
-                          <p className="truncate text-slate-500">{m.reason || '—'}</p>
-                        </div>
-                        <span
-                          className={`shrink-0 font-mono font-bold tabular ${
-                            m.signedAmountXof >= 0 ? 'text-emerald-700' : 'text-red-600'
-                          }`}
-                        >
-                          {m.signedAmountXof >= 0 ? '+' : ''}
-                          {formatXof(m.signedAmountXof)}
-                        </span>
-                      </div>
-                    ))}
+                {isOwner ? (
+                  <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                    <h3 className="mb-3 text-sm font-bold text-slate-900 sm:text-base">
+                      Mouvements de la session en cours ({current.movements.length})
+                    </h3>
+                    <div className="max-h-96 divide-y divide-slate-100 overflow-y-auto text-xs">
+                      {current.movements.length === 0 ? (
+                        <p className="py-4 text-center text-slate-500 italic">Aucun mouvement pour le moment.</p>
+                      ) : (
+                        current.movements.map((m) => (
+                          <div key={m.id} className="flex items-center justify-between gap-2 py-2.5">
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-slate-800">{m.type}</p>
+                              <p className="truncate text-slate-500">{m.reason || '—'}</p>
+                            </div>
+                            <span
+                              className={`shrink-0 font-mono font-bold tabular ${
+                                m.signedAmountXof >= 0 ? 'text-emerald-700' : 'text-red-600'
+                              }`}
+                            >
+                              {m.signedAmountXof >= 0 ? '+' : ''}
+                              {formatXof(m.signedAmountXof)}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Lock className="h-4 w-4 text-brand-700" />
+                        <h3 className="text-sm font-bold text-slate-900 sm:text-base">
+                          Journal des flux confidentiel
+                        </h3>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 border border-slate-100 p-3.5 space-y-2.5 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Statut session :</span>
+                          <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Active</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Activité enregistrée :</span>
+                          <span className="font-bold text-slate-800">
+                            {current.movementsCount ?? current.movements.length} opération(s)
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Protocole de clôture :</span>
+                          <span className="font-bold text-brand-800">Comptage physique à l’aveugle</span>
+                        </div>
+                      </div>
+                      <p className="mt-3.5 text-xs text-slate-500 leading-relaxed">
+                        🔒 Le journal financier détaillé des encaissements est réservé au Propriétaire pour assurer l'indépendance et la fiabilité du comptage des espèces.
+                      </p>
+                    </div>
+                    <div className="mt-4 rounded-xl bg-amber-50/70 border border-amber-200/60 p-3 text-center">
+                      <p className="text-[11px] font-semibold text-amber-900">
+                        À la clôture, comptez les espèces réelles dans le tiroir et saisissez le montant total.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

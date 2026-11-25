@@ -194,14 +194,18 @@ export class CashService {
     const hoursOpen = (Date.now() - session.openedAt.getTime()) / 3_600_000;
     return {
       ...session,
+      openingAmountXof: canSeeTheoretical ? session.openingAmountXof : null,
       theoreticalAmountXof: canSeeTheoretical ? session.theoreticalAmountXof : null,
       openedAt: session.openedAt.toISOString(),
       closedAt: null,
       overdueAlert24h: hoursOpen > 24,
-      movements: session.movements.map((m) => ({
-        ...m,
-        createdAt: m.createdAt.toISOString(),
-      })),
+      movementsCount: session.movements.length,
+      movements: canSeeTheoretical
+        ? session.movements.map((m) => ({
+            ...m,
+            createdAt: m.createdAt.toISOString(),
+          }))
+        : [],
     };
   }
 
@@ -221,7 +225,7 @@ export class CashService {
       registerId: s.registerId,
       registerName: s.register.name,
       status: s.status,
-      openingAmountXof: s.openingAmountXof,
+      openingAmountXof: canSeeTheoretical ? s.openingAmountXof : null,
       theoreticalAmountXof: canSeeTheoretical ? s.theoreticalAmountXof : null,
       countedAmountXof: s.countedAmountXof,
       discrepancyXof: canSeeTheoretical ? s.discrepancyXof : null,
