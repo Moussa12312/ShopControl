@@ -12,6 +12,7 @@ import {
   Boxes,
   Building2,
   CheckCheck,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -72,6 +73,42 @@ interface AnnouncementItem {
   title: string;
   body: string;
   priority: 'INFO' | 'WARNING' | 'URGENT';
+}
+
+function playNotificationChime() {
+  if (typeof window === 'undefined') return;
+  try {
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(659.25, now);
+    gain1.gain.setValueAtTime(0.2, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.3);
+
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(987.77, now + 0.12);
+    gain2.gain.setValueAtTime(0.25, now + 0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.12);
+    osc2.stop(now + 0.5);
+  } catch {
+    // Autoplay restrictions before user gesture, safely ignored
+  }
 }
 
 const OWNER_SUPERVISION_NAV: NavItem[] = [
@@ -167,6 +204,14 @@ export function AppShell({
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
   const [dismissedAnn, setDismissedAnn] = useState<string[]>([]);
 
+  // Alertes centrales prioritaires (Pop-up au centre de l'écran, impossible à rater)
+  const [activeAlert, setActiveAlert] = useState<NotificationItem | null>(null);
+  const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(() => new Set());
+  const [isConfirmingOrder, setIsConfirmingOrder] = useState(false);
+  const [confirmSuccessMsg, setConfirmSuccessMsg] = useState<string | null>(null);
+  const previousNotifIdsRef = useRef<Set<string>>(new Set());
+  const initialAlertCheckRef = useRef(false);
+
   const notifRef = useRef<HTMLDivElement | null>(null);
   const profileRef = useRef<HTMLDivElement | null>(null);
   const touchStartXRef = useRef<number | null>(null);
@@ -241,10 +286,42 @@ export function AppShell({
       );
       setNotifications(res.items);
       setUnreadCount(res.unreadCount);
+
+      // Détection des alertes prioritaires pour affichage au centre
+      const unreadAlerts = res.items.filter(
+        (n) => !n.isRead && !dismissedAlertIds.has(n.id),
+      );
+
+      if (!initialAlertCheckRef.current) {
+        initialAlertCheckRef.current = true;
+        // Au chargement initial, si une commande récente ou alerte urgente (< 20 min) est présente
+        const urgentRecent = unreadAlerts.find((n) => {
+          const ageMs = Date.now() - new Date(n.createdAt).getTime();
+          return (
+            (n.priority === 'URGENT' || n.type === 'ONLINE_ORDER' || n.type === 'ORDER') &&
+            ageMs < 20 * 60 * 1000
+          );
+        });
+        if (urgentRecent) {
+          setActiveAlert(urgentRecent);
+          playNotificationChime();
+        }
+      } else {
+        // En cours d'utilisation : dès qu'un nouvel ID de notification arrive et est non lu
+        const freshAlert = unreadAlerts.find(
+          (n) => !previousNotifIdsRef.current.has(n.id),
+        );
+        if (freshAlert) {
+          setActiveAlert(freshAlert);
+          playNotificationChime();
+        }
+      }
+
+      previousNotifIdsRef.current = new Set(res.items.map((n) => n.id));
     } catch {
       // ignore offline
     }
-  }, [user]);
+  }, [user, dismissedAlertIds]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -258,9 +335,82 @@ export function AppShell({
     apiFetch<AnnouncementItem[]>('/announcements/active', { requiresOnline: false })
       .then((list) => setAnnouncements(Array.isArray(list) ? list : []))
       .catch(() => undefined);
-    const timer = window.setInterval(loadNotifications, 25_000);
+    // Polling rapide toutes les 12s pour une détection quasi temps réel des commandes vitrine
+    const timer = window.setInterval(loadNotifications, 12_000);
     return () => window.clearInterval(timer);
   }, [user, loadNotifications]);
+
+  // Touche Échap pour refermer l'alerte centrale sans bloquer l'écran
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && activeAlert) {
+        setDismissedAlertIds((prev) => new Set([...prev, activeAlert.id]));
+        setActiveAlert(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeAlert]);
+
+  const handleDismissAlert = (alertItem: NotificationItem) => {
+    setDismissedAlertIds((prev) => new Set([...prev, alertItem.id]));
+    setActiveAlert(null);
+  };
+
+  const handleAlertMarkAsRead = async (alertItem: NotificationItem) => {
+    await handleMarkRead(alertItem);
+    setActiveAlert(null);
+  };
+
+  const handleOpenAlertTarget = async (alertItem: NotificationItem) => {
+    await handleMarkRead(alertItem);
+    setActiveAlert(null);
+    if (alertItem.targetPath) {
+      router.push(alertItem.targetPath);
+    }
+  };
+
+  const handleDirectConfirmOrder = async (alertItem: NotificationItem) => {
+    let targetShopId = '';
+    let targetOrderId = '';
+    if (alertItem.targetPath) {
+      const matchShop = alertItem.targetPath.match(/shopId=([a-f0-9-]+)/i);
+      const matchOrder = alertItem.targetPath.match(/orderId=([a-f0-9-]+)/i);
+      if (matchShop) targetShopId = matchShop[1];
+      if (matchOrder) targetOrderId = matchOrder[1];
+    }
+    if (!targetShopId || !targetOrderId) {
+      await handleMarkRead(alertItem);
+      setActiveAlert(null);
+      if (alertItem.targetPath) router.push(alertItem.targetPath);
+      return;
+    }
+
+    setIsConfirmingOrder(true);
+    try {
+      await apiFetch(`/shops/${targetShopId}/orders/${targetOrderId}/confirm`, {
+        method: 'POST',
+        shopId: targetShopId,
+        operatorId: activeOperator?.id,
+      });
+      setConfirmSuccessMsg('Commande confirmée et stock réservé avec succès !');
+      await apiFetch(`/notifications/${alertItem.id}/read`, { method: 'PATCH' }).catch(() => undefined);
+      setUnreadCount((c) => Math.max(0, c - 1));
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === alertItem.id ? { ...n, isRead: true } : n)),
+      );
+      setTimeout(() => {
+        setConfirmSuccessMsg(null);
+        setActiveAlert(null);
+      }, 1500);
+    } catch {
+      // Si la confirmation directe nécessite un PIN ou échoue, ouvrir la commande sur sa page
+      setActiveAlert(null);
+      if (alertItem.targetPath) router.push(alertItem.targetPath);
+    } finally {
+      setIsConfirmingOrder(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -1108,6 +1258,136 @@ export function AppShell({
           </button>
         </nav>
       </div>
+
+      {/* MODAL D'ALERTE CENTRALE INTERACTIVE (Impossible à rater pour Propriétaire et Agents) */}
+      {activeAlert ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-forest-950/80 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div className="relative w-full max-w-lg rounded-3xl border border-limeglow-400/40 bg-[#091f1e] p-6 text-white shadow-2xl ring-1 ring-white/10 sm:p-7">
+            {/* Bouton fermeture */}
+            <button
+              type="button"
+              onClick={() => handleDismissAlert(activeAlert)}
+              aria-label="Fermer l'alerte"
+              className="absolute right-4 top-4 rounded-xl p-2 text-white/60 transition hover:bg-white/10 hover:text-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            {confirmSuccessMsg ? (
+              <div className="py-8 text-center animate-in zoom-in-95 duration-200">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/20 text-limeglow-400 ring-2 ring-limeglow-400/40">
+                  <CheckCircle2 className="h-10 w-10" />
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-white">Action effectuée !</h3>
+                <p className="mt-1 text-sm text-emerald-100/90">{confirmSuccessMsg}</p>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-start gap-4">
+                  {/* Icône animée */}
+                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-limeglow-400/20 text-limeglow-300 ring-2 ring-limeglow-400/40">
+                    <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-limeglow-400 opacity-75"></span>
+                      <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-limeglow-400"></span>
+                    </span>
+                    {activeAlert.type === 'ONLINE_ORDER' || activeAlert.type === 'ORDER' ? (
+                      <ShoppingBag className="h-7 w-7" />
+                    ) : activeAlert.type === 'TRANSFER' ? (
+                      <ArrowLeftRight className="h-7 w-7" />
+                    ) : activeAlert.type === 'STOCK' ? (
+                      <Boxes className="h-7 w-7" />
+                    ) : activeAlert.type === 'CASH_FINANCE' ? (
+                      <Banknote className="h-7 w-7" />
+                    ) : (
+                      <Bell className="h-7 w-7" />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1 pr-6">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-limeglow-400/15 px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-limeglow-300 ring-1 ring-limeglow-400/30">
+                      {activeAlert.type === 'ONLINE_ORDER' || activeAlert.type === 'ORDER'
+                        ? '⚡ COMMANDE VITRINE QR REÇUE'
+                        : activeAlert.type === 'TRANSFER'
+                          ? '📦 DEMANDE DE TRANSFERT DE STOCK'
+                          : activeAlert.type === 'STOCK'
+                            ? '🚨 ALERTE RUPTURE DE STOCK'
+                            : activeAlert.type === 'CASH_FINANCE'
+                              ? '💵 ALERTE CAISSE'
+                              : '🔔 ALERTE PRIORITAIRE'}
+                    </span>
+                    <h3 className="mt-2 text-lg font-extrabold tracking-tight text-white sm:text-xl">
+                      {activeAlert.title}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-sm font-medium leading-relaxed text-emerald-50">
+                    {activeAlert.message}
+                  </p>
+                  <p className="mt-2 text-[11px] font-semibold text-emerald-200/60">
+                    Arrivée à l'instant · Visible sur tous les écrans
+                  </p>
+                </div>
+
+                {/* Boutons d'action adaptés */}
+                <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleDismissAlert(activeAlert)}
+                    className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
+                  >
+                    Traiter plus tard (Échap)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAlertMarkAsRead(activeAlert)}
+                    className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-xs font-semibold text-emerald-200 transition hover:bg-white/15 hover:text-white"
+                  >
+                    Marquer comme lu
+                  </button>
+
+                  {/* Bouton de confirmation en 1 clic pour commandes */}
+                  {(activeAlert.type === 'ONLINE_ORDER' || activeAlert.type === 'ORDER') &&
+                  activeAlert.targetPath?.includes('orderId=') ? (
+                    <button
+                      type="button"
+                      disabled={isConfirmingOrder}
+                      onClick={() => handleDirectConfirmOrder(activeAlert)}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-limeglow-400 px-5 py-2.5 text-xs font-extrabold text-forest-950 shadow-lime transition hover:bg-limeglow-300 disabled:opacity-50"
+                    >
+                      {isConfirmingOrder ? (
+                        <span>Validation en cours...</span>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 stroke-[2.5]" />
+                          <span>Confirmer en 1 clic</span>
+                        </>
+                      )}
+                    </button>
+                  ) : null}
+
+                  {activeAlert.targetPath ? (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAlertTarget(activeAlert)}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-forest-950 shadow-sm transition hover:bg-emerald-50"
+                    >
+                      <span>Ouvrir la page</span>
+                      <ChevronRight className="h-3.5 w-3.5 stroke-[2.5]" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
