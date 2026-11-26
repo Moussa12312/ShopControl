@@ -15,7 +15,7 @@ import { ControlPrismaService } from '../../common/database/control-prisma.servi
 import { ShopDatabaseManagerService } from '../../common/database/shop-database-manager.service';
 import { ShopScopeGuard } from '../../common/guards/shop-scope.guard';
 
-export type AnalyticsPeriod = 'daily' | 'weekly' | 'monthly';
+export type AnalyticsPeriod = 'today' | 'daily' | 'weekly' | 'monthly';
 
 interface PeriodBuckets {
   period: AnalyticsPeriod;
@@ -27,7 +27,7 @@ interface PeriodBuckets {
 
 function buildPeriodBuckets(rawPeriod?: string): PeriodBuckets {
   const period: AnalyticsPeriod =
-    rawPeriod === 'daily' || rawPeriod === 'weekly' || rawPeriod === 'monthly'
+    rawPeriod === 'today' || rawPeriod === 'daily' || rawPeriod === 'weekly' || rawPeriod === 'monthly'
       ? rawPeriod
       : 'monthly';
 
@@ -35,6 +35,34 @@ function buildPeriodBuckets(rawPeriod?: string): PeriodBuckets {
   const endOfToday = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0),
   );
+
+  if (period === 'today') {
+    const startOfToday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0),
+    );
+    const startOfYesterday = new Date(startOfToday.getTime() - 86_400_000);
+    return {
+      period: 'today',
+      currentStart: startOfToday,
+      previousStart: startOfYesterday,
+      buckets: [
+        {
+          key: startOfToday.toISOString().slice(0, 10),
+          label: "Aujourd'hui",
+          startMs: startOfToday.getTime(),
+          endMs: endOfToday.getTime(),
+        },
+      ],
+      prevBuckets: [
+        {
+          key: startOfYesterday.toISOString().slice(0, 10),
+          startMs: startOfYesterday.getTime(),
+          endMs: startOfToday.getTime(),
+        },
+      ],
+    };
+  }
+
   const bucketCount = period === 'daily' ? 7 : period === 'weekly' ? 8 : 10;
   const bucketDays = period === 'daily' ? 1 : period === 'weekly' ? 7 : 3;
   const bucketMs = bucketDays * 86_400_000;
@@ -77,7 +105,7 @@ export class AnalyticsService {
     private readonly shopDbManager: ShopDatabaseManagerService,
   ) {}
 
-  async getShopAnalytics(shopId: string, rawPeriod?: string) {
+  async getShopAnalytics(shopId: string, rawPeriod?: string, operatorId?: string) {
     const shop = await this.controlPrisma.shop.findUniqueOrThrow({
       where: { id: shopId },
       select: { id: true, name: true, slug: true, status: true, dbName: true, dbStatus: true, currency: true },
@@ -88,7 +116,7 @@ export class AnalyticsService {
       return this.emptyResponse(spec, [shop]);
     }
 
-    const data = await this.collectSingleShopMetrics(shop.id, shop.name, spec);
+    const data = await this.collectSingleShopMetrics(shop.id, shop.name, spec, operatorId);
     return this.buildResponse(spec, [data], 0);
   }
 
@@ -122,7 +150,12 @@ export class AnalyticsService {
     return this.buildResponse(spec, perShop, companyExpAgg._sum.amountXof ?? 0);
   }
 
-  private async collectSingleShopMetrics(shopId: string, shopName: string, spec: PeriodBuckets) {
+  private async collectSingleShopMetrics(
+    shopId: string,
+    shopName: string,
+    spec: PeriodBuckets,
+    operatorId?: string,
+  ) {
     const client = await this.shopDbManager.getClientForShop(shopId);
 
     const [
@@ -139,6 +172,7 @@ export class AnalyticsService {
         where: {
           status: 'COMPLETED',
           createdAt: { gte: spec.previousStart },
+          ...(operatorId ? { operatorId } : {}),
         },
         select: {
           id: true,
@@ -536,8 +570,12 @@ export class AnalyticsController {
   @UseGuards(ShopScopeGuard)
   @Roles('OWNER', 'AGENT')
   @ApiOperation({ summary: 'Analytique temps réel d’une boutique depuis sa base PostgreSQL dédiée' })
-  shopAnalytics(@Param('shopId') shopId: string, @Query('period') period?: string) {
-    return this.analyticsService.getShopAnalytics(shopId, period);
+  shopAnalytics(
+    @Param('shopId') shopId: string,
+    @Query('period') period?: string,
+    @Query('operatorId') operatorId?: string,
+  ) {
+    return this.analyticsService.getShopAnalytics(shopId, period, operatorId);
   }
 }
 

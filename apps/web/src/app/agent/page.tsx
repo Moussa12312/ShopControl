@@ -88,10 +88,13 @@ export default function AgentHomePage() {
     setLoading(true);
     setError(null);
     try {
+      const anQs = new URLSearchParams({ period: 'today' });
+      if (activeOperator?.id) anQs.set('operatorId', activeOperator.id);
+
       const [ov, ops, an, localMeta] = await Promise.all([
         apiFetch<ShopOverview>(`/shops/${shop.shopId}/overview`, { shopId: shop.shopId }),
         apiFetch<OperatorRow[]>(`/shops/${shop.shopId}/operators`, { shopId: shop.shopId }),
-        apiFetch<ShopAnalyticsMini>(`/shops/${shop.shopId}/analytics?period=daily`, {
+        apiFetch<ShopAnalyticsMini>(`/shops/${shop.shopId}/analytics?${anQs.toString()}`, {
           shopId: shop.shopId,
         }).catch(() => null),
         getLocalTerminalMeta(),
@@ -107,7 +110,7 @@ export default function AgentHomePage() {
     } finally {
       setLoading(false);
     }
-  }, [shop]);
+  }, [shop, activeOperator?.id]);
 
   useEffect(() => {
     void load();
@@ -214,10 +217,18 @@ export default function AgentHomePage() {
             <ShoppingBag className="h-4 w-4" />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] text-[#98b3ae]">Ventes récentes</p>
-            <p className="truncate text-base font-extrabold text-white tabular">
-              {formatXof(analytics?.kpis.currentSalesXof ?? 0)}
+            <p className="text-[11px] text-[#98b3ae]">
+              {activeOperator ? `Mes ventes d'aujourd'hui (${activeOperator.firstName})` : "Ventes d'aujourd'hui"}
             </p>
+            <div className="flex items-baseline gap-2">
+              <p className="truncate text-base font-extrabold text-white tabular">
+                {formatXof(analytics?.kpis.currentSalesXof ?? 0)}
+              </p>
+              <span className="text-xs font-semibold text-emerald-200/80">
+                · {analytics?.kpis.currentSalesCount ?? 0} vente(s)
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400">Remis à 0 chaque jour à minuit</p>
           </div>
         </div>
 

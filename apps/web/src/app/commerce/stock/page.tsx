@@ -942,17 +942,31 @@ export default function StockPage() {
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-[#1b3d3b] bg-[#091f1e] p-3.5 sm:p-4 text-white">
-                  <span className="text-[11px] font-bold text-white/50 uppercase tracking-wider">
-                    Valeur vente potentielle
-                  </span>
-                  <div className="mt-1 text-2xl font-black text-white font-mono">
-                    {formatXof(valuationData.summary.totalRetailValueXof)}
+                {isOwner ? (
+                  <div className="rounded-2xl border border-[#1b3d3b] bg-[#091f1e] p-3.5 sm:p-4 text-white">
+                    <span className="text-[11px] font-bold text-white/50 uppercase tracking-wider">
+                      Valeur vente potentielle
+                    </span>
+                    <div className="mt-1 text-2xl font-black text-white font-mono">
+                      {formatXof(valuationData.summary.totalRetailValueXof)}
+                    </div>
+                    <span className="mt-1 text-[11px] text-white/45 block">Prix public TTC</span>
                   </div>
-                  <span className="mt-1 text-[11px] text-white/45 block">Prix public TTC</span>
-                </div>
+                ) : (
+                  <div className="rounded-2xl border border-[#1b3d3b] bg-[#091f1e] p-3.5 sm:p-4 text-white">
+                    <span className="text-[11px] font-bold text-white/50 uppercase tracking-wider">
+                      Unités en réserve / rayon
+                    </span>
+                    <div className="mt-1 text-2xl font-black text-white font-mono">
+                      {valuationData.summary.totalUnitsPhysical}
+                    </div>
+                    <span className="mt-1 text-[11px] text-white/45 block">
+                      Physique total ({valuationData.summary.totalUnitsReserved} réservé)
+                    </span>
+                  </div>
+                )}
 
-                {valuationData.canReadCost && valuationData.summary.totalCostValueXof !== null ? (
+                {isOwner && valuationData.canReadCost && valuationData.summary.totalCostValueXof !== null ? (
                   <div className="rounded-2xl border border-[#1b3d3b] bg-[#091f1e] p-3.5 sm:p-4 text-white">
                     <span className="text-[11px] font-bold text-white/50 uppercase tracking-wider">
                       Valeur coût (CMP)
@@ -966,7 +980,7 @@ export default function StockPage() {
                       </span>
                     )}
                   </div>
-                ) : (
+                ) : !isOwner ? null : (
                   <div className="rounded-2xl border border-[#1b3d3b] bg-[#091f1e] p-3.5 sm:p-4 text-white">
                     <span className="text-[11px] font-bold text-white/50 uppercase tracking-wider">
                       Unités physiques
