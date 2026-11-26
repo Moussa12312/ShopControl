@@ -38,7 +38,16 @@ done
 
 # 4. Recharger la configuration Nginx
 docker exec unisphere_nginx nginx -s reload 2>/dev/null || true
-echo "Test immédiat du proxy..."
+echo "Attente du démarrage complet de ShopControl (migrations & serveur)..."
+for i in $(seq 1 30); do
+  if curl -sf -o /dev/null http://127.0.0.1:3200 2>/dev/null; then
+    echo "✅ Serveur local prêt !"
+    break
+  fi
+  sleep 2
+done
+
+echo "Test du proxy public HTTPS..."
 curl -I https://myshop.unisphere-ai.com || true
 
 echo "=========================================="
