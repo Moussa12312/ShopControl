@@ -70,4 +70,5 @@ volumes:
 
 networks:
   shopcontrol_net:
+    name: shopcontrol_net
     driver: bridge

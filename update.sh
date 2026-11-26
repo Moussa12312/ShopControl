@@ -17,8 +17,9 @@ echo "[3/4] Redémarrage en tâche de fond..."
 docker compose -f docker-compose.contabo.yml up -d
 
 echo "[4/4] Reconnexion au réseau Nginx & Rechargement du proxy..."
-# 1. Connecter unisphere_nginx au réseau interne shopcontrol_net
+# 1. Connecter unisphere_nginx aux réseaux de shopcontrol
 docker network connect shopcontrol_net unisphere_nginx 2>/dev/null || true
+docker network connect shopcontrol_shopcontrol_net unisphere_nginx 2>/dev/null || true
 
 # 2. Connecter shopcontrol_app à chaque réseau de unisphere_nginx
 for net in $(docker inspect unisphere_nginx --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' 2>/dev/null); do
@@ -27,8 +28,17 @@ for net in $(docker inspect unisphere_nginx --format '{{range $k,$v := .NetworkS
   fi
 done
 
-# 3. Recharger la configuration Nginx
+# 3. Connecter unisphere_nginx à chaque réseau de shopcontrol_app
+for net in $(docker inspect shopcontrol_app --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' 2>/dev/null); do
+  if [ -n "$net" ]; then
+    docker network connect "$net" unisphere_nginx 2>/dev/null || true
+  fi
+done
+
+# 4. Recharger la configuration Nginx
 docker exec unisphere_nginx nginx -s reload 2>/dev/null || true
+echo "Test immédiat du proxy..."
+curl -I https://shopcontrol.duckdns.org || true
 
 echo "=========================================="
 echo "✅ Mise à jour terminée avec succès !"
