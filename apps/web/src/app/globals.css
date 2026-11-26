@@ -9,12 +9,6 @@
     overscroll-behavior-y: none;
   }
 
-  /* Dézoom standardisé élégant (90%) sur grand écran (PC / Laptop) pour une vue aérée et professionnelle */
-  @media (min-width: 1024px) {
-    html {
-      zoom: 90%;
-    }
-  }
 
   body {
     @apply min-h-screen w-full bg-[#ebf2ef] text-slate-900 antialiased;
