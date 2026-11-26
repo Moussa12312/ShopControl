@@ -55,7 +55,7 @@ services:
       JWT_REFRESH_SECRET: "1a2b3c4d5e6f7081920a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcd"
       TOTP_ENCRYPTION_KEY: "a3f9c2e81b4d70659f1234a8c7e6d5b49012ef34ab56cd7890ef1234567890ab"
       COOKIE_SECURE: "true"
-      CORS_ORIGINS: "http://169.58.101.183:3200,https://shopcontrol.duckdns.org"
+      CORS_ORIGINS: "http://169.58.101.183:3200,https://shopcontrol.duckdns.org,https://myshop.unisphere-ai.com"
       BOOTSTRAP_SUPER_ADMIN_EMAIL: "chakirunisphereai@gmail.com"
       BOOTSTRAP_SUPER_ADMIN_PASSWORD: "ShopControl@2026!"
       BOOTSTRAP_SUPER_ADMIN_NAME: "Moussa Coulibaly"
