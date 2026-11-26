@@ -39,7 +39,7 @@ done
 # 4. Recharger la configuration Nginx
 docker exec unisphere_nginx nginx -s reload 2>/dev/null || true
 echo "Test immédiat du proxy..."
-curl -I https://shopcontrol.duckdns.org || true
+curl -I https://myshop.unisphere-ai.com || true
 
 echo "=========================================="
 echo "✅ Mise à jour terminée avec succès !"
