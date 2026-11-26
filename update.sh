@@ -14,6 +14,7 @@ echo "[2/4] Compilation du service shopcontrol_app..."
 docker compose -f docker-compose.contabo.yml build shopcontrol_app
 
 echo "[3/4] Redémarrage en tâche de fond..."
+docker network disconnect -f shopcontrol_shopcontrol_net unisphere_nginx 2>/dev/null || true
 docker compose -f docker-compose.contabo.yml up -d
 
 echo "[4/4] Reconnexion au réseau Nginx & Rechargement du proxy..."
