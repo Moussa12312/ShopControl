@@ -1340,16 +1340,20 @@ export default function ProductsPage() {
 
             {/* Tableau desktop (>= md) */}
             <div className="sc-card hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[960px] table-auto divide-y divide-slate-200 text-sm">
+              <table className="w-full min-w-[920px] table-auto divide-y divide-slate-200 text-sm">
                 <thead className="bg-porcelain-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-4 py-3.5 whitespace-nowrap min-w-[220px]">Produit & Catégorie</th>
-                    <th className="px-4 py-3.5 whitespace-nowrap min-w-[150px]">Caractéristiques</th>
-                    <th className="px-4 py-3.5 whitespace-nowrap min-w-[110px]">Prix vente</th>
-                    {canReadCost ? <th className="px-4 py-3.5 whitespace-nowrap min-w-[110px]">Coût (CMP)</th> : null}
-                    <th className="px-4 py-3.5 whitespace-nowrap min-w-[110px]">Stock dispo</th>
-                    <th className="px-4 py-3.5 whitespace-nowrap min-w-[90px]">Vitrine</th>
-                    {canEdit || canDelete ? <th className="px-4 py-3.5 text-right whitespace-nowrap min-w-[220px]">Action</th> : null}
+                    <th className="px-3.5 py-3.5 whitespace-nowrap min-w-[200px]">Produit & Catégorie</th>
+                    <th className="px-3 py-3.5 whitespace-nowrap min-w-[140px]">Caractéristiques</th>
+                    <th className="px-3 py-3.5 whitespace-nowrap min-w-[100px]">Prix vente</th>
+                    {canReadCost ? <th className="px-3 py-3.5 whitespace-nowrap min-w-[100px]">Coût (CMP)</th> : null}
+                    <th className="px-3 py-3.5 whitespace-nowrap min-w-[95px]">Stock dispo</th>
+                    <th className="px-3 py-3.5 whitespace-nowrap min-w-[80px]">Vitrine</th>
+                    {canEdit || canDelete ? (
+                      <th className="sticky right-0 z-10 bg-porcelain-50 px-3.5 py-3.5 text-right whitespace-nowrap min-w-[190px] shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.08)]">
+                        Action
+                      </th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1464,42 +1468,42 @@ export default function ProductsPage() {
                             {PRODUCT_STATUS_LABELS[p.status]}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <td className="sticky right-0 z-10 bg-white/95 backdrop-blur-xs px-3 py-2.5 text-right shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.08)] group-hover:bg-porcelain-50/95 transition">
+                          <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => setPreviewProduct(p)}
-                              className="sc-btn-ghost px-2.5 py-1.5 text-xs font-semibold"
+                              className="sc-btn-ghost px-2 py-1 text-xs font-semibold"
                               title="Aperçu rapide"
                             >
                               <Eye className="h-3.5 w-3.5 text-brand-700" />
-                              Aperçu
+                              <span className="hidden xl:inline">Aperçu</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => setBarcodeTarget(p)}
-                              className="sc-btn-ghost px-2.5 py-1.5 text-xs"
+                              className="sc-btn-ghost px-2 py-1 text-xs"
                               title="Imprimer les étiquettes code-barres"
                             >
                               <Printer className="h-3.5 w-3.5" />
-                              Étiquettes
+                              <span className="hidden xl:inline">Étiquettes</span>
                             </button>
                             {canEdit ? (
                               <button
                                 type="button"
                                 onClick={() => openEdit(p)}
-                                className="sc-btn-ghost px-2.5 py-1.5 text-xs"
+                                className="sc-btn-ghost flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-forest-950 transition hover:bg-slate-200"
                                 title="Modifier le produit"
                               >
-                                <Pencil className="h-3.5 w-3.5" />
-                                Modifier
+                                <Pencil className="h-3.5 w-3.5 text-forest-800" />
+                                <span>Modifier</span>
                               </button>
                             ) : null}
                             {canDelete ? (
                               <button
                                 type="button"
                                 onClick={() => setDeleteTarget(p)}
-                                className="sc-btn-ghost px-2 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
+                                className="sc-btn-ghost p-1.5 text-xs text-rose-600 hover:bg-rose-50"
                                 title="Supprimer ou archiver ce produit"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />

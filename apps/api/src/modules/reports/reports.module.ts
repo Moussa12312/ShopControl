@@ -147,7 +147,7 @@ export class ReportsService {
       }),
       client.product.findMany({
         where: { status: { not: 'ARCHIVED' } },
-        select: { alertThreshold: true, stockBalances: { where: { variantKey: 'BASE' } } },
+        select: { alertThreshold: true, stockBalances: true },
       }),
       client.onlineOrder.count({
         where: { status: { in: ['NEW', 'CONFIRMED', 'PREPARING', 'READY', 'IN_DELIVERY'] } },
@@ -208,8 +208,13 @@ export class ReportsService {
     const openCashSessionsCount = cashSessions.filter((c) => c.status === 'OPEN').length;
     const cashDiscrepancyTotalXof = cashSessions.reduce((a, c) => a + (c.discrepancyXof ?? 0), 0);
     const lowStockCount = products.filter((p) => {
-      const bal = p.stockBalances[0];
-      const avail = (bal?.physicalQty ?? 0) - (bal?.reservedQty ?? 0);
+      let totalPhys = 0;
+      let totalRes = 0;
+      for (const bal of p.stockBalances) {
+        totalPhys += bal.physicalQty;
+        totalRes += bal.reservedQty;
+      }
+      const avail = totalPhys - totalRes;
       return avail <= p.alertThreshold;
     }).length;
 

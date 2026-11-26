@@ -193,8 +193,28 @@ export function AppShell({
     logout,
   } = useAuth();
 
-  // Sidebar fermé par défaut sur desktop et rétractable sur mobile
-  const [expanded, setExpanded] = useState(false);
+  // Sidebar ouvert par défaut sur grand écran (>= 1024px) avec mémorisation locale
+  const [expanded, setExpandedState] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = localStorage.getItem('shopcontrol_sidebar_expanded');
+    if (saved !== null) {
+      setExpandedState(saved === 'true');
+    } else {
+      setExpandedState(window.innerWidth >= 1024);
+    }
+  }, []);
+
+  const setExpanded = (valueOrFn: boolean | ((prev: boolean) => boolean)) => {
+    setExpandedState((prev) => {
+      const next = typeof valueOrFn === 'function' ? valueOrFn(prev) : valueOrFn;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('shopcontrol_sidebar_expanded', String(next));
+      }
+      return next;
+    });
+  };
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileCollapsed, setMobileCollapsed] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);

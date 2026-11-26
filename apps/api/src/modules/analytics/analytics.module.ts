@@ -174,7 +174,8 @@ export class AnalyticsService {
         where: { status: { not: 'ARCHIVED' } },
         include: {
           category: { select: { name: true } },
-          stockBalances: { where: { variantKey: 'BASE' } },
+          variants: { where: { isActive: true }, select: { id: true, alertThreshold: true } },
+          stockBalances: true,
         },
         orderBy: { name: 'asc' },
       }),
@@ -278,16 +279,47 @@ export class AnalyticsService {
     let outOfStockCount = 0;
 
     const productRows = products.map((p) => {
-      const bal = p.stockBalances[0];
-      const available = (bal?.physicalQty ?? 0) - (bal?.reservedQty ?? 0);
+      const activeVars = p.variants || [];
+      const hasVars = activeVars.length > 0;
+
+      let totalPhysical = 0;
+      let totalReserved = 0;
+      for (const bal of p.stockBalances) {
+        totalPhysical += bal.physicalQty;
+        totalReserved += bal.reservedQty;
+      }
+      const available = totalPhysical - totalReserved;
+
       let health: 'OK' | 'LOW' | 'CRITICAL' = 'OK';
-      if (available <= 0) {
-        health = 'CRITICAL';
-        outOfStockCount += 1;
-        lowStockCount += 1;
-      } else if (available <= p.alertThreshold) {
-        health = 'LOW';
-        lowStockCount += 1;
+      if (hasVars) {
+        if (available <= 0) {
+          health = 'CRITICAL';
+          outOfStockCount += 1;
+          lowStockCount += 1;
+        } else {
+          const hasOutOfStockVariant = activeVars.some((v) => {
+            const vBal = p.stockBalances.find((b) => b.variantKey === v.id);
+            return ((vBal?.physicalQty ?? 0) - (vBal?.reservedQty ?? 0)) <= 0;
+          });
+          if (available <= p.alertThreshold) {
+            health = 'LOW';
+            lowStockCount += 1;
+          } else if (hasOutOfStockVariant) {
+            health = 'LOW';
+            lowStockCount += 1;
+          }
+        }
+      } else {
+        const bal = p.stockBalances.find((b) => b.variantKey === 'BASE') || p.stockBalances[0];
+        const baseAvail = (bal?.physicalQty ?? 0) - (bal?.reservedQty ?? 0);
+        if (baseAvail <= 0) {
+          health = 'CRITICAL';
+          outOfStockCount += 1;
+          lowStockCount += 1;
+        } else if (baseAvail <= p.alertThreshold) {
+          health = 'LOW';
+          lowStockCount += 1;
+        }
       }
 
       const imgs = Array.isArray(p.imageUrls) ? (p.imageUrls as string[]) : [];
