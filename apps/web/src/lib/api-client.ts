@@ -142,7 +142,24 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     try {
       parsed = JSON.parse(rawText);
     } catch {
-      parsed = { message: rawText };
+      // Détection des erreurs Nginx / Reverse Proxy (502 Bad Gateway, 503, 504) ou HTML brut
+      if (
+        response.status === 502 ||
+        response.status === 503 ||
+        response.status === 504 ||
+        rawText.includes('<html') ||
+        rawText.includes('Bad Gateway')
+      ) {
+        parsed = {
+          code: 'SERVER_BOOTING',
+          message:
+            'Le serveur est en cours de redémarrage ou de synchronisation. Veuillez patienter quelques instants et cliquer sur Réessayer.',
+        };
+      } else {
+        // Élimine toute balise HTML parasite pour un message propre
+        const cleanMsg = rawText.replace(/<[^>]*>/g, '').trim();
+        parsed = { message: cleanMsg || 'Une erreur est survenue lors de la communication avec le serveur.' };
+      }
     }
   }
 
