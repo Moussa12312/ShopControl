@@ -667,7 +667,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                 {isOpenNow ? 'Ouverte' : 'Fermée'}
               </p>
               {shop.address || shop.phone ? (
-                <p className="hidden truncate text-[11px] text-emerald-200/70 sm:block">
+                <p className="hidden truncate text-[11px] text-blue-200/70 sm:block">
                   {[shop.address, shop.phone].filter(Boolean).join(' · ')}
                 </p>
               ) : null}
@@ -729,7 +729,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
       <section className="obsidian-hero px-3 pb-6 pt-4 text-white sm:px-6">
         <div className="mx-auto max-w-6xl space-y-3.5">
           {shop.slogan || shop.address || shop.phone ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-emerald-100/80">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-blue-100/80">
               {shop.slogan ? <p className="min-w-0 break-words font-medium text-white">{shop.slogan}</p> : <span />}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
                 {shop.address ? (
@@ -750,13 +750,13 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
 
           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
             <div className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-200/60" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-200/60" />
               <input
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Rechercher un produit…"
-                className="w-full rounded-xl border border-white/15 bg-white/10 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-emerald-200/60 focus:border-limeglow-400 focus:bg-white/15"
+                className="w-full rounded-xl border border-white/15 bg-white/10 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-blue-200/60 focus:border-limeglow-400 focus:bg-white/15"
               />
             </div>
 
@@ -768,7 +768,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                   className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition ${
                     catId === ''
                       ? 'bg-white text-forest-950'
-                      : 'bg-white/10 text-emerald-100 hover:bg-white/20'
+                      : 'bg-white/10 text-blue-100 hover:bg-white/20'
                   }`}
                 >
                   Tout ({products.length})
@@ -781,7 +781,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                     className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition ${
                       catId === c.id
                         ? 'bg-white text-forest-950'
-                        : 'bg-white/10 text-emerald-100 hover:bg-white/20'
+                        : 'bg-white/10 text-blue-100 hover:bg-white/20'
                     }`}
                   >
                     {c.name}
@@ -797,7 +797,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
             <div className="flex flex-col gap-2 border-t border-white/10 pt-2.5 text-xs sm:flex-row sm:flex-wrap sm:items-center">
               {profile.enableSizes && allSizes.length > 0 ? (
                 <div className="flex w-full max-w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 sm:w-auto sm:pb-0">
-                  <span className="shrink-0 text-[11px] font-bold text-emerald-200/80">
+                  <span className="shrink-0 text-[11px] font-bold text-blue-200/80">
                     Taille :
                   </span>
                   <button
@@ -830,7 +830,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
 
               {profile.enableColors && allColors.length > 0 ? (
                 <div className="flex w-full max-w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 sm:w-auto sm:pb-0">
-                  <span className="shrink-0 text-[11px] font-bold text-emerald-200/80">
+                  <span className="shrink-0 text-[11px] font-bold text-blue-200/80">
                     Couleur :
                   </span>
                   <button

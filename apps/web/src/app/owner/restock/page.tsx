@@ -239,7 +239,7 @@ export default function OwnerRestockPage() {
           <h1 className="text-lg font-extrabold tracking-tight text-white sm:text-xl">
             Réapprovisionnement
           </h1>
-          <p className="text-[11px] text-emerald-200/70">
+          <p className="text-[11px] text-blue-200/80">
             Déficits de stock & commandes grossistes
           </p>
         </div>
@@ -258,21 +258,21 @@ export default function OwnerRestockPage() {
       {/* 3 Cartes KPI compactes adaptées smartphone */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-3">
         <div className="sc-dark-glass p-2.5 sm:p-3.5 rounded-xl text-center sm:text-left">
-          <p className="text-[10px] sm:text-[11px] font-medium text-[#98b3ae]">À réappro</p>
+          <p className="text-[10px] sm:text-[11px] font-medium text-slate-300">À réappro</p>
           <p className="mt-0.5 text-base sm:text-xl font-extrabold text-amber-400 tabular">
             {restockSuggestions.length}
           </p>
         </div>
 
         <div className="sc-dark-glass p-2.5 sm:p-3.5 rounded-xl text-center sm:text-left">
-          <p className="text-[10px] sm:text-[11px] font-medium text-[#98b3ae]">Volume</p>
+          <p className="text-[10px] sm:text-[11px] font-medium text-slate-300">Volume</p>
           <p className="mt-0.5 text-base sm:text-xl font-extrabold text-white tabular">
             {restockSuggestions.reduce((sum, item) => sum + item.suggestedQty, 0)}
           </p>
         </div>
 
         <div className="lime-glow-card p-2.5 sm:p-3.5 rounded-xl border border-limeglow-400/30 text-center sm:text-left">
-          <p className="text-[10px] sm:text-[11px] font-medium text-emerald-100/90">Budget est.</p>
+          <p className="text-[10px] sm:text-[11px] font-medium text-sky-100/90">Budget est.</p>
           <p className="mt-0.5 text-xs sm:text-lg font-extrabold text-limeglow-300 tabular truncate">
             {formatXof(
               restockSuggestions.reduce(

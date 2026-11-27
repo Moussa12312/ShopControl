@@ -660,7 +660,7 @@ export function AppShell({
                 <p className="truncate text-[13px] font-bold tracking-tight text-white">
                   {brandTitle}
                 </p>
-                <p className="truncate text-[10px] text-emerald-200/65">{brandSubtitle}</p>
+                <p className="truncate text-[10px] text-blue-200/70">{brandSubtitle}</p>
               </div>
             ) : null}
           </Link>
@@ -669,7 +669,7 @@ export function AppShell({
               type="button"
               onClick={() => setMobileOpen(false)}
               aria-label="Fermer le menu"
-              className="rounded-lg p-1.5 text-emerald-200/70 hover:bg-white/10 hover:text-white lg:hidden"
+              className="rounded-lg p-1.5 text-blue-200/70 hover:bg-white/10 hover:text-white lg:hidden"
             >
               <X className="h-4 w-4" />
             </button>
@@ -685,7 +685,7 @@ export function AppShell({
                 onClick={() => handleSwitchOwnerMode('supervision')}
                 className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition ${ownerMode === 'supervision'
                   ? 'bg-limeglow-400 text-forest-950 font-bold'
-                  : 'text-emerald-200/75 hover:text-white'
+                  : 'text-blue-200/75 hover:text-white'
                   }`}
               >
                 <Eye className="h-3.5 w-3.5" />
@@ -696,7 +696,7 @@ export function AppShell({
                 onClick={() => handleSwitchOwnerMode('management')}
                 className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition ${ownerMode === 'management'
                   ? 'bg-limeglow-400 text-forest-950 font-bold'
-                  : 'text-emerald-200/75 hover:text-white'
+                  : 'text-blue-200/75 hover:text-white'
                   }`}
               >
                 <Wrench className="h-3.5 w-3.5" />
@@ -711,7 +711,7 @@ export function AppShell({
           {groupedNav.map((section) => (
             <div key={section.group} className="space-y-0.5">
               {showLabels ? (
-                <p className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-200/40">
+                <p className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-blue-200/40">
                   {section.group}
                 </p>
               ) : null}
@@ -726,7 +726,7 @@ export function AppShell({
                     title={!showLabels ? item.label : undefined}
                     className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[12.5px] font-medium transition-all ${active
                       ? 'bg-white font-semibold text-forest-950 shadow-xs'
-                      : 'text-[#8aa8a2] hover:bg-white/[0.08] hover:text-white'
+                      : 'text-slate-400 hover:bg-white/[0.08] hover:text-white'
                       } ${!showLabels ? 'justify-center px-0' : ''}`}
                   >
                     <Icon className={`h-[17px] w-[17px] shrink-0 ${active ? 'text-brand-700' : ''}`} />
@@ -745,7 +745,7 @@ export function AppShell({
             onClick={() => setMobileCollapsed((v) => !v)}
             aria-label={mobileCollapsed ? 'Déplier le menu mobile' : 'Réduire le menu mobile'}
             title={mobileCollapsed ? 'Déplier' : 'Réduire'}
-            className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-[#8aa8a2] transition hover:bg-white/10 hover:text-white lg:hidden ${mobileCollapsed ? 'justify-center px-0' : ''
+            className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-slate-400 transition hover:bg-white/10 hover:text-white lg:hidden ${mobileCollapsed ? 'justify-center px-0' : ''
               }`}
           >
             {mobileCollapsed ? (
@@ -764,7 +764,7 @@ export function AppShell({
               onClick={() => setMobileOpen(false)}
               aria-label="Fermer le menu"
               title="Fermer le menu"
-              className="flex w-full items-center justify-center rounded-xl py-2 text-xs font-medium text-emerald-200/75 transition hover:bg-white/10 hover:text-white lg:hidden"
+              className="flex w-full items-center justify-center rounded-xl py-2 text-xs font-medium text-blue-200/75 transition hover:bg-white/10 hover:text-white lg:hidden"
             >
               <X className="h-4 w-4 shrink-0" />
             </button>
@@ -775,7 +775,7 @@ export function AppShell({
             onClick={() => setExpanded((v) => !v)}
             aria-label={expanded ? 'Replier le menu' : 'Ouvrir le menu'}
             title={expanded ? 'Replier' : 'Déplier le menu'}
-            className={`hidden w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-[#8aa8a2] transition hover:bg-white/10 hover:text-white lg:flex ${!expanded ? 'justify-center px-0' : ''
+            className={`hidden w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-slate-400 transition hover:bg-white/10 hover:text-white lg:flex ${!expanded ? 'justify-center px-0' : ''
               }`}
           >
             {expanded ? (
@@ -828,7 +828,7 @@ export function AppShell({
             <p className="truncate text-[13px] font-bold tracking-tight text-white sm:text-sm">
               {pageTitle}
             </p>
-            <p className="hidden truncate text-[11px] text-emerald-200/65 md:block">
+            <p className="hidden truncate text-[11px] text-blue-200/70 md:block">
               {brandTitle}
               {user.role === 'AGENT' && activeOperator ? ` · Op. ${activeOperator.firstName}` : ''}
             </p>
@@ -849,7 +849,7 @@ export function AppShell({
                 onClick={() => handleSwitchOwnerMode('supervision')}
                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition ${ownerMode === 'supervision'
                   ? 'bg-white text-forest-950 font-bold shadow-xs'
-                  : 'text-[#8aa8a2] hover:text-white'
+                  : 'text-slate-400 hover:text-white'
                   }`}
               >
                 <Eye className="h-3 w-3" />
@@ -860,7 +860,7 @@ export function AppShell({
                 onClick={() => handleSwitchOwnerMode('management')}
                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition ${ownerMode === 'management'
                   ? 'bg-white text-forest-950 font-bold shadow-xs'
-                  : 'text-[#8aa8a2] hover:text-white'
+                  : 'text-slate-400 hover:text-white'
                   }`}
               >
                 <Wrench className="h-3 w-3" />
@@ -912,7 +912,7 @@ export function AppShell({
                 setProfileOpen(false);
               }}
               aria-label="Centre de notifications"
-              className="relative flex h-9 w-9 items-center justify-center rounded-full bg-forest-800 text-emerald-100 ring-1 ring-white/10 transition hover:bg-forest-700"
+              className="relative flex h-9 w-9 items-center justify-center rounded-full bg-forest-800 text-blue-100 ring-1 ring-white/10 transition hover:bg-forest-700"
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 ? (
@@ -998,7 +998,7 @@ export function AppShell({
               <span className="hidden max-w-[100px] truncate text-xs font-semibold text-white sm:inline">
                 {user.fullName.split(' ')[0]}
               </span>
-              <ChevronDown className="h-3.5 w-3.5 text-emerald-200/70" />
+              <ChevronDown className="h-3.5 w-3.5 text-blue-200/70" />
             </button>
 
             {profileOpen ? (
@@ -1192,7 +1192,7 @@ export function AppShell({
                     {title || pageTitle}
                   </h1>
                   {subtitle ? (
-                    <p className="mt-0.5 line-clamp-2 text-[11px] text-emerald-200/75 sm:text-xs">
+                    <p className="mt-0.5 line-clamp-2 text-[11px] text-blue-200/75 sm:text-xs">
                       {subtitle}
                     </p>
                   ) : null}
@@ -1220,7 +1220,7 @@ export function AppShell({
         {/* Dock mobile natif fixé en bas (< lg) — Obsidian Emerald (se rétracte à l'ouverture du clavier virtuel) */}
         <nav
           aria-label="Navigation rapide mobile"
-          className={`no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950 px-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 text-[10px] font-semibold text-[#8aa8a2] transition-all duration-200 ease-out lg:hidden ${keyboardVisible ? 'translate-y-full pointer-events-none opacity-0 invisible' : 'translate-y-0 opacity-100 visible'
+          className={`no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950 px-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 text-[10px] font-semibold text-slate-400 transition-all duration-200 ease-out lg:hidden ${keyboardVisible ? 'translate-y-full pointer-events-none opacity-0 invisible' : 'translate-y-0 opacity-100 visible'
             }`}
         >
           {mobileDockItems.map((item) => {
@@ -1272,11 +1272,11 @@ export function AppShell({
 
             {confirmSuccessMsg ? (
               <div className="py-8 text-center animate-in zoom-in-95 duration-200">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/20 text-limeglow-400 ring-2 ring-limeglow-400/40">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-500/20 text-limeglow-400 ring-2 ring-limeglow-400/40">
                   <CheckCircle2 className="h-10 w-10" />
                 </div>
                 <h3 className="mt-4 text-lg font-bold text-white">Action effectuée !</h3>
-                <p className="mt-1 text-sm text-emerald-100/90">{confirmSuccessMsg}</p>
+                <p className="mt-1 text-sm text-blue-100/90">{confirmSuccessMsg}</p>
               </div>
             ) : (
               <div>
@@ -1319,10 +1319,10 @@ export function AppShell({
                 </div>
 
                 <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-sm font-medium leading-relaxed text-emerald-50">
+                  <p className="text-sm font-medium leading-relaxed text-blue-50">
                     {activeAlert.message}
                   </p>
-                  <p className="mt-2 text-[11px] font-semibold text-emerald-200/60">
+                  <p className="mt-2 text-[11px] font-semibold text-blue-200/60">
                     Arrivée à l'instant · Visible sur tous les écrans
                   </p>
                 </div>
@@ -1340,7 +1340,7 @@ export function AppShell({
                   <button
                     type="button"
                     onClick={() => handleAlertMarkAsRead(activeAlert)}
-                    className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-xs font-semibold text-emerald-200 transition hover:bg-white/15 hover:text-white"
+                    className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-xs font-semibold text-blue-200 transition hover:bg-white/15 hover:text-white"
                   >
                     Marquer comme lu
                   </button>
@@ -1369,7 +1369,7 @@ export function AppShell({
                     <button
                       type="button"
                       onClick={() => handleOpenAlertTarget(activeAlert)}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-forest-950 shadow-sm transition hover:bg-emerald-50"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-forest-950 shadow-sm transition hover:bg-blue-50"
                     >
                       <span>Ouvrir la page</span>
                       <ChevronRight className="h-3.5 w-3.5 stroke-[2.5]" />
