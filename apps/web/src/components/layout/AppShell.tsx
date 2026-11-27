@@ -242,44 +242,26 @@ export function AppShell({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleFocusIn = (e: FocusEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable)
-      ) {
-        setKeyboardVisible(true);
-      }
+    const checkKeyboard = () => {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.tagName === 'SELECT' ||
+          (activeEl as HTMLElement).isContentEditable);
+      const vv = window.visualViewport;
+      const isVvShrunk = Boolean(vv && window.innerHeight - vv.height > 120);
+      setKeyboardVisible(Boolean(isInput || isVvShrunk));
     };
 
-    const handleFocusOut = () => {
-      setKeyboardVisible(false);
-    };
-
-    const vv = window.visualViewport;
-    const handleViewportResize = () => {
-      if (vv) {
-        // Sur Android et iOS, l'ouverture du clavier réduit significativement la hauteur visible
-        const isKeyboard = window.innerHeight - vv.height > 150;
-        setKeyboardVisible(isKeyboard);
-      }
-    };
-
-    window.addEventListener('focusin', handleFocusIn);
-    window.addEventListener('focusout', handleFocusOut);
-    if (vv) {
-      vv.addEventListener('resize', handleViewportResize);
-    }
+    window.addEventListener('focusin', checkKeyboard);
+    window.addEventListener('focusout', () => setTimeout(checkKeyboard, 80));
+    window.visualViewport?.addEventListener('resize', checkKeyboard);
 
     return () => {
-      window.removeEventListener('focusin', handleFocusIn);
-      window.removeEventListener('focusout', handleFocusOut);
-      if (vv) {
-        vv.removeEventListener('resize', handleViewportResize);
-      }
+      window.removeEventListener('focusin', checkKeyboard);
+      window.visualViewport?.removeEventListener('resize', checkKeyboard);
     };
   }, []);
 
@@ -1241,23 +1223,21 @@ export function AppShell({
           </div>
 
         {/* Zone principale scrollable */}
-        <main className="w-full min-w-0 flex-1 overflow-x-clip overscroll-none p-3 pb-24 sm:p-5 sm:pb-24 lg:p-6 lg:pb-8">
+        <main
+          className={`w-full min-w-0 flex-1 overflow-x-clip overscroll-none ${
+            pathname === '/messaging' || pathname?.startsWith('/messaging')
+              ? 'p-1.5 sm:p-5 pb-2 sm:pb-8'
+              : 'p-2 sm:p-5 pb-20 sm:pb-24 lg:p-6 lg:pb-8'
+          }`}
+        >
           {children}
-
-          {/* Signature entreprise en indice en bas de page */}
-          <footer className="no-print mt-10 border-t border-slate-200/70 pt-3 text-center text-[11px] text-slate-400">
-            <span>Propulsé par </span>
-            <sub className="bottom-[-0.18em] text-[10px] font-semibold tracking-wide text-slate-500">
-              Chakir’s Entreprise
-            </sub>
-          </footer>
         </main>
 
         {/* Dock mobile natif fixé en bas (< lg) — Obsidian Emerald (se rétracte à l'ouverture du clavier virtuel) */}
         <nav
           aria-label="Navigation rapide mobile"
           className={`no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950 px-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 text-[10px] font-semibold text-[#8aa8a2] transition-all duration-200 ease-out lg:hidden ${
-            keyboardVisible ? 'translate-y-full pointer-events-none opacity-0' : 'translate-y-0 opacity-100'
+            keyboardVisible ? 'translate-y-full pointer-events-none opacity-0 invisible' : 'translate-y-0 opacity-100 visible'
           }`}
         >
           {mobileDockItems.map((item) => {

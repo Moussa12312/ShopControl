@@ -240,30 +240,30 @@ export default function OwnerDashboardPage() {
         </div>
       </div>
 
-      {/* 4 cartes KPI Obsidian Glass + Lime Glow sur 1 rangée desktop */}
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 4 cartes KPI en 2x2 compact sur mobile et 4 colonnes sur desktop */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         {/* Carte 1 : Ventes du jour / période */}
-        <div className="sc-dark-glass min-w-0 p-3.5">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500/20 text-limeglow-400 ring-1 ring-brand-400/25">
-              <ShoppingBag className="h-4 w-4" />
+        <div className="sc-dark-glass min-w-0 p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl flex flex-col justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-brand-500/20 text-limeglow-400 ring-1 ring-brand-400/25">
+              <ShoppingBag className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </span>
             <div className="min-w-0">
-              <p className="text-[11px] font-medium text-[#98b3ae]">
+              <p className="truncate text-[10px] sm:text-[11px] font-medium text-[#98b3ae]">
                 {period === 'daily'
-                  ? 'Ventes du jour'
+                  ? 'Ventes jour'
                   : period === 'weekly'
-                    ? 'Ventes de la semaine'
-                    : 'Ventes du mois'}
+                    ? 'Ventes sem.'
+                    : 'Ventes mois'}
               </p>
-              <p className="truncate text-base font-extrabold tracking-tight text-white tabular sm:text-lg">
+              <p className="truncate text-sm sm:text-lg font-extrabold tracking-tight text-white tabular">
                 {formatXof(kpis?.currentSalesXof ?? 0)}
               </p>
             </div>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10px] sm:text-[11px]">
             <TrendingUp
-              className={`h-3.5 w-3.5 shrink-0 ${
+              className={`h-3 w-3 shrink-0 ${
                 (kpis?.salesDeltaPercent ?? 0) >= 0 ? 'text-limeglow-400' : 'text-rose-400'
               }`}
             />
@@ -275,32 +275,20 @@ export default function OwnerDashboardPage() {
               {(kpis?.salesDeltaPercent ?? 0) >= 0 ? '+' : ''}
               {kpis?.salesDeltaPercent ?? 0}%
             </span>
-            <span className="text-[#8aa8a2]">· {kpis?.currentSalesCount ?? 0} vente(s)</span>
-            {(kpis?.refundsXof ?? 0) > 0 ? (
-              <span className="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-200">
-                -{formatXof(kpis?.refundsXof ?? 0)} remb.
-              </span>
-            ) : null}
+            <span className="text-[#8aa8a2]">· {kpis?.currentSalesCount ?? 0} v.</span>
           </div>
         </div>
 
         {/* Carte 2 : Bénéfice net réel */}
-        <div className="sc-dark-glass min-w-0 p-3.5">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-200">
-              <BarChart3 className="h-4 w-4" />
+        <div className="sc-dark-glass min-w-0 p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl flex flex-col justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-white/10 text-emerald-200">
+              <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </span>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="text-[11px] font-medium text-[#98b3ae]">Bénéfice net réel</p>
-                {kpis?.isEstimated ? (
-                  <span className="rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-200">
-                    Estimé
-                  </span>
-                ) : null}
-              </div>
+              <p className="truncate text-[10px] sm:text-[11px] font-medium text-[#98b3ae]">Bénéfice net</p>
               <p
-                className={`truncate text-base font-extrabold tracking-tight tabular sm:text-lg ${
+                className={`truncate text-sm sm:text-lg font-extrabold tracking-tight tabular ${
                   (kpis?.estimatedNetProfitXof ?? 0) >= 0 ? 'text-white' : 'text-rose-300'
                 }`}
               >
@@ -308,77 +296,72 @@ export default function OwnerDashboardPage() {
               </p>
             </div>
           </div>
-          <p className="mt-2 truncate text-[11px] text-[#8aa8a2]">
+          <p className="mt-1.5 truncate text-[10px] sm:text-[11px] text-[#8aa8a2]">
             Marge : <strong className="text-emerald-200 tabular">{formatXof(kpis?.grossMarginXof ?? 0)}</strong>
-            {' · '}Dép. : <strong className="text-white tabular">{formatXof(kpis?.expensesXof ?? 0)}</strong>
           </p>
         </div>
 
         {/* Carte 3 : Alertes urgentes de stock */}
-        <div className="sc-dark-glass min-w-0 p-3.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/25">
-                <AlertTriangle className="h-4 w-4" />
+        <div className="sc-dark-glass min-w-0 p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/25">
+                <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
               <div className="min-w-0">
-                <p className="text-[11px] font-medium text-[#98b3ae]">Alertes urgentes stock</p>
-                <p className="truncate text-base font-extrabold tracking-tight text-white tabular sm:text-lg">
-                  {(kpis?.lowStockCount ?? 0) + (kpis?.outOfStockCount ?? 0)} article(s)
+                <p className="truncate text-[10px] sm:text-[11px] font-medium text-[#98b3ae]">Stock urgence</p>
+                <p className="truncate text-sm sm:text-lg font-extrabold tracking-tight text-white tabular">
+                  {(kpis?.lowStockCount ?? 0) + (kpis?.outOfStockCount ?? 0)} art.
                 </p>
               </div>
             </div>
             <Link
               href="/commerce/stock"
-              className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold text-amber-200 transition hover:bg-white/20"
+              className="inline-flex shrink-0 items-center rounded-full bg-white/10 p-1 text-amber-200 hover:bg-white/20 sm:px-2 sm:py-1 sm:text-[10px]"
             >
-              <span>Gérer</span>
               <ChevronRight className="h-3 w-3" />
             </Link>
           </div>
-          <p className="mt-2 truncate text-[11px] text-[#8aa8a2]">
+          <p className="mt-1.5 truncate text-[10px] sm:text-[11px] text-[#8aa8a2]">
             {(kpis?.outOfStockCount ?? 0) > 0 ? (
-              <strong className="text-rose-300 font-bold">{kpis?.outOfStockCount ?? 0} rupture(s)</strong>
+              <strong className="text-rose-300">{kpis?.outOfStockCount} rupture(s)</strong>
             ) : (
               <span className="text-emerald-300">0 rupture</span>
             )}
             {' · '}
-            <span className={(kpis?.lowStockCount ?? 0) > 0 ? 'font-bold text-amber-300' : 'text-slate-300'}>
-              {kpis?.lowStockCount ?? 0} stock bas
-            </span>
+            <span>{kpis?.lowStockCount ?? 0} bas</span>
           </p>
         </div>
 
         {/* Carte 4 : État des caisses */}
-        <div className="lime-glow-card flex min-w-0 flex-col justify-between rounded-2xl border border-limeglow-400/30 p-3.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-limeglow-400/20 text-limeglow-300 ring-1 ring-limeglow-400/30">
-                <Banknote className="h-4 w-4" />
+        <div className="lime-glow-card flex min-w-0 flex-col justify-between rounded-xl sm:rounded-2xl border border-limeglow-400/30 p-2.5 sm:p-3.5">
+          <div className="flex items-center justify-between gap-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-limeglow-400/20 text-limeglow-300 ring-1 ring-limeglow-400/30">
+                <Banknote className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
               <div className="min-w-0">
-                <p className="text-[11px] font-medium text-emerald-100/90">État des caisses</p>
-                <p className="truncate text-base font-extrabold tracking-tight text-white tabular sm:text-lg">
-                  {kpis?.openCashSessionsCount ?? 0} caisse(s) active(s)
+                <p className="truncate text-[10px] sm:text-[11px] font-medium text-emerald-100/90">Caisses</p>
+                <p className="truncate text-sm sm:text-lg font-extrabold tracking-tight text-white tabular">
+                  {kpis?.openCashSessionsCount ?? 0} active(s)
                 </p>
               </div>
             </div>
             <Link
               href="/commerce/cash"
-              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-limeglow-400 px-2.5 py-1 text-[11px] font-extrabold text-forest-950 shadow-lime transition hover:bg-limeglow-300"
+              className="inline-flex shrink-0 items-center rounded-full bg-limeglow-400 p-1 text-forest-950 shadow-lime hover:bg-limeglow-300 sm:px-2 sm:py-1 sm:text-[11px] sm:font-bold"
             >
-              <span>Caisses</span>
               <ChevronRight className="h-3 w-3 stroke-[2.5]" />
             </Link>
           </div>
-          <p className="mt-2 truncate text-[11px] text-emerald-100/80">
+          <p className="mt-1.5 truncate text-[10px] sm:text-[11px] text-emerald-100/80">
             {(kpis?.recentDiscrepancies ?? 0) > 0 ? (
-              <strong className="text-rose-300 font-bold">{kpis?.recentDiscrepancies} écart(s)</strong>
+              <strong className="text-rose-300">{kpis?.recentDiscrepancies} écart(s)</strong>
             ) : (
-              <span className="text-limeglow-300">Aucun écart</span>
+              <span className="text-limeglow-300">0 écart</span>
             )}
             {' · '}
-            <span>{kpis?.overdueCashSessions ?? 0} en retard</span>
+            <span>{kpis?.overdueCashSessions ?? 0} retard</span>
           </p>
         </div>
       </div>

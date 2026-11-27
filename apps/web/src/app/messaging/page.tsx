@@ -288,7 +288,7 @@ function MessagingContent() {
             }
           />
         ) : (
-          <div className="sc-card grid overflow-hidden lg:grid-cols-12" style={{ height: 'calc(100dvh - 13.5rem)', minHeight: '520px' }}>
+          <div className="sc-card grid overflow-hidden lg:grid-cols-12 h-[calc(100dvh-5.5rem)] sm:h-[calc(100dvh-12rem)]">
             {/* Colonne Liste des conversations */}
             <aside
               className={`flex flex-col overflow-hidden border-r border-slate-200/80 bg-white lg:col-span-4 lg:flex ${
@@ -545,7 +545,7 @@ function MessagingContent() {
                   {/* Zone de rédaction */}
                   <form
                     onSubmit={handleSend}
-                    className="space-y-2 border-t border-slate-200/80 bg-white p-3.5 sm:p-4"
+                    className="space-y-1.5 border-t border-slate-200/80 bg-white p-2.5 sm:p-4 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
                   >
                     <ImageUploader
                       purpose="message"

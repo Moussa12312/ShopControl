@@ -233,19 +233,14 @@ export default function OwnerRestockPage() {
   };
 
   const heroSection = (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-limeglow-400/20 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-limeglow-300 ring-1 ring-limeglow-400/30">
-            <Sparkles className="h-3.5 w-3.5" />
-            Supervision Propriétaire Exclusif
-          </span>
-          <h1 className="mt-2 text-xl font-extrabold tracking-tight text-white sm:text-2xl">
-            Carnet de Réapprovisionnement Automatique
+          <h1 className="text-lg font-extrabold tracking-tight text-white sm:text-xl">
+            Réapprovisionnement
           </h1>
-          <p className="mt-1 text-xs text-emerald-100/80 max-w-2xl leading-relaxed">
-            Calcul en temps réel des déficits de stock basé sur les ventes en caisse et les seuils d’alerte. 
-            Regroupement par grossiste attitré et génération de bons de commande en 1 clic.
+          <p className="text-[11px] text-emerald-200/70">
+            Déficits de stock & commandes grossistes
           </p>
         </div>
 
@@ -253,34 +248,32 @@ export default function OwnerRestockPage() {
           type="button"
           onClick={() => load()}
           disabled={loading || busy}
-          className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/20"
+          className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
           <span>Actualiser</span>
         </button>
       </div>
 
-      {/* 3 Cartes KPI de Synthèse */}
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-        <div className="sc-dark-glass p-4 rounded-2xl">
-          <p className="text-[11px] font-semibold text-[#98b3ae]">Articles en besoin de réappro</p>
-          <p className="mt-1 text-2xl font-extrabold text-amber-400 tabular">
+      {/* 3 Cartes KPI compactes adaptées smartphone */}
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-3">
+        <div className="sc-dark-glass p-2.5 sm:p-3.5 rounded-xl text-center sm:text-left">
+          <p className="text-[10px] sm:text-[11px] font-medium text-[#98b3ae]">À réappro</p>
+          <p className="mt-0.5 text-base sm:text-xl font-extrabold text-amber-400 tabular">
             {restockSuggestions.length}
           </p>
-          <p className="text-[11px] text-[#8aa8a2] mt-0.5">Ruptures ou sous le seuil d'alerte</p>
         </div>
 
-        <div className="sc-dark-glass p-4 rounded-2xl">
-          <p className="text-[11px] font-semibold text-[#98b3ae]">Volume total à commander</p>
-          <p className="mt-1 text-2xl font-extrabold text-white tabular">
-            {restockSuggestions.reduce((sum, item) => sum + item.suggestedQty, 0)} articles
+        <div className="sc-dark-glass p-2.5 sm:p-3.5 rounded-xl text-center sm:text-left">
+          <p className="text-[10px] sm:text-[11px] font-medium text-[#98b3ae]">Volume</p>
+          <p className="mt-0.5 text-base sm:text-xl font-extrabold text-white tabular">
+            {restockSuggestions.reduce((sum, item) => sum + item.suggestedQty, 0)}
           </p>
-          <p className="text-[11px] text-[#8aa8a2] mt-0.5">Pour ramener le stock au niveau de confort</p>
         </div>
 
-        <div className="lime-glow-card p-4 rounded-2xl border border-limeglow-400/30">
-          <p className="text-[11px] font-semibold text-emerald-100/90">Budget d’achat estimé</p>
-          <p className="mt-1 text-2xl font-extrabold text-limeglow-300 tabular">
+        <div className="lime-glow-card p-2.5 sm:p-3.5 rounded-xl border border-limeglow-400/30 text-center sm:text-left">
+          <p className="text-[10px] sm:text-[11px] font-medium text-emerald-100/90">Budget est.</p>
+          <p className="mt-0.5 text-xs sm:text-lg font-extrabold text-limeglow-300 tabular truncate">
             {formatXof(
               restockSuggestions.reduce(
                 (sum, item) => sum + item.suggestedQty * item.unitCostXof,
@@ -288,7 +281,6 @@ export default function OwnerRestockPage() {
               ),
             )}
           </p>
-          <p className="text-[11px] text-emerald-100/70 mt-0.5">Basé sur le coût moyen pondéré (CMP)</p>
         </div>
       </div>
     </div>
