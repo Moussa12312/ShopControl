@@ -109,24 +109,68 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
   } catch {
-    // Si la requête échoue suite à une coupure réseau, basculer sur le cache local
-    if (isGet && cacheKey) {
-      const cached = await getCachedApiResponse<T>(cacheKey);
-      if (cached !== null) {
-        return cached;
-      }
-      if (options.requiresOnline === false) {
-        if (path.includes('products') || path.includes('sales') || path.includes('sessions') || path.includes('movements') || path.includes('clients') || path.includes('expenses') || path.includes('orders') || path.includes('purchases') || path.includes('transfers') || path.includes('categories') || path.includes('alerts')) {
-          return { items: [], total: 0 } as T;
+    // Si la requête échoue suite à un redémarrage serveur à chaud (1 à 2 secondes), retenter une fois automatiquement
+    if (!options.skipRefresh && typeof window !== 'undefined') {
+      try {
+        await new Promise((r) => setTimeout(r, 1200));
+        response = await fetch(url, {
+          method,
+          credentials: 'include',
+          headers,
+          body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+        });
+      } catch {
+        // En cas d'échec répété, basculer sur le cache local
+        if (isGet && cacheKey) {
+          const cached = await getCachedApiResponse<T>(cacheKey);
+          if (cached !== null) {
+            return cached;
+          }
         }
-        return [] as T;
+        throw new ApiError(
+          0,
+          'NETWORK_ERROR',
+          'Impossible de joindre le serveur ShopControl. Vérifiez votre connexion réseau.',
+        );
       }
+    } else {
+      // Si la requête échoue suite à une coupure réseau, basculer sur le cache local
+      if (isGet && cacheKey) {
+        const cached = await getCachedApiResponse<T>(cacheKey);
+        if (cached !== null) {
+          return cached;
+        }
+        if (options.requiresOnline === false) {
+          if (path.includes('products') || path.includes('sales') || path.includes('sessions') || path.includes('movements') || path.includes('clients') || path.includes('expenses') || path.includes('orders') || path.includes('purchases') || path.includes('transfers') || path.includes('categories') || path.includes('alerts')) {
+            return { items: [], total: 0 } as T;
+          }
+          return [] as T;
+        }
+      }
+      throw new ApiError(
+        0,
+        'NETWORK_ERROR',
+        'Impossible de joindre le serveur ShopControl. Vérifiez votre connexion réseau.',
+      );
     }
-    throw new ApiError(
-      0,
-      'NETWORK_ERROR',
-      'Impossible de joindre le serveur ShopControl. Vérifiez votre connexion réseau.',
-    );
+  }
+
+  // Si Nginx renvoie temporairement 502/503 pendant le hot-swap de conteneur, retenter une fois après 1 seconde
+  if ([502, 503, 504].includes(response.status) && !options.skipRefresh && typeof window !== 'undefined') {
+    try {
+      await new Promise((r) => setTimeout(r, 1200));
+      const retryResponse = await fetch(url, {
+        method,
+        credentials: 'include',
+        headers,
+        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      });
+      if (retryResponse.ok || retryResponse.status < 500) {
+        response = retryResponse;
+      }
+    } catch {
+      // Poursuivre avec la réponse initiale
+    }
   }
 
   if (response.status === 401 && !options.skipRefresh && !path.startsWith('/auth/login')) {

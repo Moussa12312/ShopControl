@@ -18,9 +18,8 @@ echo "[3/4] Redémarrage des conteneurs..."
 docker network disconnect -f shopcontrol_shopcontrol_net unisphere_nginx 2>/dev/null || true
 docker network rm shopcontrol_shopcontrol_net 2>/dev/null || true
 
-# Redémarrer proprement en recréant le conteneur avec son nom officiel
-docker compose -f docker-compose.contabo.yml down 2>/dev/null || true
-docker compose -f docker-compose.contabo.yml up -d --remove-orphans
+# Remplacement fluide à chaud : Postgres et Redis restent 100% allumés sans interruption
+docker compose -f docker-compose.contabo.yml up -d --no-deps shopcontrol_app
 
 echo "[4/4] Reconnexion au réseau Nginx & Rechargement du proxy..."
 APP_ID=$(docker compose -f docker-compose.contabo.yml ps -q shopcontrol_app)

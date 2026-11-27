@@ -265,6 +265,45 @@ export function AppShell({
     };
   }, []);
 
+  // Détection transparente des mises à jour serveur (ne coupe JAMAIS le travail en cours)
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const initialBootTimeRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let mounted = true;
+    const checkServerVersion = async () => {
+      try {
+        const res = await fetch('/api/v1/health', { method: 'GET', credentials: 'omit' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && typeof data.serverBootTime === 'number') {
+          if (initialBootTimeRef.current === null) {
+            initialBootTimeRef.current = data.serverBootTime;
+          } else if (data.serverBootTime > initialBootTimeRef.current) {
+            // Le serveur a été redémarré avec une nouvelle version sans couper l'utilisateur !
+            if (mounted) {
+              setUpdateAvailable(true);
+            }
+          }
+        }
+      } catch {
+        // Silencieux
+      }
+    };
+
+    // Vérification initiale après 8s, puis toutes les 45s discrètement
+    const timeout = setTimeout(checkServerVersion, 8000);
+    const interval = setInterval(checkServerVersion, 45_000);
+
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, []);
+
   // Fermeture des menus déroulants au clic extérieur
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -1380,6 +1419,42 @@ export function AppShell({
             )}
           </div>
         </div>
+      ) : null}
+
+      {/* Toast discret de mise à jour prête (Ne coupe JAMAIS le travail en cours) */}
+      {updateAvailable ? (
+        <aside
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-16 sm:bottom-6 right-3 sm:right-6 z-[9990] flex max-w-sm sm:max-w-md items-center gap-3 rounded-2xl border border-sky-400/40 bg-[#0a1526]/95 p-3.5 text-white shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-4 duration-300"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/20 text-sky-300 ring-1 ring-sky-400/30">
+            <Sparkles className="h-5 w-5 animate-pulse text-sky-400" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-white">Mise à jour prête !</p>
+            <p className="text-[11px] text-slate-300">
+              Vos opérations en cours ne sont pas interrompues. Relancez quand vous le souhaitez.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-xl bg-sky-400 px-3 py-1.5 text-xs font-bold text-forest-950 shadow-sm transition hover:bg-sky-300 active:scale-95"
+            >
+              Relancer
+            </button>
+            <button
+              type="button"
+              onClick={() => setUpdateAvailable(false)}
+              aria-label="Fermer la notification de mise à jour"
+              className="rounded-lg p-1 text-slate-400 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </aside>
       ) : null}
     </div>
   );

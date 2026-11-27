@@ -4,6 +4,8 @@ import { Public } from '../../common/auth/auth.decorators';
 import { ControlPrismaService } from '../../common/database/control-prisma.service';
 import { RedisService } from '../../common/redis/redis.module';
 
+const SERVER_BOOT_TIME = Date.now();
+
 @ApiTags('Santé')
 @Controller('health')
 export class HealthController {
@@ -33,6 +35,7 @@ export class HealthController {
     return {
       status: db === 'ok' ? 'ok' : 'degraded',
       services: { db, redis },
+      serverBootTime: SERVER_BOOT_TIME,
       timestamp: new Date().toISOString(),
     };
   }
