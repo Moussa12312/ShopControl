@@ -139,7 +139,8 @@ interface SaleRow {
 const DEBT_METHOD = '__DEBT__';
 
 export default function PosPage() {
-  const { activeOperator } = useAuth();
+  const { user, activeOperator } = useAuth();
+  const isOwner = user?.role === 'OWNER' || user?.role === 'SUPER_ADMIN';
   const { isOnline, apiReachable } = useNetworkStatus();
   const { shopId, activeShop, selectShop } = useActiveOperationalShop();
   const shopType = normalizeShopType(activeShop?.shopType);
@@ -1759,7 +1760,10 @@ export default function PosPage() {
             ) : (
               <>
                 <div className="space-y-3 md:hidden">
-                  {filteredSales.map((sale) => (
+                  {filteredSales.map((sale) => {
+                    const isSaleRecent = Date.now() - new Date(sale.createdAt).getTime() <= 3 * 86_400_000;
+                    const canAgentAction = isOwner || isSaleRecent;
+                    return (
                     <div
                       key={`m-${sale.id}`}
                       className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs"
@@ -1830,21 +1834,23 @@ export default function PosPage() {
                               Avoir
                             </button>
                           ) : null}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setModalErr(null);
-                              setReturnTarget(sale);
-                              setReturnLineId(sale.lines[0]?.id || '');
-                              setReturnQty(1);
-                              setReturnReason('');
-                            }}
-                            className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-slate-300 py-2 text-xs font-semibold text-slate-700"
-                          >
-                            <Undo2 className="h-3.5 w-3.5" />
-                            Retour
-                          </button>
-                          {sale.paidAmountXof - sale.refundedAmountXof > 0 ? (
+                          {canAgentAction ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setModalErr(null);
+                                setReturnTarget(sale);
+                                setReturnLineId(sale.lines[0]?.id || '');
+                                setReturnQty(1);
+                                setReturnReason('');
+                              }}
+                              className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-slate-300 py-2 text-xs font-semibold text-slate-700"
+                            >
+                              <Undo2 className="h-3.5 w-3.5" />
+                              Retour
+                            </button>
+                          ) : null}
+                          {canAgentAction && sale.paidAmountXof - sale.refundedAmountXof > 0 ? (
                             <button
                               type="button"
                               onClick={() => {
@@ -1862,18 +1868,20 @@ export default function PosPage() {
                               Remb.
                             </button>
                           ) : null}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setModalErr(null);
-                              setCancelSaleTarget(sale);
-                              setCancelReason('');
-                            }}
-                            className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-red-50 py-2 text-xs font-semibold text-red-700"
-                          >
-                            <XCircle className="h-3.5 w-3.5" />
-                            Annuler
-                          </button>
+                          {canAgentAction ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setModalErr(null);
+                                setCancelSaleTarget(sale);
+                                setCancelReason('');
+                              }}
+                              className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-red-50 py-2 text-xs font-semibold text-red-700"
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                              Annuler
+                            </button>
+                          ) : null}
                         </div>
                       ) : (
                         <div className="mt-2 flex items-center justify-between gap-2">
@@ -1890,7 +1898,8 @@ export default function PosPage() {
                         </div>
                       )}
                     </div>
-                  ))}
+                  );
+                })}
                 </div>
 
                 <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
@@ -1905,7 +1914,10 @@ export default function PosPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredSales.map((sale) => (
+                      {filteredSales.map((sale) => {
+                        const isSaleRecent = Date.now() - new Date(sale.createdAt).getTime() <= 3 * 86_400_000;
+                        const canAgentAction = isOwner || isSaleRecent;
+                        return (
                         <tr key={sale.id} className="hover:bg-slate-50/60">
                           <td className="px-4 py-3">
                             <p className="font-mono text-xs font-bold text-slate-900">
@@ -1991,6 +2003,7 @@ export default function PosPage() {
                               ) : null}
                               {sale.status === 'COMPLETED' ? (
                                 <>
+                                {canAgentAction ? (
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -2005,24 +2018,26 @@ export default function PosPage() {
                                     <Undo2 className="h-3.5 w-3.5" />
                                     Retour
                                   </button>
-                                  {sale.paidAmountXof - sale.refundedAmountXof > 0 ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setModalErr(null);
-                                        setRefundTarget(sale);
-                                        setRefundAmount(
-                                          Math.max(0, sale.paidAmountXof - sale.refundedAmountXof),
-                                        );
-                                        setRefundMethodCode(sale.payments[0]?.paymentMethodCode || 'CASH');
-                                        setRefundReason('');
-                                      }}
-                                      className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100"
-                                    >
-                                      <RotateCcw className="h-3.5 w-3.5" />
-                                      Rembourser
-                                    </button>
-                                  ) : null}
+                                ) : null}
+                                {canAgentAction && sale.paidAmountXof - sale.refundedAmountXof > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setModalErr(null);
+                                      setRefundTarget(sale);
+                                      setRefundAmount(
+                                        Math.max(0, sale.paidAmountXof - sale.refundedAmountXof),
+                                      );
+                                      setRefundMethodCode(sale.payments[0]?.paymentMethodCode || 'CASH');
+                                      setRefundReason('');
+                                    }}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                    Rembourser
+                                  </button>
+                                ) : null}
+                                {canAgentAction ? (
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -2035,12 +2050,14 @@ export default function PosPage() {
                                     <XCircle className="h-3.5 w-3.5" />
                                     Annuler
                                   </button>
-                                </>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                ) : null}
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                      );
+                    })}
                     </tbody>
                   </table>
                 </div>

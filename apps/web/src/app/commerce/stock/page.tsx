@@ -732,7 +732,7 @@ export default function StockPage() {
             }`}
           >
             <Boxes className="w-4 h-4" />
-            <span>État & Valeur</span>
+            <span>{isOwner ? 'État & Valeur' : 'État du stock'}</span>
           </button>
 
           <button
@@ -1150,19 +1150,28 @@ export default function StockPage() {
                               {item.stockAvailable} {item.unit}
                             </span>
                           </div>
-                          <div>
-                            <span className="text-white/40 block text-[10px]">Valeur vente</span>
-                            <span className="font-bold text-[#a3e635] text-sm">
-                              {formatXof(item.retailValueXof)}
-                            </span>
-                          </div>
-                          {valuationData.canReadCost && item.costPriceXof !== null && (
+                          {isOwner ? (
+                            <div>
+                              <span className="text-white/40 block text-[10px]">Valeur vente</span>
+                              <span className="font-bold text-[#a3e635] text-sm">
+                                {formatXof(item.retailValueXof)}
+                              </span>
+                            </div>
+                          ) : (
+                            <div>
+                              <span className="text-white/40 block text-[10px]">Stock physique</span>
+                              <span className="font-bold text-white text-sm">
+                                {item.stockPhysical} {item.unit}
+                              </span>
+                            </div>
+                          )}
+                          {isOwner && valuationData.canReadCost && item.costPriceXof !== null && (
                             <div>
                               <span className="text-white/40 block text-[10px]">Coût unitaire (CMP)</span>
                               <span className="text-white/80">{formatXof(item.costPriceXof)}</span>
                             </div>
                           )}
-                          {valuationData.canReadCost && item.costValueXof !== null && (
+                          {isOwner && valuationData.canReadCost && item.costValueXof !== null && (
                             <div>
                               <span className="text-white/40 block text-[10px]">Valeur coût</span>
                               <span className="text-amber-300 font-bold">{formatXof(item.costValueXof)}</span>
@@ -1279,8 +1288,8 @@ export default function StockPage() {
                         <th className="px-3 py-3 text-center">Physique</th>
                         <th className="px-3 py-3 text-center">Disponible</th>
                         <th className="px-3 py-3 text-center">Statut</th>
-                        <th className="px-3 py-3 text-right">Valeur Vente</th>
-                        {valuationData.canReadCost && (
+                        {isOwner && <th className="px-3 py-3 text-right">Valeur Vente</th>}
+                        {isOwner && valuationData.canReadCost && (
                           <th className="px-3 py-3 text-right">Valeur Coût</th>
                         )}
                         <th className="px-4 py-3 text-right">Actions</th>
@@ -1360,10 +1369,12 @@ export default function StockPage() {
                                       : 'En stock'}
                                 </span>
                               </td>
-                              <td className="px-3 py-2.5 text-right font-mono font-bold text-[#a3e635]">
-                                {formatXof(item.retailValueXof)}
-                              </td>
-                              {valuationData.canReadCost && (
+                              {isOwner && (
+                                <td className="px-3 py-2.5 text-right font-mono font-bold text-[#a3e635]">
+                                  {formatXof(item.retailValueXof)}
+                                </td>
+                              )}
+                              {isOwner && valuationData.canReadCost && (
                                 <td className="px-3 py-2.5 text-right font-mono text-amber-300 font-bold">
                                   {item.costValueXof !== null ? formatXof(item.costValueXof) : '—'}
                                 </td>
@@ -1445,10 +1456,12 @@ export default function StockPage() {
                                           : 'OK'}
                                     </span>
                                   </td>
-                                  <td className="px-3 py-2 text-right font-mono text-[#a3e635]">
-                                    {formatXof(v.retailValueXof)}
-                                  </td>
-                                  {valuationData.canReadCost && (
+                                  {isOwner && (
+                                    <td className="px-3 py-2 text-right font-mono text-[#a3e635]">
+                                      {formatXof(v.retailValueXof)}
+                                    </td>
+                                  )}
+                                  {isOwner && valuationData.canReadCost && (
                                     <td className="px-3 py-2 text-right font-mono text-amber-300">
                                       {v.costValueXof !== null ? formatXof(v.costValueXof) : '—'}
                                     </td>
@@ -2496,11 +2509,13 @@ export default function StockPage() {
                 <span style={{ fontSize: '8pt', color: '#666', textTransform: 'uppercase' }}>Unités en Stock</span>
                 <p style={{ fontSize: '14pt', fontWeight: 'bold', margin: '1mm 0 0 0' }}>{valuationData.summary.totalUnitsPhysical}</p>
               </div>
-              <div>
-                <span style={{ fontSize: '8pt', color: '#666', textTransform: 'uppercase' }}>Valeur Vente (TTC)</span>
-                <p style={{ fontSize: '14pt', fontWeight: 'bold', margin: '1mm 0 0 0' }}>{formatXof(valuationData.summary.totalRetailValueXof)}</p>
-              </div>
-              {valuationData.canReadCost && valuationData.summary.totalCostValueXof !== null && (
+              {isOwner && (
+                <div>
+                  <span style={{ fontSize: '8pt', color: '#666', textTransform: 'uppercase' }}>Valeur Vente (TTC)</span>
+                  <p style={{ fontSize: '14pt', fontWeight: 'bold', margin: '1mm 0 0 0' }}>{formatXof(valuationData.summary.totalRetailValueXof)}</p>
+                </div>
+              )}
+              {isOwner && valuationData.canReadCost && valuationData.summary.totalCostValueXof !== null && (
                 <div>
                   <span style={{ fontSize: '8pt', color: '#666', textTransform: 'uppercase' }}>Valeur Coût (CMP)</span>
                   <p style={{ fontSize: '14pt', fontWeight: 'bold', margin: '1mm 0 0 0' }}>{formatXof(valuationData.summary.totalCostValueXof)}</p>
@@ -2523,8 +2538,8 @@ export default function StockPage() {
                 <th style={{ padding: '2mm', textAlign: 'right' }}>Prix Vente</th>
                 {valuationData?.canReadCost && <th style={{ padding: '2mm', textAlign: 'right' }}>Coût CMP</th>}
                 <th style={{ padding: '2mm', textAlign: 'center' }}>Stock Dispo</th>
-                <th style={{ padding: '2mm', textAlign: 'right' }}>Valeur Vente</th>
-                {valuationData?.canReadCost && <th style={{ padding: '2mm', textAlign: 'right' }}>Valeur Coût</th>}
+                {isOwner && <th style={{ padding: '2mm', textAlign: 'right' }}>Valeur Vente</th>}
+                {isOwner && valuationData?.canReadCost && <th style={{ padding: '2mm', textAlign: 'right' }}>Valeur Coût</th>}
               </tr>
             </thead>
             <tbody>
@@ -2544,10 +2559,12 @@ export default function StockPage() {
                   <td style={{ padding: '2mm', textAlign: 'center', fontWeight: 'bold' }}>
                     {item.stockAvailable} {item.unit}
                   </td>
-                  <td style={{ padding: '2mm', textAlign: 'right', fontWeight: 'bold' }}>
-                    {formatXof(item.retailValueXof)}
-                  </td>
-                  {valuationData?.canReadCost && (
+                  {isOwner && (
+                    <td style={{ padding: '2mm', textAlign: 'right', fontWeight: 'bold' }}>
+                      {formatXof(item.retailValueXof)}
+                    </td>
+                  )}
+                  {isOwner && valuationData?.canReadCost && (
                     <td style={{ padding: '2mm', textAlign: 'right' }}>
                       {item.costValueXof !== null ? formatXof(item.costValueXof) : '—'}
                     </td>

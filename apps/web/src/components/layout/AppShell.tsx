@@ -193,8 +193,8 @@ export function AppShell({
     logout,
   } = useAuth();
 
-  // Sidebar ouvert par défaut sur grand écran (>= 1024px) avec mémorisation locale
-  const [expanded, setExpandedState] = useState(true);
+  // Sidebar fermé par défaut avec mémorisation locale
+  const [expanded, setExpandedState] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -202,7 +202,7 @@ export function AppShell({
     if (saved !== null) {
       setExpandedState(saved === 'true');
     } else {
-      setExpandedState(window.innerWidth >= 1024);
+      setExpandedState(false);
     }
   }, []);
 
@@ -813,6 +813,17 @@ export function AppShell({
               <ChevronRight className="h-4 w-4 shrink-0" />
             )}
           </button>
+
+          {/* Signe propulsé par Chakir's Entreprise tout en bas du sidebar */}
+          {showLabels ? (
+            <div className="mt-1.5 px-1 text-center text-[10px] text-white/35">
+              Propulsé par <span className="font-semibold text-white/55">Chakir’s Entreprise</span>
+            </div>
+          ) : (
+            <div className="mt-1 text-center text-[9px] font-bold text-white/30" title="Propulsé par Chakir’s Entreprise">
+              CE
+            </div>
+          )}
         </div>
       </aside>
 

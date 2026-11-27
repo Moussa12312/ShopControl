@@ -247,7 +247,14 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   const [chatOpen, setChatOpen] = useState(false);
   const [chatToken, setChatToken] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<
-    Array<{ id: string; senderRole: string; senderName: string; body: string; createdAt: string }>
+    Array<{
+      id: string;
+      senderRole: string;
+      senderName: string;
+      body: string;
+      createdAt: string;
+      attachmentUrl?: string | null;
+    }>
   >([]);
   const [chatName, setChatName] = useState('');
   const [chatPhone, setChatPhone] = useState('');
@@ -923,9 +930,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                               : 'bg-rose-50 text-rose-700'
                           }`}
                         >
-                          {p.inStock
-                            ? `${p.stockAvailableDecimal ?? p.stockAvailable} ${p.unit} dispo`
-                            : 'Rupture'}
+                          {p.inStock ? 'En stock' : 'Rupture'}
                         </span>
                       </div>
                       <button
@@ -1090,7 +1095,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                             : 'bg-rose-50 text-rose-700'
                         }`}
                       >
-                        {p.inStock ? `${p.stockAvailable} en stock` : 'Rupture'}
+                        {p.inStock ? 'En stock' : 'Rupture'}
                       </span>
                     </div>
 
@@ -1142,18 +1147,18 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                   key={p.id}
                   className="sc-card-hover flex min-w-0 flex-col overflow-hidden rounded-2xl"
                 >
-                  {/* Photo contrôlée et proportionnée (jamais démesurée) */}
+                  {/* Photo contrôlée, non rognée et proportionnée */}
                   <button
                     type="button"
                     onClick={() => openProductDetail(p)}
-                    className="group relative h-36 w-full overflow-hidden bg-porcelain-50 sm:h-44"
+                    className="group relative h-44 sm:h-52 w-full overflow-hidden bg-white flex items-center justify-center"
                   >
                     {photo ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={photo}
                         alt={p.name}
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                        className="h-full w-full object-contain p-2 transition duration-300 group-hover:scale-105"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-slate-300">
@@ -1161,13 +1166,13 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                       </div>
                     )}
                     <span
-                      className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-extrabold backdrop-blur-xs ${
+                      className={`absolute left-2 top-2 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold backdrop-blur-xs ${
                         p.inStock
-                          ? 'bg-emerald-950/75 text-limeglow-300'
+                          ? 'bg-emerald-950/85 text-limeglow-300'
                           : 'bg-rose-600/90 text-white'
                       }`}
                     >
-                      {p.inStock ? `${p.stockAvailable} dispo` : 'Rupture'}
+                      {p.inStock ? 'En stock' : 'Rupture'}
                     </span>
                     {(p.imageUrls?.length || 0) > 1 ? (
                       <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-forest-950/80 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
@@ -1377,7 +1382,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                     }`}
                   >
                     {detailProduct.inStock
-                      ? `${detailProduct.stockAvailableDecimal ?? detailProduct.stockAvailable} ${detailProduct.unit} en stock`
+                      ? 'En stock'
                       : 'Rupture de stock'}
                   </span>
                 </div>
@@ -1456,7 +1461,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                         ) : null}
                         {v.stockAvailable != null ? (
                           <span className={`mt-0.5 font-semibold ${v.stockAvailable <= 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                            {v.stockAvailable <= 0 ? 'Rupture' : `${v.stockAvailable} en stock`}
+                            {v.stockAvailable <= 0 ? 'Rupture' : 'Disponible'}
                           </span>
                         ) : null}
                       </button>
@@ -2122,6 +2127,21 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
                       >
                         <p className="text-[10px] font-bold opacity-70">{m.senderName}</p>
                         <p className="mt-0.5 whitespace-pre-wrap leading-relaxed">{m.body}</p>
+                        {m.attachmentUrl ? (
+                          <a
+                            href={m.attachmentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 block overflow-hidden rounded-xl"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={m.attachmentUrl}
+                              alt="Photo jointe"
+                              className="max-h-48 w-full rounded-xl border border-black/10 object-cover"
+                            />
+                          </a>
+                        ) : null}
                       </div>
                       <span className="mt-1 px-1 text-[9px] text-slate-400">
                         {formatDateTimeInTimezone(m.createdAt)}

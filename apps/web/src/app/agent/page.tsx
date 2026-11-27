@@ -228,7 +228,6 @@ export default function AgentHomePage() {
                 · {analytics?.kpis.currentSalesCount ?? 0} vente(s)
               </span>
             </div>
-            <p className="text-[10px] text-slate-400">Remis à 0 chaque jour à minuit</p>
           </div>
         </div>
 
@@ -325,11 +324,10 @@ export default function AgentHomePage() {
                           key={op.id}
                           type="button"
                           onClick={() => handleSelectOperator(op)}
-                          className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition ${
-                            selected
+                          className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition ${selected
                               ? 'border-forest-900 bg-forest-900 text-white shadow-xs'
                               : 'border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100'
-                          }`}
+                            }`}
                         >
                           <span>{op.firstName}</span>
                           {op.hasPin ? <KeyRound className="h-3.5 w-3.5 opacity-75" /> : null}

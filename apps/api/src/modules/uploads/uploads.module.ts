@@ -27,9 +27,9 @@ const SAFE_FILENAME_RE = /^[a-z]+_[a-f0-9-]+\.(jpg|png|webp)$/;
 
 function resolveUploadsDir(): string {
   const candidates = [
+    path.resolve('/app/apps/api/uploads'),
     path.resolve(process.cwd(), 'uploads'),
     path.resolve(process.cwd(), '../../uploads'),
-    path.resolve('/app/apps/api/uploads'),
     path.resolve('/app/uploads'),
   ];
   for (const dir of candidates) {
@@ -137,9 +137,9 @@ export class UploadsController {
       throw new NotFoundException({ code: 'MEDIA_NOT_FOUND', message: 'Image introuvable.' });
     }
     const candidates = [
+      path.resolve('/app/apps/api/uploads', filename),
       path.resolve(process.cwd(), 'uploads', filename),
       path.resolve(process.cwd(), '../../uploads', filename),
-      path.resolve('/app/apps/api/uploads', filename),
       path.resolve('/app/uploads', filename),
     ];
     const fullPath = candidates.find((p) => fs.existsSync(p));

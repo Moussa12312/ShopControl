@@ -817,6 +817,16 @@ export class SalesService {
         });
       }
 
+      if (actor.role !== 'OWNER' && actor.role !== 'SUPER_ADMIN') {
+        const ageMs = Date.now() - new Date(sale.createdAt).getTime();
+        if (ageMs > 3 * 24 * 60 * 60 * 1000) {
+          throw new ForbiddenException({
+            code: 'SALE_MODIFICATION_EXPIRED',
+            message: 'Seul le propriétaire peut annuler une vente datant de plus de 3 jours.',
+          });
+        }
+      }
+
       // Réintègre les quantités non encore retournées (y compris Gros/Détail, Fraction & Lots FEFO)
       for (const line of sale.lines) {
         if (line.fractionalQtyMilli && line.fractionalQtyMilli > 0 && line.returnedQty === 0) {
@@ -962,6 +972,16 @@ export class SalesService {
         });
       }
 
+      if (actor.role !== 'OWNER' && actor.role !== 'SUPER_ADMIN') {
+        const ageMs = Date.now() - new Date(sale.createdAt).getTime();
+        if (ageMs > 3 * 24 * 60 * 60 * 1000) {
+          throw new ForbiddenException({
+            code: 'SALE_MODIFICATION_EXPIRED',
+            message: 'Seul le propriétaire peut enregistrer un retour sur une vente datant de plus de 3 jours.',
+          });
+        }
+      }
+
       const createdReturns = [];
       for (const item of input.items) {
         const line = sale.lines.find((l) => l.id === item.saleLineId);
@@ -1090,6 +1110,16 @@ export class SalesService {
           code: 'SALE_ALREADY_CANCELLED',
           message: 'Impossible de rembourser une vente déjà annulée.',
         });
+      }
+
+      if (actor.role !== 'OWNER' && actor.role !== 'SUPER_ADMIN') {
+        const ageMs = Date.now() - new Date(sale.createdAt).getTime();
+        if (ageMs > 3 * 24 * 60 * 60 * 1000) {
+          throw new ForbiddenException({
+            code: 'SALE_MODIFICATION_EXPIRED',
+            message: 'Seul le propriétaire peut rembourser une vente datant de plus de 3 jours.',
+          });
+        }
       }
       const maxRefundable = Math.max(0, sale.paidAmountXof - sale.refundedAmountXof);
       if (maxRefundable <= 0) {
