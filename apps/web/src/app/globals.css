@@ -112,7 +112,7 @@
     @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-950 disabled:opacity-50;
   }
   .sc-hero-btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-bold text-forest-950 shadow-sm transition hover:bg-blue-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-bold text-forest-950 shadow-sm transition hover:bg-emerald-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50;
   }
   .sc-hero-btn-ghost {
     @apply inline-flex items-center justify-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50;
@@ -120,14 +120,14 @@
 }
 
 .lime-glow-card {
-  background: radial-gradient(circle at 82% 45%, rgba(56, 189, 248, 0.28), rgba(14, 29, 53, 0.95) 55%, rgba(6, 13, 25, 0.99) 100%);
+  background: radial-gradient(circle at 82% 45%, rgba(163, 230, 53, 0.28), rgba(14, 46, 40, 0.94) 55%, rgba(6, 21, 20, 0.99) 100%);
 }
 
 .obsidian-hero {
   background:
-    radial-gradient(760px circle at 10% -15%, rgba(37, 99, 235, 0.32), transparent 55%),
-    radial-gradient(540px circle at 92% 5%, rgba(56, 189, 248, 0.20), transparent 48%),
-    linear-gradient(180deg, #060d19 0%, #0a1526 50%, #0e1d35 100%);
+    radial-gradient(760px circle at 10% -15%, rgba(20, 158, 127, 0.22), transparent 55%),
+    radial-gradient(540px circle at 92% 5%, rgba(163, 230, 53, 0.12), transparent 48%),
+    linear-gradient(180deg, #061514 0%, #0b2220 100%);
 }
 
 /* Scrollbar fine */

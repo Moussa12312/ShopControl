@@ -182,7 +182,7 @@ export default function OwnerDashboardPage() {
           <h1 className="truncate text-base font-extrabold tracking-tight text-white sm:text-xl">
             Bonjour {firstName} !
           </h1>
-          <p className="truncate text-[11px] text-blue-200/80 sm:text-xs">
+          <p className="truncate text-[11px] text-emerald-200/70 sm:text-xs">
             {selectedShopId === 'ALL'
               ? `Vue consolidée · ${overview?.totals.totalShops ?? shops.length} boutique(s)`
               : `${selectedShopMeta?.shopName || ''} · Données temps réel`}
@@ -286,7 +286,7 @@ export default function OwnerDashboardPage() {
               <ShoppingBag className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-[10px] sm:text-[11px] font-medium text-slate-300">
+              <p className="truncate text-[10px] sm:text-[11px] font-medium text-[#98b3ae]">
                 {period === 'daily'
                   ? 'Ventes jour'
                   : period === 'weekly'
@@ -310,18 +310,18 @@ export default function OwnerDashboardPage() {
               {(kpis?.salesDeltaPercent ?? 0) >= 0 ? '+' : ''}
               {kpis?.salesDeltaPercent ?? 0}%
             </span>
-            <span className="text-slate-400">· {kpis?.currentSalesCount ?? 0} v.</span>
+            <span className="text-[#8aa8a2]">· {kpis?.currentSalesCount ?? 0} v.</span>
           </div>
         </div>
 
         {/* Carte 2 : Bénéfice net réel */}
         <div className="sc-dark-glass min-w-0 p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl flex flex-col justify-between">
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-white/10 text-blue-200">
+            <span className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-white/10 text-emerald-200">
               <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-[10px] sm:text-[11px] font-medium text-slate-300">Bénéfice net</p>
+              <p className="truncate text-[10px] sm:text-[11px] font-medium text-[#98b3ae]">Bénéfice net</p>
               <p
                 className={`truncate text-sm sm:text-lg font-extrabold tracking-tight tabular ${(kpis?.estimatedNetProfitXof ?? 0) >= 0 ? 'text-white' : 'text-rose-300'
                   }`}
@@ -330,8 +330,8 @@ export default function OwnerDashboardPage() {
               </p>
             </div>
           </div>
-          <p className="mt-1.5 truncate text-[10px] sm:text-[11px] text-slate-400">
-            Marge : <strong className="text-blue-200 tabular">{formatXof(kpis?.grossMarginXof ?? 0)}</strong>
+          <p className="mt-1.5 truncate text-[10px] sm:text-[11px] text-[#8aa8a2]">
+            Marge : <strong className="text-emerald-200 tabular">{formatXof(kpis?.grossMarginXof ?? 0)}</strong>
           </p>
         </div>
 
@@ -343,7 +343,7 @@ export default function OwnerDashboardPage() {
                 <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
               <div className="min-w-0">
-                <p className="truncate text-[10px] sm:text-[11px] font-medium text-slate-300">Stock urgence</p>
+                <p className="truncate text-[10px] sm:text-[11px] font-medium text-[#98b3ae]">Stock urgence</p>
                 <p className="truncate text-sm sm:text-lg font-extrabold tracking-tight text-white tabular">
                   {(kpis?.lowStockCount ?? 0) + (kpis?.outOfStockCount ?? 0)} art.
                 </p>
@@ -356,11 +356,11 @@ export default function OwnerDashboardPage() {
               <ChevronRight className="h-3 w-3" />
             </Link>
           </div>
-          <p className="mt-1.5 truncate text-[10px] sm:text-[11px] text-slate-400">
+          <p className="mt-1.5 truncate text-[10px] sm:text-[11px] text-[#8aa8a2]">
             {(kpis?.outOfStockCount ?? 0) > 0 ? (
               <strong className="text-rose-300">{kpis?.outOfStockCount} rupture(s)</strong>
             ) : (
-              <span className="text-sky-300">0 rupture</span>
+              <span className="text-emerald-300">0 rupture</span>
             )}
             {' · '}
             <span>{kpis?.lowStockCount ?? 0} bas</span>
@@ -375,7 +375,7 @@ export default function OwnerDashboardPage() {
                 <Banknote className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
               <div className="min-w-0">
-                <p className="truncate text-[10px] sm:text-[11px] font-medium text-sky-100/90">Caisses</p>
+                <p className="truncate text-[10px] sm:text-[11px] font-medium text-emerald-100/90">Caisses</p>
                 <p className="truncate text-sm sm:text-lg font-extrabold tracking-tight text-white tabular">
                   {kpis?.openCashSessionsCount ?? 0} active(s)
                 </p>
@@ -388,7 +388,7 @@ export default function OwnerDashboardPage() {
               <ChevronRight className="h-3 w-3 stroke-[2.5]" />
             </Link>
           </div>
-          <p className="mt-1.5 truncate text-[10px] sm:text-[11px] text-sky-100/80">
+          <p className="mt-1.5 truncate text-[10px] sm:text-[11px] text-emerald-100/80">
             {(kpis?.recentDiscrepancies ?? 0) > 0 ? (
               <strong className="text-rose-300">{kpis?.recentDiscrepancies} écart(s)</strong>
             ) : (
