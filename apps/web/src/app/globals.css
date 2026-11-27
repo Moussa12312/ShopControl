@@ -120,14 +120,14 @@
 }
 
 .lime-glow-card {
-  background: radial-gradient(circle at 82% 45%, rgba(163, 230, 53, 0.28), rgba(14, 46, 40, 0.94) 55%, rgba(6, 21, 20, 0.99) 100%);
+  background: radial-gradient(circle at 82% 45%, rgba(163, 230, 53, 0.22), rgba(16, 33, 61, 0.95) 55%, rgba(7, 14, 27, 0.99) 100%);
 }
 
 .obsidian-hero {
   background:
-    radial-gradient(760px circle at 10% -15%, rgba(20, 158, 127, 0.22), transparent 55%),
+    radial-gradient(760px circle at 10% -15%, rgba(37, 99, 235, 0.22), transparent 55%),
     radial-gradient(540px circle at 92% 5%, rgba(163, 230, 53, 0.12), transparent 48%),
-    linear-gradient(180deg, #061514 0%, #0b2220 100%);
+    linear-gradient(180deg, #070e1b 0%, #0c192e 100%);
 }
 
 /* Scrollbar fine */

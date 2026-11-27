@@ -17,7 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Crown,
-  Gift,  Database,
+  Gift, Database,
   Eye,
   FileSearch,
   FileText,
@@ -626,24 +626,21 @@ export function AppShell({
           }
           touchStartXRef.current = null;
         }}
-        className={`no-print overscroll-none fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-white/[0.07] bg-forest-950 pt-[env(safe-area-inset-top,0px)] text-slate-200 transition-all duration-200 ${sidebarWidthClass} ${
-          mobileOpen
-            ? `${mobileCollapsed ? 'w-[68px]' : 'w-64'} translate-x-0 shadow-2xl`
-            : 'w-64 -translate-x-full lg:translate-x-0'
-        }`}
+        className={`no-print overscroll-none fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-white/[0.07] bg-forest-950 pt-[env(safe-area-inset-top,0px)] text-slate-200 transition-all duration-200 ${sidebarWidthClass} ${mobileOpen
+          ? `${mobileCollapsed ? 'w-[68px]' : 'w-64'} translate-x-0 shadow-2xl`
+          : 'w-64 -translate-x-full lg:translate-x-0'
+          }`}
       >
         {/* Marque dynamique : Logo + Nom de la boutique */}
         <div
-          className={`flex h-14 shrink-0 items-center border-b border-white/[0.08] ${
-            !showLabels ? 'justify-center px-2' : 'justify-between px-3'
-          }`}
+          className={`flex h-14 shrink-0 items-center border-b border-white/[0.08] ${!showLabels ? 'justify-center px-2' : 'justify-between px-3'
+            }`}
         >
           <Link
             href={navItems[0]?.href || '/'}
             onClick={() => setMobileOpen(false)}
-            className={`flex min-w-0 items-center gap-2.5 overflow-hidden ${
-              !showLabels ? 'mx-auto' : ''
-            }`}
+            className={`flex min-w-0 items-center gap-2.5 overflow-hidden ${!showLabels ? 'mx-auto' : ''
+              }`}
             title={brandTitle}
           >
             {brandLogoUrl ? (
@@ -686,11 +683,10 @@ export function AppShell({
               <button
                 type="button"
                 onClick={() => handleSwitchOwnerMode('supervision')}
-                className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition ${
-                  ownerMode === 'supervision'
-                    ? 'bg-limeglow-400 text-forest-950 font-bold'
-                    : 'text-emerald-200/75 hover:text-white'
-                }`}
+                className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition ${ownerMode === 'supervision'
+                  ? 'bg-limeglow-400 text-forest-950 font-bold'
+                  : 'text-emerald-200/75 hover:text-white'
+                  }`}
               >
                 <Eye className="h-3.5 w-3.5" />
                 Supervision
@@ -698,11 +694,10 @@ export function AppShell({
               <button
                 type="button"
                 onClick={() => handleSwitchOwnerMode('management')}
-                className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition ${
-                  ownerMode === 'management'
-                    ? 'bg-limeglow-400 text-forest-950 font-bold'
-                    : 'text-emerald-200/75 hover:text-white'
-                }`}
+                className={`flex items-center justify-center gap-1 rounded-lg py-1.5 transition ${ownerMode === 'management'
+                  ? 'bg-limeglow-400 text-forest-950 font-bold'
+                  : 'text-emerald-200/75 hover:text-white'
+                  }`}
               >
                 <Wrench className="h-3.5 w-3.5" />
                 Gestion
@@ -729,11 +724,10 @@ export function AppShell({
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
                     title={!showLabels ? item.label : undefined}
-                    className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[12.5px] font-medium transition-all ${
-                      active
-                        ? 'bg-white font-semibold text-forest-950 shadow-xs'
-                        : 'text-[#8aa8a2] hover:bg-white/[0.08] hover:text-white'
-                    } ${!showLabels ? 'justify-center px-0' : ''}`}
+                    className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[12.5px] font-medium transition-all ${active
+                      ? 'bg-white font-semibold text-forest-950 shadow-xs'
+                      : 'text-[#8aa8a2] hover:bg-white/[0.08] hover:text-white'
+                      } ${!showLabels ? 'justify-center px-0' : ''}`}
                   >
                     <Icon className={`h-[17px] w-[17px] shrink-0 ${active ? 'text-brand-700' : ''}`} />
                     {showLabels ? <span className="truncate">{item.label}</span> : null}
@@ -751,9 +745,8 @@ export function AppShell({
             onClick={() => setMobileCollapsed((v) => !v)}
             aria-label={mobileCollapsed ? 'Déplier le menu mobile' : 'Réduire le menu mobile'}
             title={mobileCollapsed ? 'Déplier' : 'Réduire'}
-            className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-[#8aa8a2] transition hover:bg-white/10 hover:text-white lg:hidden ${
-              mobileCollapsed ? 'justify-center px-0' : ''
-            }`}
+            className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-[#8aa8a2] transition hover:bg-white/10 hover:text-white lg:hidden ${mobileCollapsed ? 'justify-center px-0' : ''
+              }`}
           >
             {mobileCollapsed ? (
               <ChevronRight className="h-4 w-4 shrink-0" />
@@ -782,9 +775,8 @@ export function AppShell({
             onClick={() => setExpanded((v) => !v)}
             aria-label={expanded ? 'Replier le menu' : 'Ouvrir le menu'}
             title={expanded ? 'Replier' : 'Déplier le menu'}
-            className={`hidden w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-[#8aa8a2] transition hover:bg-white/10 hover:text-white lg:flex ${
-              !expanded ? 'justify-center px-0' : ''
-            }`}
+            className={`hidden w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-[#8aa8a2] transition hover:bg-white/10 hover:text-white lg:flex ${!expanded ? 'justify-center px-0' : ''
+              }`}
           >
             {expanded ? (
               <>
@@ -855,11 +847,10 @@ export function AppShell({
               <button
                 type="button"
                 onClick={() => handleSwitchOwnerMode('supervision')}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition ${
-                  ownerMode === 'supervision'
-                    ? 'bg-white text-forest-950 font-bold shadow-xs'
-                    : 'text-[#8aa8a2] hover:text-white'
-                }`}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition ${ownerMode === 'supervision'
+                  ? 'bg-white text-forest-950 font-bold shadow-xs'
+                  : 'text-[#8aa8a2] hover:text-white'
+                  }`}
               >
                 <Eye className="h-3 w-3" />
                 <span>Supervision</span>
@@ -867,11 +858,10 @@ export function AppShell({
               <button
                 type="button"
                 onClick={() => handleSwitchOwnerMode('management')}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition ${
-                  ownerMode === 'management'
-                    ? 'bg-white text-forest-950 font-bold shadow-xs'
-                    : 'text-[#8aa8a2] hover:text-white'
-                }`}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 transition ${ownerMode === 'management'
+                  ? 'bg-white text-forest-950 font-bold shadow-xs'
+                  : 'text-[#8aa8a2] hover:text-white'
+                  }`}
               >
                 <Wrench className="h-3 w-3" />
                 <span>Gestion</span>
@@ -963,19 +953,17 @@ export function AppShell({
                         key={n.id}
                         type="button"
                         onClick={() => handleMarkRead(n)}
-                        className={`block w-full px-4 py-2.5 text-left transition hover:bg-slate-50 ${
-                          !n.isRead ? 'bg-brand-50/50' : ''
-                        }`}
+                        className={`block w-full px-4 py-2.5 text-left transition hover:bg-slate-50 ${!n.isRead ? 'bg-brand-50/50' : ''
+                          }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span
-                            className={`text-xs font-bold ${
-                              n.priority === 'URGENT'
-                                ? 'text-rose-700'
-                                : n.priority === 'WARNING'
-                                  ? 'text-amber-700'
-                                  : 'text-slate-900'
-                            }`}
+                            className={`text-xs font-bold ${n.priority === 'URGENT'
+                              ? 'text-rose-700'
+                              : n.priority === 'WARNING'
+                                ? 'text-amber-700'
+                                : 'text-slate-900'
+                              }`}
                           >
                             {n.title}
                           </span>
@@ -1039,11 +1027,10 @@ export function AppShell({
                           setProfileOpen(false);
                           handleSwitchOwnerMode('supervision');
                         }}
-                        className={`rounded-lg py-1.5 ${
-                          ownerMode === 'supervision'
-                            ? 'bg-forest-900 text-white'
-                            : 'text-slate-600'
-                        }`}
+                        className={`rounded-lg py-1.5 ${ownerMode === 'supervision'
+                          ? 'bg-forest-900 text-white'
+                          : 'text-slate-600'
+                          }`}
                       >
                         Supervision
                       </button>
@@ -1053,11 +1040,10 @@ export function AppShell({
                           setProfileOpen(false);
                           handleSwitchOwnerMode('management');
                         }}
-                        className={`rounded-lg py-1.5 ${
-                          ownerMode === 'management'
-                            ? 'bg-forest-900 text-white'
-                            : 'text-slate-600'
-                        }`}
+                        className={`rounded-lg py-1.5 ${ownerMode === 'management'
+                          ? 'bg-forest-900 text-white'
+                          : 'text-slate-600'
+                          }`}
                       >
                         Gestion
                       </button>
@@ -1120,115 +1106,113 @@ export function AppShell({
       >
         {/* Bandeaux d'alertes + Entête Obsidian Emerald présente sur TOUTES les pages */}
         <div className="no-print">
-            {visibleAnnouncements.slice(0, 1).map((ann) => (
-              <div
-                key={ann.id}
-                className={`flex items-center justify-between gap-3 px-4 py-2 text-xs font-medium lg:px-6 ${
-                  ann.priority === 'URGENT'
-                    ? 'bg-rose-600 text-white'
-                    : ann.priority === 'WARNING'
-                      ? 'bg-amber-400 text-forest-950'
-                      : 'bg-brand-700 text-white'
+          {visibleAnnouncements.slice(0, 1).map((ann) => (
+            <div
+              key={ann.id}
+              className={`flex items-center justify-between gap-3 px-4 py-2 text-xs font-medium lg:px-6 ${ann.priority === 'URGENT'
+                ? 'bg-rose-600 text-white'
+                : ann.priority === 'WARNING'
+                  ? 'bg-amber-400 text-forest-950'
+                  : 'bg-brand-700 text-white'
                 }`}
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <Megaphone className="h-4 w-4 shrink-0" />
-                  <span className="truncate">
-                    <strong>{ann.title} :</strong> {ann.body}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setDismissedAnn((prev) => [...prev, ann.id])}
-                  aria-label="Masquer l’annonce"
-                  className="rounded-lg p-1 hover:bg-black/10"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
-
-            {user.mustSetupTwoFactor ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-500 px-4 py-2 text-xs font-semibold text-forest-950 lg:px-6">
-                <span className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  Sécurité Super Admin : activez la double authentification (2FA).
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <Megaphone className="h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  <strong>{ann.title} :</strong> {ann.body}
                 </span>
-                <Link
-                  href="/setup-2fa"
-                  className="rounded-full bg-forest-900 px-3 py-1 text-xs font-semibold text-white hover:bg-forest-800"
-                >
-                  Configurer le 2FA
-                </Link>
               </div>
-            ) : null}
-
-            {supportGrantId ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 bg-indigo-600 px-4 py-2 text-xs font-medium text-white lg:px-6">
-                <span>Mode accès d’assistance exceptionnel actif (lecture seule).</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSupportGrantId(null);
-                    router.push('/admin/security');
-                  }}
-                  className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold hover:bg-white/25"
-                >
-                  Quitter support
-                </button>
-              </div>
-            ) : null}
-
-            {isSuspended ? (
-              <div
-                role="alert"
-                className="flex items-center gap-2 bg-rose-600 px-4 py-2 text-xs font-semibold text-white lg:px-6"
+              <button
+                type="button"
+                onClick={() => setDismissedAnn((prev) => [...prev, ann.id])}
+                aria-label="Masquer l’annonce"
+                className="rounded-lg p-1 hover:bg-black/10"
               >
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span>Lecture seule : ce compte ou cette boutique est suspendu(e).</span>
-              </div>
-            ) : isPastDue ? (
-              <div
-                role="alert"
-                className="flex items-center gap-2 bg-amber-400 px-4 py-2 text-xs font-semibold text-forest-950 lg:px-6"
-              >
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span>Abonnement en délai de grâce (Impayé) : régularisez avant suspension.</span>
-              </div>
-            ) : null}
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
 
-            {hero ? (
-              <div className="obsidian-hero px-4 pb-5 pt-4 text-white sm:px-5 lg:px-6">{hero}</div>
-            ) : (
-              <div className="obsidian-hero px-3.5 py-3.5 text-white sm:px-5 sm:py-4 lg:px-6">
-                <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
-                  <div className="min-w-0">
-                    <h1 className="line-clamp-2 text-base font-extrabold tracking-tight text-white sm:truncate sm:text-xl">
-                      {title || pageTitle}
-                    </h1>
-                    {subtitle ? (
-                      <p className="mt-0.5 line-clamp-2 text-[11px] text-emerald-200/75 sm:text-xs">
-                        {subtitle}
-                      </p>
-                    ) : null}
-                  </div>
-                  {headerActions ? (
-                    <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:gap-2">
-                      {headerActions}
-                    </div>
+          {user.mustSetupTwoFactor ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-500 px-4 py-2 text-xs font-semibold text-forest-950 lg:px-6">
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Sécurité Super Admin : activez la double authentification (2FA).
+              </span>
+              <Link
+                href="/setup-2fa"
+                className="rounded-full bg-forest-900 px-3 py-1 text-xs font-semibold text-white hover:bg-forest-800"
+              >
+                Configurer le 2FA
+              </Link>
+            </div>
+          ) : null}
+
+          {supportGrantId ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-indigo-600 px-4 py-2 text-xs font-medium text-white lg:px-6">
+              <span>Mode accès d’assistance exceptionnel actif (lecture seule).</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSupportGrantId(null);
+                  router.push('/admin/security');
+                }}
+                className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold hover:bg-white/25"
+              >
+                Quitter support
+              </button>
+            </div>
+          ) : null}
+
+          {isSuspended ? (
+            <div
+              role="alert"
+              className="flex items-center gap-2 bg-rose-600 px-4 py-2 text-xs font-semibold text-white lg:px-6"
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>Lecture seule : ce compte ou cette boutique est suspendu(e).</span>
+            </div>
+          ) : isPastDue ? (
+            <div
+              role="alert"
+              className="flex items-center gap-2 bg-amber-400 px-4 py-2 text-xs font-semibold text-forest-950 lg:px-6"
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>Abonnement en délai de grâce (Impayé) : régularisez avant suspension.</span>
+            </div>
+          ) : null}
+
+          {hero ? (
+            <div className="obsidian-hero px-4 pb-5 pt-4 text-white sm:px-5 lg:px-6">{hero}</div>
+          ) : (
+            <div className="obsidian-hero px-3.5 py-3.5 text-white sm:px-5 sm:py-4 lg:px-6">
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
+                <div className="min-w-0">
+                  <h1 className="line-clamp-2 text-base font-extrabold tracking-tight text-white sm:truncate sm:text-xl">
+                    {title || pageTitle}
+                  </h1>
+                  {subtitle ? (
+                    <p className="mt-0.5 line-clamp-2 text-[11px] text-emerald-200/75 sm:text-xs">
+                      {subtitle}
+                    </p>
                   ) : null}
                 </div>
+                {headerActions ? (
+                  <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:gap-2">
+                    {headerActions}
+                  </div>
+                ) : null}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
         {/* Zone principale scrollable */}
         <main
-          className={`w-full min-w-0 flex-1 overflow-x-clip overscroll-none ${
-            pathname === '/messaging' || pathname?.startsWith('/messaging')
-              ? 'p-1.5 sm:p-5 pb-2 sm:pb-8'
-              : 'p-2 sm:p-5 pb-20 sm:pb-24 lg:p-6 lg:pb-8'
-          }`}
+          className={`w-full min-w-0 flex-1 overflow-x-clip overscroll-none ${pathname === '/messaging' || pathname?.startsWith('/messaging')
+            ? 'p-1.5 sm:p-5 pb-2 sm:pb-8'
+            : 'p-2 sm:p-5 pb-20 sm:pb-24 lg:p-6 lg:pb-8'
+            }`}
         >
           {children}
         </main>
@@ -1236,9 +1220,8 @@ export function AppShell({
         {/* Dock mobile natif fixé en bas (< lg) — Obsidian Emerald (se rétracte à l'ouverture du clavier virtuel) */}
         <nav
           aria-label="Navigation rapide mobile"
-          className={`no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950 px-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 text-[10px] font-semibold text-[#8aa8a2] transition-all duration-200 ease-out lg:hidden ${
-            keyboardVisible ? 'translate-y-full pointer-events-none opacity-0 invisible' : 'translate-y-0 opacity-100 visible'
-          }`}
+          className={`no-print fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/10 bg-forest-950 px-1 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5 text-[10px] font-semibold text-[#8aa8a2] transition-all duration-200 ease-out lg:hidden ${keyboardVisible ? 'translate-y-full pointer-events-none opacity-0 invisible' : 'translate-y-0 opacity-100 visible'
+            }`}
         >
           {mobileDockItems.map((item) => {
             const Icon = item.icon;
@@ -1247,9 +1230,8 @@ export function AppShell({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 transition ${
-                  active ? 'bg-white text-forest-950 font-bold' : 'hover:text-white'
-                }`}
+                className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1 transition ${active ? 'bg-white text-forest-950 font-bold' : 'hover:text-white'
+                  }`}
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="max-w-full truncate">{item.shortLabel || item.label}</span>
@@ -1277,7 +1259,7 @@ export function AppShell({
           aria-modal="true"
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-forest-950/80 backdrop-blur-md animate-in fade-in duration-200"
         >
-          <div className="relative w-full max-w-lg rounded-3xl border border-limeglow-400/40 bg-[#091f1e] p-6 text-white shadow-2xl ring-1 ring-white/10 sm:p-7">
+          <div className="relative w-full max-w-lg rounded-3xl border border-limeglow-400/40 bg-forest-900 p-6 text-white shadow-2xl ring-1 ring-white/10 sm:p-7">
             {/* Bouton fermeture */}
             <button
               type="button"
@@ -1365,7 +1347,7 @@ export function AppShell({
 
                   {/* Bouton de confirmation en 1 clic pour commandes */}
                   {(activeAlert.type === 'ONLINE_ORDER' || activeAlert.type === 'ORDER') &&
-                  activeAlert.targetPath?.includes('orderId=') ? (
+                    activeAlert.targetPath?.includes('orderId=') ? (
                     <button
                       type="button"
                       disabled={isConfirmingOrder}
